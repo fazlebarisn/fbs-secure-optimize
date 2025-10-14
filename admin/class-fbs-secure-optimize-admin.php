@@ -75,6 +75,7 @@ class FBS_Secure_Optimize_Admin {
         add_action('admin_init', array($this, 'register_settings'));
         add_action('admin_notices', array($this, 'admin_notices'));
         add_action('wp_ajax_fbs_opt_cleanup_database', array($this, 'ajax_cleanup_database'));
+        add_action('wp_ajax_fbs_opt_reset_settings', array($this, 'ajax_reset_settings'));
     }
 
     /**
@@ -895,6 +896,10 @@ class FBS_Secure_Optimize_Admin {
                 
                 <div class="fbs-opt-form-actions">
                     <?php submit_button(__('Save Performance Settings', 'fbs-optimize'), 'primary fbs-opt-button-primary', 'submit', false); ?>
+                    <button type="button" class="fbs-opt-reset-btn fbs-opt-button fbs-opt-button-secondary" data-tab="performance">
+                        <span class="dashicons dashicons-undo"></span>
+                        <?php esc_html_e('Reset to Defaults', 'fbs-optimize'); ?>
+                    </button>
                 </div>
             </form>
         </div>
@@ -1030,6 +1035,10 @@ class FBS_Secure_Optimize_Admin {
                 
                 <div class="fbs-opt-form-actions">
                     <?php submit_button(__('Save Security Settings', 'fbs-optimize'), 'primary fbs-opt-button-primary', 'submit', false); ?>
+                    <button type="button" class="fbs-opt-reset-btn fbs-opt-button fbs-opt-button-secondary" data-tab="security">
+                        <span class="dashicons dashicons-undo"></span>
+                        <?php esc_html_e('Reset to Defaults', 'fbs-optimize'); ?>
+                    </button>
                 </div>
             </form>
         </div>
@@ -1322,5 +1331,85 @@ class FBS_Secure_Optimize_Admin {
         } else {
             wp_send_json_error(array('message' => __('Database cleanup module not found.', 'fbs-optimize')));
         }
+    }
+
+    /**
+     * AJAX handler for resetting settings
+     * @since 1.0.0
+     * @author Fazle Bari <fazlebarisn@gmail.com>
+     */
+    public function ajax_reset_settings() {
+        // Verify nonce
+        if (!wp_verify_nonce($_POST['nonce'], 'fbs_opt_admin_nonce')) {
+            wp_die(__('Security check failed.', 'fbs-optimize'));
+        }
+        
+        // Check user capabilities
+        if (!current_user_can('manage_options')) {
+            wp_die(__('You do not have sufficient permissions.', 'fbs-optimize'));
+        }
+        
+        $tab = sanitize_text_field($_POST['tab']);
+        $defaults = $this->get_default_settings();
+        
+        if ($tab === 'performance') {
+            // Reset performance settings
+            $current_settings = get_option('fbs_opt_settings', array());
+            $current_settings['asset_optimization'] = $defaults['asset_optimization'];
+            $current_settings['database_cleanup'] = $defaults['database_cleanup'];
+            update_option('fbs_opt_settings', $current_settings);
+            
+            wp_send_json_success(array('message' => __('Performance settings reset to defaults.', 'fbs-optimize')));
+        } elseif ($tab === 'security') {
+            // Reset security settings
+            $current_settings = get_option('fbs_opt_settings', array());
+            $current_settings['login_security'] = $defaults['login_security'];
+            $current_settings['security_headers'] = $defaults['security_headers'];
+            update_option('fbs_opt_settings', $current_settings);
+            
+            wp_send_json_success(array('message' => __('Security settings reset to defaults.', 'fbs-optimize')));
+        } else {
+            wp_send_json_error(array('message' => __('Invalid tab specified.', 'fbs-optimize')));
+        }
+    }
+
+    /**
+     * Get default settings
+     * @since 1.0.0
+     * @author Fazle Bari <fazlebarisn@gmail.com>
+     * @return array
+     */
+    private function get_default_settings() {
+        return array(
+            'asset_optimization' => array(
+                'minify_css' => 0,
+                'minify_js' => 0,
+                'combine_css' => 0,
+                'combine_js' => 0,
+                'lazy_load_images' => 0,
+                'lazy_load_iframes' => 0
+            ),
+            'database_cleanup' => array(
+                'cleanup_revisions' => 0,
+                'cleanup_autodrafts' => 0,
+                'cleanup_spam_comments' => 0,
+                'cleanup_transients' => 0,
+                'auto_cleanup' => 0,
+                'cleanup_frequency' => 'weekly'
+            ),
+            'login_security' => array(
+                'limit_login_attempts' => 0,
+                'max_attempts' => 5,
+                'lockout_duration' => 15,
+                'whitelist_ips' => ''
+            ),
+            'security_headers' => array(
+                'x_content_type_options' => 0,
+                'x_frame_options' => 0,
+                'x_xss_protection' => 0,
+                'strict_transport_security' => 0,
+                'hide_wp_version' => 0
+            )
+        );
     }
 }

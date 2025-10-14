@@ -42,6 +42,7 @@
             
             // Toggle switches
             $(document).on('change', '.fbs-opt-toggle input', this.handleToggleChange);
+            $(document).on('click', '.fbs-opt-toggle', this.handleToggleClick);
             
             // Export/Import buttons
             $(document).on('click', '.fbs-opt-export-btn', this.handleExportClick);
@@ -190,6 +191,20 @@
         },
 
         /**
+         * Handle toggle switch click
+         * @since 1.0.0
+         * @author Fazle Bari <fazlebarisn@gmail.com>
+         */
+        handleToggleClick: function(e) {
+            var $toggle = $(this);
+            var $input = $toggle.find('input[type="checkbox"]');
+            
+            if ($input.length > 0) {
+                $input.prop('checked', !$input.prop('checked')).trigger('change');
+            }
+        },
+
+        /**
          * Handle export button click
          * @since 1.0.0
          * @author Fazle Bari <fazlebarisn@gmail.com>
@@ -247,18 +262,22 @@
         handleResetClick: function(e) {
             e.preventDefault();
             
-            if (!confirm('Are you sure you want to reset all settings to defaults? This action cannot be undone.')) {
+            var $btn = $(this);
+            var tab = $btn.data('tab');
+            var tabName = tab === 'performance' ? 'Performance' : 'Security';
+            
+            if (!confirm('Are you sure you want to reset all ' + tabName + ' settings to defaults? This action cannot be undone.')) {
                 return;
             }
             
-            var $btn = $(this);
-            $btn.prop('disabled', true).text('Resetting...');
+            $btn.prop('disabled', true).html('<span class="dashicons dashicons-update"></span> Resetting...');
             
             $.ajax({
                 url: fbsOptAdmin.ajaxUrl,
                 type: 'POST',
                 data: {
                     action: 'fbs_opt_reset_settings',
+                    tab: tab,
                     nonce: fbsOptAdmin.nonce
                 },
                 success: function(response) {
@@ -272,7 +291,7 @@
                     alert('Failed to reset settings.');
                 },
                 complete: function() {
-                    $btn.prop('disabled', false).text('Reset to Defaults');
+                    $btn.prop('disabled', false).html('<span class="dashicons dashicons-undo"></span> Reset to Defaults');
                 }
             });
         },
