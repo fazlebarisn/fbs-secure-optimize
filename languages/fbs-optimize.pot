@@ -1,0 +1,405 @@
+# Copyright (C) 2024 FBS Secure Optimize
+# This file is distributed under the same license as the FBS Secure Optimize package.
+msgid ""
+msgstr ""
+"Project-Id-Version: FBS Secure Optimize 1.0.0\n"
+"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/fbs-optimize\n"
+"POT-Creation-Date: 2024-01-01 12:00+0000\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"PO-Revision-Date: 2024-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+
+#: fbs-optimize.php:15
+msgid "FBS Secure Optimize"
+msgstr ""
+
+#: fbs-optimize.php:16
+msgid "A comprehensive WordPress plugin for performance optimization and security enhancement. Features asset optimization, database cleanup, login security, and security headers."
+msgstr ""
+
+#: includes/class-fbs-optimize.php:200
+msgid "Database cleanup completed successfully."
+msgstr ""
+
+#: includes/class-fbs-optimize.php:201
+msgid "An error occurred during database cleanup."
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:50
+msgid "Performance"
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:51
+msgid "Security"
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:52
+msgid "Statistics"
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:70
+msgid "FBS Secure Optimize"
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:71
+msgid "FBS Secure Optimize"
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:85
+msgid "Performance Settings"
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:86
+msgid "Configure performance optimization settings to improve your website speed."
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:92
+msgid "Security Settings"
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:93
+msgid "Configure security settings to protect your website from common threats."
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:100
+msgid "Minify CSS"
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:101
+msgid "Minify CSS files to reduce file size."
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:110
+msgid "Minify JavaScript"
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:111
+msgid "Minify JavaScript files to reduce file size."
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:120
+msgid "Combine CSS Files"
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:121
+msgid "Combine multiple CSS files into one to reduce HTTP requests."
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:130
+msgid "Combine JavaScript Files"
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:131
+msgid "Combine multiple JavaScript files into one to reduce HTTP requests."
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:140
+msgid "Lazy Load Images"
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:141
+msgid "Load images only when they are about to enter the viewport."
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:150
+msgid "Lazy Load Iframes"
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:151
+msgid "Load iframes only when they are about to enter the viewport."
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:160
+msgid "Clean Post Revisions"
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:161
+msgid "Remove old post revisions to reduce database size."
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:170
+msgid "Clean Auto-drafts"
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:171
+msgid "Remove auto-draft posts to reduce database size."
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:180
+msgid "Clean Spam Comments"
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:181
+msgid "Remove spam comments to reduce database size."
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:190
+msgid "Clean Transients"
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:191
+msgid "Remove expired transients to reduce database size."
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:200
+msgid "Automatic Cleanup"
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:201
+msgid "Automatically perform database cleanup on a schedule."
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:210
+msgid "Cleanup Frequency"
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:211
+msgid "How often to perform automatic cleanup."
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:214
+msgid "Daily"
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:215
+msgid "Weekly"
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:216
+msgid "Monthly"
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:230
+msgid "Limit Login Attempts"
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:231
+msgid "Limit the number of login attempts to prevent brute force attacks."
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:240
+msgid "Maximum Attempts"
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:241
+msgid "Maximum number of login attempts before lockout."
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:250
+msgid "Lockout Duration (minutes)"
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:251
+msgid "How long to lock out users after exceeding maximum attempts."
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:260
+msgid "Whitelist IP Addresses"
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:261
+msgid "IP addresses that are exempt from login attempt limits (one per line)."
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:270
+msgid "X-Content-Type-Options"
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:271
+msgid "Prevent MIME type sniffing attacks."
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:280
+msgid "X-Frame-Options"
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:281
+msgid "Prevent clickjacking attacks."
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:290
+msgid "X-XSS-Protection"
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:291
+msgid "Enable XSS filtering in browsers."
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:300
+msgid "Strict-Transport-Security"
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:301
+msgid "Force HTTPS connections (requires SSL certificate)."
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:310
+msgid "Hide WordPress Version"
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:311
+msgid "Remove WordPress version from head and RSS feeds."
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:400
+msgid "Settings saved successfully."
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:500
+msgid "Asset Optimization"
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:550
+msgid "Database Cleanup"
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:570
+msgid "Manual Cleanup"
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:571
+msgid "Perform database cleanup manually. This action cannot be undone."
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:572
+msgid "Clean Database Now"
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:580
+msgid "Login Security"
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:620
+msgid "Security Headers"
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:650
+msgid "Database Statistics"
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:660
+msgid "Post Revisions"
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:670
+msgid "Auto-drafts"
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:680
+msgid "Spam Comments"
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:690
+msgid "Transients"
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:700
+msgid "Security Statistics"
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:710
+msgid "Failed Logins (24h)"
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:750
+msgid "Security check failed."
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:755
+msgid "You do not have sufficient permissions."
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:765
+msgid "Database cleanup completed successfully."
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:770
+msgid "An error occurred during database cleanup."
+msgstr ""
+
+#: admin/class-fbs-optimize-admin.php:775
+msgid "Database cleanup module not found."
+msgstr ""
+
+#: modules/class-fbs-optimize-login-security.php:50
+msgid "Your IP address has been temporarily blocked due to too many failed login attempts. Please try again in %d minutes."
+msgstr ""
+
+#: modules/class-fbs-optimize-login-security.php:200
+msgid "For security purposes, login attempts are limited. Multiple failed attempts will result in temporary IP blocking."
+msgstr ""
+
+#: modules/class-fbs-optimize-security-headers.php:200
+msgid "Enable SSL/HTTPS for your website to use Strict-Transport-Security header."
+msgstr ""
+
+#: modules/class-fbs-optimize-security-headers.php:210
+msgid "Consider hiding WordPress version to prevent information disclosure."
+msgstr ""
+
+#: modules/class-fbs-optimize-security-headers.php:220
+msgid "Enable X-Content-Type-Options header to prevent MIME type sniffing attacks."
+msgstr ""
+
+#: modules/class-fbs-optimize-security-headers.php:230
+msgid "Enable X-Frame-Options header to prevent clickjacking attacks."
+msgstr ""
+
+#: modules/class-fbs-optimize-security-headers.php:240
+msgid "Enable X-XSS-Protection header for additional XSS protection."
+msgstr ""
+
+#: modules/class-fbs-optimize-security-headers.php:300
+msgid "No security headers are currently enabled."
+msgstr ""
+
+#: modules/class-fbs-optimize-security-headers.php:310
+msgid "Strict-Transport-Security header is enabled but SSL is not active."
+msgstr ""
+
+#: modules/class-fbs-optimize-security-headers.php:400
+msgid "X-Content-Type-Options header enabled"
+msgstr ""
+
+#: modules/class-fbs-optimize-security-headers.php:401
+msgid "X-Content-Type-Options header disabled"
+msgstr ""
+
+#: modules/class-fbs-optimize-security-headers.php:410
+msgid "X-Frame-Options header enabled"
+msgstr ""
+
+#: modules/class-fbs-optimize-security-headers.php:411
+msgid "X-Frame-Options header disabled"
+msgstr ""
+
+#: modules/class-fbs-optimize-security-headers.php:420
+msgid "X-XSS-Protection header enabled"
+msgstr ""
+
+#: modules/class-fbs-optimize-security-headers.php:421
+msgid "X-XSS-Protection header disabled"
+msgstr ""
+
+#: modules/class-fbs-optimize-security-headers.php:430
+msgid "Strict-Transport-Security header enabled"
+msgstr ""
+
+#: modules/class-fbs-optimize-security-headers.php:431
+msgid "Strict-Transport-Security header enabled but SSL not active"
+msgstr ""
+
+#: modules/class-fbs-optimize-security-headers.php:432
+msgid "Strict-Transport-Security header disabled"
+msgstr ""
+
+#: modules/class-fbs-optimize-security-headers.php:440
+msgid "WordPress version hidden"
+msgstr ""
+
+#: modules/class-fbs-optimize-security-headers.php:441
+msgid "WordPress version visible"
+msgstr ""

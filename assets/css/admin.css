@@ -1,0 +1,788 @@
+/**
+ * Modern Admin styles for FBS Secure Optimize plugin
+ * @since 1.0.0
+ * @author Fazle Bari <fazlebarisn@gmail.com>
+ * @package FBS_Optimize
+ */
+
+/* ==========================================================================
+   Main Admin Layout
+   ========================================================================== */
+
+.fbs-opt-admin-wrap {
+    background: #f8f9fa;
+    min-height: 100vh;
+    margin: -20px -20px 0 -20px;
+    padding: 0;
+}
+
+.fbs-opt-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 40px 40px 30px;
+    margin-bottom: 0;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.fbs-opt-title {
+    font-size: 32px;
+    font-weight: 600;
+    margin: 0 0 10px 0;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.fbs-opt-title .dashicons {
+    font-size: 36px;
+    width: 36px;
+    height: 36px;
+}
+
+.fbs-opt-subtitle {
+    font-size: 16px;
+    margin: 0;
+    opacity: 0.9;
+    font-weight: 400;
+}
+
+/* ==========================================================================
+   Tabs Navigation
+   ========================================================================== */
+
+.fbs-opt-tabs {
+    background: white;
+    border-bottom: 1px solid #e1e5e9;
+    padding: 0 40px;
+    margin-bottom: 0;
+}
+
+.fbs-opt-tabs .nav-tab-wrapper {
+    border-bottom: none;
+    margin: 0;
+    padding: 0;
+}
+
+.fbs-opt-tabs .nav-tab {
+    background: transparent;
+    border: none;
+    border-bottom: 3px solid transparent;
+    color: #6c757d;
+    font-weight: 500;
+    font-size: 15px;
+    padding: 20px 25px;
+    margin: 0;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.fbs-opt-tabs .nav-tab:hover {
+    background: #f8f9fa;
+    color: #495057;
+    border-bottom-color: #dee2e6;
+}
+
+.fbs-opt-tabs .nav-tab-active {
+    color: #667eea;
+    border-bottom-color: #667eea;
+    background: #f8f9fa;
+}
+
+.fbs-opt-tabs .nav-tab .dashicons {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+}
+
+/* ==========================================================================
+   Main Content Area
+   ========================================================================== */
+
+.fbs-opt-admin-content {
+    padding: 40px;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.fbs-opt-tab-content {
+    display: none;
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+.fbs-opt-tab-content.active {
+    display: block;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* ==========================================================================
+   Forms and Sections
+   ========================================================================== */
+
+.fbs-opt-form {
+    background: transparent;
+}
+
+.fbs-opt-section {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+    margin-bottom: 30px;
+    overflow: hidden;
+}
+
+.fbs-opt-section-header {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    padding: 25px 30px;
+    border-bottom: 1px solid #e1e5e9;
+}
+
+.fbs-opt-section-title {
+    font-size: 20px;
+    font-weight: 600;
+    margin: 0 0 8px 0;
+    color: #2c3e50;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.fbs-opt-section-title .dashicons {
+    color: #667eea;
+    font-size: 22px;
+    width: 22px;
+    height: 22px;
+}
+
+.fbs-opt-section-description {
+    margin: 0;
+    color: #6c757d;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+/* ==========================================================================
+   Options Grid
+   ========================================================================== */
+
+.fbs-opt-options-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 20px;
+    padding: 30px;
+}
+
+.fbs-opt-option-card {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    padding: 20px;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.fbs-opt-option-card:hover {
+    border-color: #667eea;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.1);
+    transform: translateY(-2px);
+}
+
+.fbs-opt-option-card-wide {
+    grid-column: 1 / -1;
+}
+
+.fbs-opt-option-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.fbs-opt-option-header h4 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+.fbs-opt-option-description {
+    margin: 0;
+    color: #6c757d;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+/* ==========================================================================
+   Toggle Switches
+   ========================================================================== */
+
+.fbs-opt-toggle {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 28px;
+}
+
+.fbs-opt-toggle input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.fbs-opt-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: 0.3s;
+    border-radius: 28px;
+}
+
+.fbs-opt-slider:before {
+    position: absolute;
+    content: "";
+    height: 22px;
+    width: 22px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: 0.3s;
+    border-radius: 50%;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+input:checked + .fbs-opt-slider {
+    background-color: #667eea;
+}
+
+input:checked + .fbs-opt-slider:before {
+    transform: translateX(22px);
+}
+
+.fbs-opt-toggle input:focus + .fbs-opt-slider {
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+}
+
+/* ==========================================================================
+   Form Controls
+   ========================================================================== */
+
+.fbs-opt-input,
+.fbs-opt-select,
+.fbs-opt-textarea {
+    background: white;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-size: 14px;
+    color: #374151;
+    transition: all 0.2s ease;
+    width: 100%;
+    max-width: 200px;
+}
+
+.fbs-opt-input:focus,
+.fbs-opt-select:focus,
+.fbs-opt-textarea:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.fbs-opt-textarea {
+    max-width: 100%;
+    min-height: 80px;
+    resize: vertical;
+}
+
+/* ==========================================================================
+   Action Cards
+   ========================================================================== */
+
+.fbs-opt-cleanup-actions {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+    margin: 30px 0;
+    overflow: hidden;
+}
+
+.fbs-opt-action-card {
+    padding: 30px;
+    text-align: center;
+    background: linear-gradient(135deg, #fff5f5 0%, #fed7d7 100%);
+    border-left: 4px solid #e53e3e;
+}
+
+.fbs-opt-action-card h3 {
+    margin: 0 0 10px 0;
+    color: #2d3748;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.fbs-opt-action-card p {
+    margin: 0 0 20px 0;
+    color: #4a5568;
+    font-size: 14px;
+}
+
+/* ==========================================================================
+   Buttons
+   ========================================================================== */
+
+.fbs-opt-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 24px;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.fbs-opt-button-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+}
+
+.fbs-opt-button-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+    color: white;
+}
+
+.fbs-opt-button-secondary {
+    background: #6c757d;
+    color: white;
+    box-shadow: 0 2px 8px rgba(108, 117, 125, 0.3);
+}
+
+.fbs-opt-button-secondary:hover {
+    background: #5a6268;
+    transform: translateY(-1px);
+    color: white;
+}
+
+.fbs-opt-form-actions {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+    padding: 25px 30px;
+    text-align: center;
+    margin-top: 30px;
+}
+
+/* ==========================================================================
+   Statistics
+   ========================================================================== */
+
+.fbs-opt-stats-overview {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.fbs-opt-overview-card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+    padding: 25px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    transition: all 0.3s ease;
+}
+
+.fbs-opt-overview-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.fbs-opt-overview-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.fbs-opt-overview-icon .dashicons {
+    color: white;
+    font-size: 28px;
+    width: 28px;
+    height: 28px;
+}
+
+.fbs-opt-overview-content h3 {
+    margin: 0 0 8px 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+.fbs-opt-overview-content p {
+    margin: 0;
+    color: #6c757d;
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+.fbs-opt-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+    padding: 30px;
+}
+
+.fbs-opt-stat-card {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 12px;
+    padding: 25px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.fbs-opt-stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.fbs-opt-stat-card:hover {
+    border-color: #667eea;
+    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.15);
+    transform: translateY(-3px);
+}
+
+.fbs-opt-stat-icon {
+    width: 50px;
+    height: 50px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.fbs-opt-stat-icon .dashicons {
+    color: white;
+    font-size: 24px;
+    width: 24px;
+    height: 24px;
+}
+
+.fbs-opt-stat-content {
+    flex: 1;
+}
+
+.fbs-opt-stat-content h4 {
+    margin: 0 0 8px 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+.fbs-opt-stat-number {
+    display: block;
+    font-size: 28px;
+    font-weight: 700;
+    color: #667eea;
+    margin-bottom: 5px;
+}
+
+.fbs-opt-stat-number.fbs-opt-score {
+    color: #10b981;
+}
+
+.fbs-opt-stat-description {
+    margin: 0;
+    color: #6c757d;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+/* ==========================================================================
+   Performance Metrics
+   ========================================================================== */
+
+.fbs-opt-performance-metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+    padding: 30px;
+}
+
+.fbs-opt-metric-card {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 12px;
+    padding: 25px;
+    transition: all 0.3s ease;
+}
+
+.fbs-opt-metric-card:hover {
+    border-color: #667eea;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.1);
+}
+
+.fbs-opt-metric-card h4 {
+    margin: 0 0 15px 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+.fbs-opt-metric-bar {
+    width: 100%;
+    height: 8px;
+    background-color: #e9ecef;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 10px;
+}
+
+.fbs-opt-metric-fill {
+    height: 100%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 4px;
+    transition: width 0.8s ease;
+}
+
+.fbs-opt-metric-value {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #667eea;
+}
+
+/* ==========================================================================
+   Status and Notifications
+   ========================================================================== */
+
+#fbs-opt-cleanup-status {
+    margin-left: 15px;
+    font-weight: 500;
+    font-size: 14px;
+}
+
+.fbs-opt-cleanup-status.success {
+    color: #10b981;
+}
+
+.fbs-opt-cleanup-status.error {
+    color: #ef4444;
+}
+
+.fbs-opt-loading {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid #f3f3f3;
+    border-top: 2px solid #667eea;
+    border-radius: 50%;
+    animation: fbs-opt-spin 1s linear infinite;
+    margin-right: 8px;
+}
+
+@keyframes fbs-opt-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* ==========================================================================
+   Responsive Design
+   ========================================================================== */
+
+@media (max-width: 1200px) {
+    .fbs-opt-admin-content {
+        padding: 30px 20px;
+    }
+    
+    .fbs-opt-header {
+        padding: 30px 20px 25px;
+    }
+    
+    .fbs-opt-tabs {
+        padding: 0 20px;
+    }
+}
+
+@media (max-width: 768px) {
+    .fbs-opt-title {
+        font-size: 24px;
+    }
+    
+    .fbs-opt-options-grid {
+        grid-template-columns: 1fr;
+        padding: 20px;
+    }
+    
+    .fbs-opt-stats-grid {
+        grid-template-columns: 1fr;
+        padding: 20px;
+    }
+    
+    .fbs-opt-stats-overview {
+        grid-template-columns: 1fr;
+    }
+    
+    .fbs-opt-performance-metrics {
+        grid-template-columns: 1fr;
+        padding: 20px;
+    }
+    
+    .fbs-opt-overview-card {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .fbs-opt-stat-card {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .fbs-opt-tabs .nav-tab {
+        padding: 15px 20px;
+        font-size: 14px;
+    }
+}
+
+@media (max-width: 480px) {
+    .fbs-opt-admin-content {
+        padding: 20px 15px;
+    }
+    
+    .fbs-opt-header {
+        padding: 25px 15px 20px;
+    }
+    
+    .fbs-opt-tabs {
+        padding: 0 15px;
+    }
+    
+    .fbs-opt-section-header {
+        padding: 20px;
+    }
+    
+    .fbs-opt-options-grid {
+        padding: 15px;
+    }
+    
+    .fbs-opt-stats-grid {
+        padding: 15px;
+    }
+}
+
+/* ==========================================================================
+   WordPress Admin Integration
+   ========================================================================== */
+
+.fbs-opt-admin-wrap .notice {
+    margin: 20px 0;
+    border-radius: 8px;
+    border-left-width: 4px;
+}
+
+.fbs-opt-admin-wrap .notice-success {
+    background: #d1fae5;
+    border-left-color: #10b981;
+    color: #065f46;
+}
+
+.fbs-opt-admin-wrap .notice-error {
+    background: #fee2e2;
+    border-left-color: #ef4444;
+    color: #991b1b;
+}
+
+.fbs-opt-admin-wrap .notice-warning {
+    background: #fef3c7;
+    border-left-color: #f59e0b;
+    color: #92400e;
+}
+
+.fbs-opt-admin-wrap .notice-info {
+    background: #dbeafe;
+    border-left-color: #3b82f6;
+    color: #1e40af;
+}
+
+/* ==========================================================================
+   Accessibility
+   ========================================================================== */
+
+.fbs-opt-toggle input:focus + .fbs-opt-slider {
+    outline: 2px solid #667eea;
+    outline-offset: 2px;
+}
+
+.fbs-opt-button:focus {
+    outline: 2px solid #667eea;
+    outline-offset: 2px;
+}
+
+.fbs-opt-input:focus,
+.fbs-opt-select:focus,
+.fbs-opt-textarea:focus {
+    outline: 2px solid #667eea;
+    outline-offset: 2px;
+}
+
+/* ==========================================================================
+   Print Styles
+   ========================================================================== */
+
+@media print {
+    .fbs-opt-admin-wrap {
+        background: white;
+    }
+    
+    .fbs-opt-header {
+        background: #f8f9fa;
+        color: #2c3e50;
+    }
+    
+    .fbs-opt-tabs {
+        display: none;
+    }
+    
+    .fbs-opt-tab-content {
+        display: block !important;
+    }
+    
+    .fbs-opt-button {
+        display: none;
+    }
+}
+}
