@@ -557,7 +557,7 @@ class FBS_Secure_Optimize_Admin {
             esc_attr($args['label_for']),
             esc_attr($section),
             esc_attr($value),
-            implode(' ', $attributes)
+            wp_kses_data(implode(' ', $attributes))
         );
         
         if (isset($args['description'])) {
@@ -1308,12 +1308,12 @@ class FBS_Secure_Optimize_Admin {
     public function ajax_cleanup_database() {
         // Verify nonce
         if (!wp_verify_nonce($_POST['nonce'], 'fbs_opt_admin_nonce')) {
-            wp_die(__('Security check failed.', 'fbs-optimize'));
+            wp_die(esc_html__('Security check failed.', 'fbs-optimize'));
         }
         
         // Check user capabilities
         if (!current_user_can('manage_options')) {
-            wp_die(__('You do not have sufficient permissions.', 'fbs-optimize'));
+            wp_die(esc_html__('You do not have sufficient permissions.', 'fbs-optimize'));
         }
         
         // Get database cleanup module
@@ -1341,12 +1341,12 @@ class FBS_Secure_Optimize_Admin {
     public function ajax_reset_settings() {
         // Verify nonce
         if (!wp_verify_nonce($_POST['nonce'], 'fbs_opt_admin_nonce')) {
-            wp_die(__('Security check failed.', 'fbs-optimize'));
+            wp_die(esc_html__('Security check failed.', 'fbs-optimize'));
         }
         
         // Check user capabilities
         if (!current_user_can('manage_options')) {
-            wp_die(__('You do not have sufficient permissions.', 'fbs-optimize'));
+            wp_die(esc_html__('You do not have sufficient permissions.', 'fbs-optimize'));
         }
         
         $tab = sanitize_text_field($_POST['tab']);
