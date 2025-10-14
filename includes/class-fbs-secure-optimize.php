@@ -252,24 +252,42 @@ class FBS_Secure_Optimize_Controller {
      * @return array Plugin statistics
      */
     public static function get_stats() {
-        global $wpdb;
+        // Check cache first
+        $cache_key = 'fbs_opt_stats';
+        $stats = wp_cache_get($cache_key, 'fbs_optimize');
         
-        $stats = array();
-        
-        // Database cleanup stats
-        $stats['post_revisions'] = $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->posts} WHERE post_type = 'revision'");
-        $stats['auto_drafts'] = $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->posts} WHERE post_status = 'auto-draft'");
-        $stats['spam_comments'] = $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->comments} WHERE comment_approved = 'spam'");
-        $stats['transients'] = $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->options} WHERE option_name LIKE '_transient_%' OR option_name LIKE '_site_transient_%'");
-        
-        // Login attempts stats
-        $login_attempts_table = $wpdb->prefix . 'fbs_opt_login_attempts';
-        if ($wpdb->get_var("SHOW TABLES LIKE '$login_attempts_table'") == $login_attempts_table) {
-            $stats['failed_logins'] = $wpdb->get_var("SELECT COUNT(*) FROM $login_attempts_table WHERE success = 0 AND attempt_time > DATE_SUB(NOW(), INTERVAL 24 HOUR)");
-        } else {
-            $stats['failed_logins'] = 0;
+        if (false === $stats) {
+            global $wpdb;
+            
+            $stats = array();
+            
+            // Database cleanup stats
+            $stats['post_revisions'] = $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->posts} WHERE post_type = 'revision'");
+            $stats['auto_drafts'] = $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->posts} WHERE post_status = 'auto-draft'");
+            $stats['spam_comments'] = $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->comments} WHERE comment_approved = 'spam'");
+            $stats['transients'] = $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->options} WHERE option_name LIKE '_transient_%' OR option_name LIKE '_site_transient_%'");
+            
+            // Login attempts stats
+            $login_attempts_table = $wpdb->prefix . 'fbs_opt_login_attempts';
+            if ($wpdb->get_var("SHOW TABLES LIKE '$login_attempts_table'") == $login_attempts_table) {
+                $stats['failed_logins'] = $wpdb->get_var("SELECT COUNT(*) FROM $login_attempts_table WHERE success = 0 AND attempt_time > DATE_SUB(NOW(), INTERVAL 24 HOUR)");
+            } else {
+                $stats['failed_logins'] = 0;
+            }
+            
+            // Cache the results for 5 minutes
+            wp_cache_set($cache_key, $stats, 'fbs_optimize', 300);
         }
         
         return $stats;
+    }
+
+    /**
+     * Clear statistics cache
+     * @since 1.0.0
+     * @author Fazle Bari <fazlebarisn@gmail.com>
+     */
+    public static function clear_stats_cache() {
+        wp_cache_delete('fbs_opt_stats', 'fbs_optimize');
     }
 }

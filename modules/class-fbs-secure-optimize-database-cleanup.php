@@ -135,6 +135,9 @@ class FBS_Secure_Optimize_Database_Cleanup {
                 'info'
             );
 
+            // Clear statistics cache since database has been modified
+            FBS_Secure_Optimize_Controller::clear_stats_cache();
+
             return $results;
 
         } catch (Exception $e) {
