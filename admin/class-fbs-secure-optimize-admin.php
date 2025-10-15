@@ -935,25 +935,25 @@ class FBS_Secure_Optimize_Admin {
                             <div class="fbs-opt-option-header">
                                 <h4><?php esc_html_e('Limit Login Attempts', 'fbs-secure-optimize'); ?></h4>
                                 <div class="fbs-opt-toggle">
-                                    <input type="checkbox" name="fbs_opt_settings[login_security][limit_login_attempts]" value="1" <?php checked(1, $this->get_setting_value('login_security', 'limit_login_attempts')); ?> />
+                                    <input type="checkbox" name="fbs_opt_settings[login_security][limit_login_attempts]" value="1" id="limit_login_attempts_toggle" <?php checked(1, $this->get_setting_value('login_security', 'limit_login_attempts')); ?> />
                                     <span class="fbs-opt-slider"></span>
                                 </div>
                             </div>
                             <p class="fbs-opt-option-description"><?php esc_html_e('Limit the number of login attempts to prevent brute force attacks', 'fbs-secure-optimize'); ?></p>
                         </div>
                         
-                        <div class="fbs-opt-option-card">
+                        <div class="fbs-opt-option-card fbs-opt-dependent-option" data-depends-on="limit_login_attempts_toggle">
                             <div class="fbs-opt-option-header">
                                 <h4><?php esc_html_e('Maximum Attempts', 'fbs-secure-optimize'); ?></h4>
-                                <input type="number" name="fbs_opt_settings[login_security][max_attempts]" value="<?php echo esc_attr($this->get_setting_value('login_security', 'max_attempts')); ?>" min="3" max="20" class="fbs-opt-input" />
+                                <input type="number" name="fbs_opt_settings[login_security][max_attempts]" value="<?php echo esc_attr($this->get_setting_value('login_security', 'max_attempts')); ?>" min="3" max="20" class="fbs-opt-input" id="max_attempts_input" />
                             </div>
                             <p class="fbs-opt-option-description"><?php esc_html_e('Maximum number of login attempts before lockout', 'fbs-secure-optimize'); ?></p>
                         </div>
                         
-                        <div class="fbs-opt-option-card">
+                        <div class="fbs-opt-option-card fbs-opt-dependent-option" data-depends-on="limit_login_attempts_toggle">
                             <div class="fbs-opt-option-header">
                                 <h4><?php esc_html_e('Lockout Duration (minutes)', 'fbs-secure-optimize'); ?></h4>
-                                <input type="number" name="fbs_opt_settings[login_security][lockout_duration]" value="<?php echo esc_attr($this->get_setting_value('login_security', 'lockout_duration')); ?>" min="5" max="1440" class="fbs-opt-input" />
+                                <input type="number" name="fbs_opt_settings[login_security][lockout_duration]" value="<?php echo esc_attr($this->get_setting_value('login_security', 'lockout_duration')); ?>" min="5" max="1440" class="fbs-opt-input" id="lockout_duration_input" />
                             </div>
                             <p class="fbs-opt-option-description"><?php esc_html_e('How long to lock out users after exceeding maximum attempts', 'fbs-secure-optimize'); ?></p>
                         </div>

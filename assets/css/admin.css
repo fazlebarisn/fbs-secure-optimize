@@ -789,7 +789,8 @@
     color: #9aa0a6;
 }
 
-.fbs-opt-admin-wrap .fbs-opt-dependent-option.disabled .fbs-opt-select {
+.fbs-opt-admin-wrap .fbs-opt-dependent-option.disabled .fbs-opt-select,
+.fbs-opt-admin-wrap .fbs-opt-dependent-option.disabled .fbs-opt-input {
     background: #f8f9fa;
     color: #9aa0a6;
     cursor: not-allowed;
