@@ -274,9 +274,9 @@ class FBS_Secure_Optimize_Controller {
             // Login attempts stats
             $login_attempts_table = $wpdb->prefix . 'fbs_opt_login_attempts';
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Table existence check with caching
-            if ($wpdb->get_var("SHOW TABLES LIKE '$login_attempts_table'") == $login_attempts_table) {
+            if ($wpdb->get_var("SHOW TABLES LIKE '" . esc_sql($login_attempts_table) . "'") == $login_attempts_table) {
                 // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Statistics gathering with caching
-                $stats['failed_logins'] = $wpdb->get_var("SELECT COUNT(*) FROM $login_attempts_table WHERE success = 0 AND attempt_time > DATE_SUB(NOW(), INTERVAL 24 HOUR)");
+                $stats['failed_logins'] = $wpdb->get_var("SELECT COUNT(*) FROM " . esc_sql($login_attempts_table) . " WHERE success = 0 AND attempt_time > DATE_SUB(NOW(), INTERVAL 24 HOUR)");
             } else {
                 $stats['failed_logins'] = 0;
             }

@@ -58,7 +58,7 @@ class FBS_Secure_Optimize_Login_Security {
             add_action('wp_login_failed', array($this, 'handle_failed_login'));
             add_action('wp_login', array($this, 'handle_successful_login'));
             add_filter('authenticate', array($this, 'check_login_attempts'), 30, 3);
-            add_action('login_head', array($this, 'add_login_styles'));
+            add_action('login_enqueue_scripts', array($this, 'enqueue_login_styles'));
             add_action('login_footer', array($this, 'add_login_scripts'));
         }
     }
@@ -162,8 +162,8 @@ class FBS_Secure_Optimize_Login_Security {
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Login security cleanup operation
         $wpdb->query(
             $wpdb->prepare(
-                "DELETE FROM $table_name WHERE attempt_time < %s",
-                date('Y-m-d H:i:s', strtotime('-30 days'))
+                "DELETE FROM " . esc_sql($table_name) . " WHERE attempt_time < %s",
+                gmdate('Y-m-d H:i:s', strtotime('-30 days'))
             )
         );
     }
@@ -187,12 +187,12 @@ class FBS_Secure_Optimize_Login_Security {
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Login security check operation
         $failed_attempts = $wpdb->get_var(
             $wpdb->prepare(
-                "SELECT COUNT(*) FROM $table_name 
+                "SELECT COUNT(*) FROM " . esc_sql($table_name) . " 
                  WHERE ip_address = %s 
                  AND success = 0 
                  AND attempt_time > %s",
                 $ip_address,
-                date('Y-m-d H:i:s', strtotime("-{$lockout_duration} minutes"))
+                gmdate('Y-m-d H:i:s', strtotime("-{$lockout_duration} minutes"))
             )
         );
         
@@ -324,31 +324,17 @@ class FBS_Secure_Optimize_Login_Security {
     }
 
     /**
-     * Add login page styles
+     * Enqueue login page styles
      * @since 1.0.0
      * @author Fazle Bari <fazlebarisn@gmail.com>
      */
-    public function add_login_styles() {
-        ?>
-        <style>
-        .fbs-opt-login-warning {
-            background: #fff3cd;
-            border: 1px solid #ffeaa7;
-            color: #856404;
-            padding: 12px;
-            margin: 16px 0;
-            border-radius: 4px;
-        }
-        .fbs-opt-login-error {
-            background: #f8d7da;
-            border: 1px solid #f5c6cb;
-            color: #721c24;
-            padding: 12px;
-            margin: 16px 0;
-            border-radius: 4px;
-        }
-        </style>
-        <?php
+    public function enqueue_login_styles() {
+        wp_enqueue_style(
+            'fbs-opt-login',
+            FBS_SECURE_OPTIMIZE_PLUGIN_URL . 'assets/css/admin.css',
+            array(),
+            FBS_SECURE_OPTIMIZE_VERSION
+        );
     }
 
     /**
@@ -398,9 +384,9 @@ class FBS_Secure_Optimize_Login_Security {
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Login security statistics operation
         $stats['total_attempts'] = $wpdb->get_var(
             $wpdb->prepare(
-                "SELECT COUNT(*) FROM $table_name 
+                "SELECT COUNT(*) FROM " . esc_sql($table_name) . " 
                  WHERE attempt_time > %s",
-                date('Y-m-d H:i:s', strtotime("-{$hours} hours"))
+                gmdate('Y-m-d H:i:s', strtotime("-{$hours} hours"))
             )
         );
         
@@ -408,10 +394,10 @@ class FBS_Secure_Optimize_Login_Security {
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Login security statistics operation
         $stats['failed_attempts'] = $wpdb->get_var(
             $wpdb->prepare(
-                "SELECT COUNT(*) FROM $table_name 
+                "SELECT COUNT(*) FROM " . esc_sql($table_name) . " 
                  WHERE success = 0 
                  AND attempt_time > %s",
-                date('Y-m-d H:i:s', strtotime("-{$hours} hours"))
+                gmdate('Y-m-d H:i:s', strtotime("-{$hours} hours"))
             )
         );
         
@@ -419,10 +405,10 @@ class FBS_Secure_Optimize_Login_Security {
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Login security statistics operation
         $stats['successful_attempts'] = $wpdb->get_var(
             $wpdb->prepare(
-                "SELECT COUNT(*) FROM $table_name 
+                "SELECT COUNT(*) FROM " . esc_sql($table_name) . " 
                  WHERE success = 1 
                  AND attempt_time > %s",
-                date('Y-m-d H:i:s', strtotime("-{$hours} hours"))
+                gmdate('Y-m-d H:i:s', strtotime("-{$hours} hours"))
             )
         );
         
@@ -430,9 +416,9 @@ class FBS_Secure_Optimize_Login_Security {
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Login security statistics operation
         $stats['unique_ips'] = $wpdb->get_var(
             $wpdb->prepare(
-                "SELECT COUNT(DISTINCT ip_address) FROM $table_name 
+                "SELECT COUNT(DISTINCT ip_address) FROM " . esc_sql($table_name) . " 
                  WHERE attempt_time > %s",
-                date('Y-m-d H:i:s', strtotime("-{$hours} hours"))
+                gmdate('Y-m-d H:i:s', strtotime("-{$hours} hours"))
             )
         );
         
@@ -444,12 +430,12 @@ class FBS_Secure_Optimize_Login_Security {
         $blocked_ips = $wpdb->get_results(
             $wpdb->prepare(
                 "SELECT ip_address, COUNT(*) as attempts 
-                 FROM $table_name 
+                 FROM " . esc_sql($table_name) . " 
                  WHERE success = 0 
                  AND attempt_time > %s 
                  GROUP BY ip_address 
                  HAVING attempts >= %d",
-                date('Y-m-d H:i:s', strtotime("-{$lockout_duration} minutes")),
+                gmdate('Y-m-d H:i:s', strtotime("-{$lockout_duration} minutes")),
                 $max_attempts
             )
         );
@@ -475,7 +461,7 @@ class FBS_Secure_Optimize_Login_Security {
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Login security statistics operation
         return $wpdb->get_results(
             $wpdb->prepare(
-                "SELECT * FROM $table_name 
+                "SELECT * FROM " . esc_sql($table_name) . " 
                  ORDER BY attempt_time DESC 
                  LIMIT %d",
                 $limit
@@ -496,7 +482,7 @@ class FBS_Secure_Optimize_Login_Security {
         $table_name = $wpdb->prefix . 'fbs_opt_login_attempts';
         
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Login security cleanup operation
-        $result = $wpdb->query("TRUNCATE TABLE $table_name");
+        $result = $wpdb->query("TRUNCATE TABLE " . esc_sql($table_name));
         
         if ($result !== false) {
             FBS_Secure_Optimize_Controller::log('All login attempts cleared', 'info');

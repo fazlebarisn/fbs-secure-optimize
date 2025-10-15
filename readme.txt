@@ -1,14 +1,14 @@
 === FBS Secure Optimize ===
 Contributors: fazlebari
-Tags: performance, security, optimization, speed, cache, minify, lazy loading, database cleanup, login security, security headers
+Tags: performance, security, optimization, speed, cache
 Requires at least: 5.0
-Tested up to: 6.4
+Tested up to: 6.8
 Requires PHP: 7.4
 Stable tag: 1.0.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-A comprehensive WordPress plugin for performance optimization and security enhancement. Features asset optimization, database cleanup, login security, and security headers to secure and optimize your WordPress site.
+A comprehensive WordPress plugin for performance optimization and security enhancement. Features asset optimization, database cleanup, and security.
 
 == Description ==
 

@@ -101,7 +101,7 @@ class FBS_Secure_Optimize_Admin {
 
         // Get current tab from URL
         if (isset($_GET['tab']) && array_key_exists($_GET['tab'], $this->tabs)) {
-            $this->current_tab = sanitize_text_field($_GET['tab']);
+            $this->current_tab = sanitize_text_field(wp_unslash($_GET['tab']));
         }
     }
 
@@ -1295,7 +1295,7 @@ class FBS_Secure_Optimize_Admin {
      * @author Fazle Bari <fazlebarisn@gmail.com>
      */
     public function admin_notices() {
-        if (isset($_GET['settings-updated']) && $_GET['settings-updated']) {
+        if (isset($_GET['settings-updated']) && wp_unslash($_GET['settings-updated'])) {
             echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__('Settings saved successfully.', 'fbs-secure-optimize') . '</p></div>';
         }
     }
@@ -1349,7 +1349,7 @@ class FBS_Secure_Optimize_Admin {
             wp_die(esc_html__('You do not have sufficient permissions.', 'fbs-secure-optimize'));
         }
         
-        $tab = sanitize_text_field($_POST['tab']);
+        $tab = sanitize_text_field(wp_unslash($_POST['tab']));
         $defaults = $this->get_default_settings();
         
         if ($tab === 'performance') {

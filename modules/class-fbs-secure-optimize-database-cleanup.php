@@ -370,7 +370,7 @@ class FBS_Secure_Optimize_Database_Cleanup {
         
         foreach ($tables as $table) {
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Database maintenance operation
-            if ($wpdb->query("OPTIMIZE TABLE $table")) {
+            if ($wpdb->query("OPTIMIZE TABLE " . esc_sql($table))) {
                 $optimized_count++;
             }
         }
@@ -482,10 +482,13 @@ class FBS_Secure_Optimize_Database_Cleanup {
         
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Statistics gathering operation
         $result = $wpdb->get_row(
-            "SELECT 
-                ROUND(SUM(data_length + index_length) / 1024 / 1024, 2) AS 'size_mb'
-             FROM information_schema.tables 
-             WHERE table_schema = '" . DB_NAME . "'"
+            $wpdb->prepare(
+                "SELECT 
+                    ROUND(SUM(data_length + index_length) / 1024 / 1024, 2) AS 'size_mb'
+                 FROM information_schema.tables 
+                 WHERE table_schema = %s",
+                DB_NAME
+            )
         );
         
         return $result ? $result->size_mb . ' MB' : 'Unknown';
@@ -503,13 +506,16 @@ class FBS_Secure_Optimize_Database_Cleanup {
         
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Statistics gathering operation
         $tables = $wpdb->get_results(
-            "SELECT 
-                table_name,
-                ROUND(((data_length + index_length) / 1024 / 1024), 2) AS 'size_mb',
-                table_rows
-             FROM information_schema.tables 
-             WHERE table_schema = '" . DB_NAME . "'
-             ORDER BY (data_length + index_length) DESC"
+            $wpdb->prepare(
+                "SELECT 
+                    table_name,
+                    ROUND(((data_length + index_length) / 1024 / 1024), 2) AS 'size_mb',
+                    table_rows
+                 FROM information_schema.tables 
+                 WHERE table_schema = %s
+                 ORDER BY (data_length + index_length) DESC",
+                DB_NAME
+            )
         );
         
         return $tables;
@@ -575,7 +581,7 @@ class FBS_Secure_Optimize_Database_Cleanup {
         
         // Optimize the table
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Database maintenance operation
-        $wpdb->query("OPTIMIZE TABLE $table_name");
+        $wpdb->query("OPTIMIZE TABLE " . esc_sql($table_name));
         
         return true;
     }
