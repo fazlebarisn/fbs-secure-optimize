@@ -75,6 +75,7 @@ class FBS_Secure_Optimize_Admin {
         add_action('admin_init', array($this, 'register_settings'));
         add_action('admin_notices', array($this, 'admin_notices'));
         add_action('wp_ajax_fbs_opt_cleanup_database', array($this, 'ajax_cleanup_database'));
+        add_action('wp_ajax_fbs_opt_clear_cache', array($this, 'ajax_clear_cache'));
         add_action('wp_ajax_fbs_opt_reset_settings', array($this, 'ajax_reset_settings'));
     }
 
@@ -894,6 +895,16 @@ class FBS_Secure_Optimize_Admin {
                         </button>
                         <span id="fbs-opt-cleanup-status"></span>
                     </div>
+                    
+                    <div class="fbs-opt-action-card">
+                        <h3><?php esc_html_e('Cache Management', 'fbs-secure-optimize'); ?></h3>
+                        <p><?php esc_html_e('Clear optimized asset cache to force regeneration of combined and minified files.', 'fbs-secure-optimize'); ?></p>
+                        <button type="button" id="fbs-opt-clear-cache-btn" class="fbs-opt-button fbs-opt-button-secondary">
+                            <span class="dashicons dashicons-update"></span>
+                            <?php esc_html_e('Clear Asset Cache', 'fbs-secure-optimize'); ?>
+                        </button>
+                        <span id="fbs-opt-cache-status"></span>
+                    </div>
                 </div>
                 
                 <div class="fbs-opt-form-actions">
@@ -1434,6 +1445,38 @@ class FBS_Secure_Optimize_Admin {
             }
         } else {
             wp_send_json_error(array('message' => __('Database cleanup module not found.', 'fbs-secure-optimize')));
+        }
+    }
+
+    /**
+     * AJAX handler for clearing cache
+     * @since 1.0.0
+     * @author Fazle Bari <fazlebarisn@gmail.com>
+     */
+    public function ajax_clear_cache() {
+        // Verify nonce
+        if (!isset($_POST['nonce']) || !wp_verify_nonce(wp_unslash($_POST['nonce']), 'fbs_opt_admin_nonce')) {
+            wp_die(esc_html__('Security check failed.', 'fbs-secure-optimize'));
+        }
+        
+        // Check user capabilities
+        if (!current_user_can('manage_options')) {
+            wp_die(esc_html__('You do not have sufficient permissions.', 'fbs-secure-optimize'));
+        }
+        
+        // Get asset optimizer module
+        $controller = FBS_Secure_Optimize_Controller::get_instance();
+        $asset_optimizer = $controller->get_module('asset_optimizer');
+        
+        if ($asset_optimizer) {
+            $asset_optimizer->clear_cache();
+            
+            // Clear statistics cache
+            FBS_Secure_Optimize_Controller::clear_stats_cache();
+            
+            wp_send_json_success(array('message' => __('Asset cache cleared successfully.', 'fbs-secure-optimize')));
+        } else {
+            wp_send_json_error(array('message' => __('Asset optimizer module not found.', 'fbs-secure-optimize')));
         }
     }
 

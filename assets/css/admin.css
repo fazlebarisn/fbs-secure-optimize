@@ -334,6 +334,9 @@
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
     margin: 30px 0;
     overflow: hidden;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 0;
 }
 
 .fbs-opt-admin-wrap .fbs-opt-action-card {
@@ -341,6 +344,11 @@
     text-align: center;
     background: linear-gradient(135deg, #fff5f5 0%, #fed7d7 100%);
     border-left: 4px solid #e53e3e;
+}
+
+.fbs-opt-admin-wrap .fbs-opt-action-card:last-child {
+    background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+    border-left-color: #0ea5e9;
 }
 
 .fbs-opt-admin-wrap .fbs-opt-action-card h3 {
@@ -354,6 +362,57 @@
     margin: 0 0 20px 0;
     color: #4a5568;
     font-size: 14px;
+}
+
+/* ==========================================================================
+   Cache Management
+   ========================================================================== */
+
+.fbs-opt-admin-wrap .fbs-opt-cache-management {
+    padding: 30px;
+}
+
+.fbs-opt-admin-wrap .fbs-opt-cache-info {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 30px;
+}
+
+.fbs-opt-admin-wrap .fbs-opt-cache-details h4,
+.fbs-opt-admin-wrap .fbs-opt-cache-actions h4 {
+    margin: 0 0 15px 0;
+    color: #2c3e50;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.fbs-opt-admin-wrap .fbs-opt-cache-details ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.fbs-opt-admin-wrap .fbs-opt-cache-details li {
+    padding: 8px 0;
+    border-bottom: 1px solid #f1f3f4;
+    color: #6c757d;
+    font-size: 14px;
+}
+
+.fbs-opt-admin-wrap .fbs-opt-cache-details li:last-child {
+    border-bottom: none;
+}
+
+.fbs-opt-admin-wrap .fbs-opt-cache-details strong {
+    color: #2c3e50;
+    font-weight: 600;
+}
+
+.fbs-opt-admin-wrap .fbs-opt-cache-actions p {
+    margin: 0 0 20px 0;
+    color: #6c757d;
+    font-size: 14px;
+    line-height: 1.5;
 }
 
 /* ==========================================================================
@@ -618,10 +677,13 @@
    Status and Notifications
    ========================================================================== */
 
-.fbs-opt-admin-wrap #fbs-opt-cleanup-status {
+.fbs-opt-admin-wrap #fbs-opt-cleanup-status,
+.fbs-opt-admin-wrap #fbs-opt-cache-status {
     margin-left: 15px;
     font-weight: 500;
     font-size: 14px;
+    display: inline-block;
+    min-height: 20px;
 }
 
 .fbs-opt-admin-wrap .fbs-opt-cleanup-status.success {
@@ -703,6 +765,15 @@
     .fbs-opt-admin-wrap .fbs-opt-tabs .nav-tab {
         padding: 15px 20px;
         font-size: 14px;
+    }
+    
+    .fbs-opt-admin-wrap .fbs-opt-cache-info {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+    
+    .fbs-opt-admin-wrap .fbs-opt-cleanup-actions {
+        grid-template-columns: 1fr;
     }
 }
 

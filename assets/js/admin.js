@@ -38,6 +38,9 @@
             // Database cleanup button
             $(document).on('click', '#fbs-opt-cleanup-btn', this.handleCleanupClick);
             
+            // Cache clear button
+            $(document).on('click', '#fbs-opt-clear-cache-btn', this.handleCacheClearClick);
+            
             // Settings form submission
             $(document).on('submit', 'form[action*="options.php"]', this.handleFormSubmit);
             
@@ -146,6 +149,62 @@
                 },
                 error: function() {
                     $status.html('<span class="fbs-opt-cleanup-status error">✗ ' + fbsOptAdmin.strings.cleanupError + '</span>');
+                },
+                complete: function() {
+                    $btn.prop('disabled', false);
+                    
+                    // Hide status after 5 seconds
+                    setTimeout(function() {
+                        $status.fadeOut();
+                    }, 5000);
+                }
+            });
+        },
+
+        /**
+         * Handle cache clear button click
+         * @since 1.0.0
+         * @author Fazle Bari <fazlebarisn@gmail.com>
+         */
+        handleCacheClearClick: function(e) {
+            e.preventDefault();
+            
+            if (!confirm('Are you sure you want to clear the asset cache? This will force regeneration of optimized files.')) {
+                return;
+            }
+            
+            var $btn = $(this);
+            var $status = $('#fbs-opt-cache-status');
+            
+            // Make sure status is visible
+            $status.show();
+            
+            // Disable button and show loading
+            $btn.prop('disabled', true);
+            $status.html('<span class="fbs-opt-loading"></span> Clearing cache...');
+            
+            // Perform AJAX request
+            $.ajax({
+                url: fbsOptAdmin.ajaxUrl,
+                type: 'POST',
+                data: {
+                    action: 'fbs_opt_clear_cache',
+                    nonce: fbsOptAdmin.nonce
+                },
+                success: function(response) {
+                    if (response.success) {
+                        $status.html('<span class="fbs-opt-cleanup-status success">✓ ' + response.data.message + '</span>');
+                        
+                        // Refresh statistics if on statistics tab
+                        if ($('.nav-tab-active').data('tab') === 'statistics') {
+                            FBSOptimizeAdmin.refreshStatistics();
+                        }
+                    } else {
+                        $status.html('<span class="fbs-opt-cleanup-status error">✗ ' + response.data.message + '</span>');
+                    }
+                },
+                error: function() {
+                    $status.html('<span class="fbs-opt-cleanup-status error">✗ Failed to clear cache</span>');
                 },
                 complete: function() {
                     $btn.prop('disabled', false);
