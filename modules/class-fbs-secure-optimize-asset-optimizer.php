@@ -601,4 +601,5 @@ class FBS_Secure_Optimize_Asset_Optimizer {
         
         return $stats;
     }
+
 }
