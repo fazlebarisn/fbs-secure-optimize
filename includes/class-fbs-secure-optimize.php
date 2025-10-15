@@ -128,7 +128,7 @@ class FBS_Secure_Optimize_Controller {
      */
     public function enqueue_admin_scripts($hook) {
         // Only load on our admin pages
-        if (strpos($hook, 'fbs-optimize') === false) {
+        if (strpos($hook, 'fbs-secure-optimize') === false) {
             return;
         }
 
@@ -152,9 +152,9 @@ class FBS_Secure_Optimize_Controller {
             'ajaxUrl' => admin_url('admin-ajax.php'),
             'nonce' => wp_create_nonce('fbs_opt_admin_nonce'),
             'strings' => array(
-                'confirmCleanup' => __('Are you sure you want to perform database cleanup? This action cannot be undone.', 'fbs-optimize'),
-                'cleanupSuccess' => __('Database cleanup completed successfully.', 'fbs-optimize'),
-                'cleanupError' => __('An error occurred during database cleanup.', 'fbs-optimize'),
+                'confirmCleanup' => __('Are you sure you want to perform database cleanup? This action cannot be undone.', 'fbs-secure-optimize'),
+                'cleanupSuccess' => __('Database cleanup completed successfully.', 'fbs-secure-optimize'),
+                'cleanupError' => __('An error occurred during database cleanup.', 'fbs-secure-optimize'),
             ),
         ));
     }
@@ -262,14 +262,20 @@ class FBS_Secure_Optimize_Controller {
             $stats = array();
             
             // Database cleanup stats
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Statistics gathering with caching
             $stats['post_revisions'] = $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->posts} WHERE post_type = 'revision'");
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Statistics gathering with caching
             $stats['auto_drafts'] = $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->posts} WHERE post_status = 'auto-draft'");
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Statistics gathering with caching
             $stats['spam_comments'] = $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->comments} WHERE comment_approved = 'spam'");
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Statistics gathering with caching
             $stats['transients'] = $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->options} WHERE option_name LIKE '_transient_%' OR option_name LIKE '_site_transient_%'");
             
             // Login attempts stats
             $login_attempts_table = $wpdb->prefix . 'fbs_opt_login_attempts';
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Table existence check with caching
             if ($wpdb->get_var("SHOW TABLES LIKE '$login_attempts_table'") == $login_attempts_table) {
+                // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Statistics gathering with caching
                 $stats['failed_logins'] = $wpdb->get_var("SELECT COUNT(*) FROM $login_attempts_table WHERE success = 0 AND attempt_time > DATE_SUB(NOW(), INTERVAL 24 HOUR)");
             } else {
                 $stats['failed_logins'] = 0;

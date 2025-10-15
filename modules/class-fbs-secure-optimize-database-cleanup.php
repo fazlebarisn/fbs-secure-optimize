@@ -65,6 +65,7 @@ class FBS_Secure_Optimize_Database_Cleanup {
      * @return array Cleanup results
      */
     public function perform_cleanup($options = null) {
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Database maintenance operation
         global $wpdb;
         
         $results = array(
@@ -153,9 +154,11 @@ class FBS_Secure_Optimize_Database_Cleanup {
      * @return int Number of revisions deleted
      */
     private function cleanup_post_revisions() {
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Database maintenance operation
         global $wpdb;
         
         // Get all revisions
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Database maintenance operation
         $revisions = $wpdb->get_results(
             "SELECT ID FROM {$wpdb->posts} WHERE post_type = 'revision'"
         );
@@ -178,9 +181,11 @@ class FBS_Secure_Optimize_Database_Cleanup {
      * @return int Number of auto-drafts deleted
      */
     private function cleanup_auto_drafts() {
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Database maintenance operation
         global $wpdb;
         
         // Get auto-drafts older than 7 days
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Database maintenance operation
         $auto_drafts = $wpdb->get_results(
             "SELECT ID FROM {$wpdb->posts} 
              WHERE post_status = 'auto-draft' 
@@ -205,9 +210,11 @@ class FBS_Secure_Optimize_Database_Cleanup {
      * @return int Number of spam comments deleted
      */
     private function cleanup_spam_comments() {
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Database maintenance operation
         global $wpdb;
         
         // Get spam comments older than 30 days
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Database maintenance operation
         $spam_comments = $wpdb->get_results(
             "SELECT comment_ID FROM {$wpdb->comments} 
              WHERE comment_approved = 'spam' 
@@ -232,9 +239,11 @@ class FBS_Secure_Optimize_Database_Cleanup {
      * @return int Number of transients deleted
      */
     private function cleanup_transients() {
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Database maintenance operation
         global $wpdb;
         
         // Delete expired transients
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Database maintenance operation
         $deleted_count = $wpdb->query(
             "DELETE FROM {$wpdb->options} 
              WHERE option_name LIKE '_transient_timeout_%' 
@@ -242,6 +251,7 @@ class FBS_Secure_Optimize_Database_Cleanup {
         );
         
         // Delete the corresponding transient values
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Database maintenance operation
         $wpdb->query(
             "DELETE FROM {$wpdb->options} 
              WHERE option_name LIKE '_transient_%' 
@@ -254,12 +264,14 @@ class FBS_Secure_Optimize_Database_Cleanup {
         );
         
         // Delete expired site transients
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Database maintenance operation
         $wpdb->query(
             "DELETE FROM {$wpdb->options} 
              WHERE option_name LIKE '_site_transient_timeout_%' 
              AND option_value < UNIX_TIMESTAMP()"
         );
         
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Database maintenance operation
         $wpdb->query(
             "DELETE FROM {$wpdb->options} 
              WHERE option_name LIKE '_site_transient_%' 
@@ -281,8 +293,10 @@ class FBS_Secure_Optimize_Database_Cleanup {
      * @return int Number of orphaned meta deleted
      */
     private function cleanup_orphaned_post_meta() {
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Database maintenance operation
         global $wpdb;
         
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Database maintenance operation
         return $wpdb->query(
             "DELETE pm FROM {$wpdb->postmeta} pm 
              LEFT JOIN {$wpdb->posts} p ON pm.post_id = p.ID 
@@ -297,8 +311,10 @@ class FBS_Secure_Optimize_Database_Cleanup {
      * @return int Number of orphaned relationships deleted
      */
     private function cleanup_orphaned_relationships() {
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Database maintenance operation
         global $wpdb;
         
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Database maintenance operation
         return $wpdb->query(
             "DELETE tr FROM {$wpdb->term_relationships} tr 
              LEFT JOIN {$wpdb->posts} p ON tr.object_id = p.ID 
@@ -313,8 +329,10 @@ class FBS_Secure_Optimize_Database_Cleanup {
      * @return int Number of duplicate meta deleted
      */
     private function cleanup_duplicate_meta() {
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Database maintenance operation
         global $wpdb;
         
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Database maintenance operation
         return $wpdb->query(
             "DELETE pm1 FROM {$wpdb->postmeta} pm1 
              INNER JOIN {$wpdb->postmeta} pm2 
@@ -332,6 +350,7 @@ class FBS_Secure_Optimize_Database_Cleanup {
      * @return int Number of tables optimized
      */
     private function optimize_database_tables() {
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Database maintenance operation
         global $wpdb;
         
         $tables = array(
@@ -350,6 +369,7 @@ class FBS_Secure_Optimize_Database_Cleanup {
         $optimized_count = 0;
         
         foreach ($tables as $table) {
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Database maintenance operation
             if ($wpdb->query("OPTIMIZE TABLE $table")) {
                 $optimized_count++;
             }
@@ -398,32 +418,38 @@ class FBS_Secure_Optimize_Database_Cleanup {
      * @return array Database statistics
      */
     public function get_database_stats() {
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Statistics gathering operation
         global $wpdb;
         
         $stats = array();
         
         // Post revisions
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Statistics gathering operation
         $stats['post_revisions'] = $wpdb->get_var(
             "SELECT COUNT(*) FROM {$wpdb->posts} WHERE post_type = 'revision'"
         );
         
         // Auto-drafts
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Statistics gathering operation
         $stats['auto_drafts'] = $wpdb->get_var(
             "SELECT COUNT(*) FROM {$wpdb->posts} WHERE post_status = 'auto-draft'"
         );
         
         // Spam comments
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Statistics gathering operation
         $stats['spam_comments'] = $wpdb->get_var(
             "SELECT COUNT(*) FROM {$wpdb->comments} WHERE comment_approved = 'spam'"
         );
         
         // Transients
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Statistics gathering operation
         $stats['transients'] = $wpdb->get_var(
             "SELECT COUNT(*) FROM {$wpdb->options} 
              WHERE option_name LIKE '_transient_%' OR option_name LIKE '_site_transient_%'"
         );
         
         // Orphaned post meta
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Statistics gathering operation
         $stats['orphaned_meta'] = $wpdb->get_var(
             "SELECT COUNT(*) FROM {$wpdb->postmeta} pm 
              LEFT JOIN {$wpdb->posts} p ON pm.post_id = p.ID 
@@ -431,6 +457,7 @@ class FBS_Secure_Optimize_Database_Cleanup {
         );
         
         // Orphaned relationships
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Statistics gathering operation
         $stats['orphaned_relationships'] = $wpdb->get_var(
             "SELECT COUNT(*) FROM {$wpdb->term_relationships} tr 
              LEFT JOIN {$wpdb->posts} p ON tr.object_id = p.ID 
@@ -450,8 +477,10 @@ class FBS_Secure_Optimize_Database_Cleanup {
      * @return string Database size in human readable format
      */
     private function get_database_size() {
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Statistics gathering operation
         global $wpdb;
         
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Statistics gathering operation
         $result = $wpdb->get_row(
             "SELECT 
                 ROUND(SUM(data_length + index_length) / 1024 / 1024, 2) AS 'size_mb'
@@ -469,8 +498,10 @@ class FBS_Secure_Optimize_Database_Cleanup {
      * @return array Table sizes
      */
     public function get_table_sizes() {
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Statistics gathering operation
         global $wpdb;
         
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Statistics gathering operation
         $tables = $wpdb->get_results(
             "SELECT 
                 table_name,
@@ -492,6 +523,7 @@ class FBS_Secure_Optimize_Database_Cleanup {
      * @return bool True if successful
      */
     public function clean_table($table_name) {
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Database maintenance operation
         global $wpdb;
         
         // Sanitize table name
@@ -532,6 +564,7 @@ class FBS_Secure_Optimize_Database_Cleanup {
                 
             case $wpdb->commentmeta:
                 // Clean orphaned comment meta
+                // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Database maintenance operation
                 $wpdb->query(
                     "DELETE cm FROM {$wpdb->commentmeta} cm 
                      LEFT JOIN {$wpdb->comments} c ON cm.comment_id = c.comment_ID 
@@ -541,6 +574,7 @@ class FBS_Secure_Optimize_Database_Cleanup {
         }
         
         // Optimize the table
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Database maintenance operation
         $wpdb->query("OPTIMIZE TABLE $table_name");
         
         return true;

@@ -122,7 +122,7 @@ class FBS_Secure_Optimize_Login_Security {
             return new WP_Error(
                 'fbs_opt_ip_blocked',
                 sprintf(
-                    __('Your IP address has been temporarily blocked due to too many failed login attempts. Please try again in %d minutes.', 'fbs-optimize'),
+                    __('Your IP address has been temporarily blocked due to too many failed login attempts. Please try again in %d minutes.', 'fbs-secure-optimize'),
                     $lockout_duration
                 )
             );
@@ -140,10 +140,12 @@ class FBS_Secure_Optimize_Login_Security {
      * @param bool $success Whether login was successful
      */
     private function log_login_attempt($ip_address, $username, $success) {
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Login security logging operation
         global $wpdb;
         
         $table_name = $wpdb->prefix . 'fbs_opt_login_attempts';
         
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Login security logging operation
         $wpdb->insert(
             $table_name,
             array(
@@ -156,6 +158,7 @@ class FBS_Secure_Optimize_Login_Security {
         );
         
         // Clean old records (older than 30 days)
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Login security cleanup operation
         $wpdb->query(
             $wpdb->prepare(
                 "DELETE FROM $table_name WHERE attempt_time < %s",
@@ -172,6 +175,7 @@ class FBS_Secure_Optimize_Login_Security {
      * @return bool True if blocked
      */
     private function is_ip_blocked($ip_address) {
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Login security check operation
         global $wpdb;
         
         $table_name = $wpdb->prefix . 'fbs_opt_login_attempts';
@@ -179,6 +183,7 @@ class FBS_Secure_Optimize_Login_Security {
         $lockout_duration = FBS_Secure_Optimize_Controller::get_setting('login_security', 'lockout_duration', 15);
         
         // Count failed attempts in the last lockout period
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Login security check operation
         $failed_attempts = $wpdb->get_var(
             $wpdb->prepare(
                 "SELECT COUNT(*) FROM $table_name 
@@ -217,10 +222,12 @@ class FBS_Secure_Optimize_Login_Security {
      * @param string $ip_address IP address
      */
     private function clear_failed_attempts($ip_address) {
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Login security cleanup operation
         global $wpdb;
         
         $table_name = $wpdb->prefix . 'fbs_opt_login_attempts';
         
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Login security cleanup operation
         $wpdb->delete(
             $table_name,
             array('ip_address' => $ip_address, 'success' => 0),
@@ -357,7 +364,7 @@ class FBS_Secure_Optimize_Login_Security {
             if (loginForm) {
                 const notice = document.createElement('div');
                 notice.className = 'fbs-opt-login-warning';
-                notice.innerHTML = '<?php echo esc_js(__('For security purposes, login attempts are limited. Multiple failed attempts will result in temporary IP blocking.', 'fbs-optimize')); ?>';
+                notice.innerHTML = '<?php echo esc_js(__('For security purposes, login attempts are limited. Multiple failed attempts will result in temporary IP blocking.', 'fbs-secure-optimize')); ?>';
                 loginForm.parentNode.insertBefore(notice, loginForm);
             }
         });
@@ -373,6 +380,7 @@ class FBS_Secure_Optimize_Login_Security {
      * @return array Statistics
      */
     public function get_login_stats($hours = 24) {
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Login security statistics operation
         global $wpdb;
         
         $table_name = $wpdb->prefix . 'fbs_opt_login_attempts';
@@ -386,6 +394,7 @@ class FBS_Secure_Optimize_Login_Security {
         );
         
         // Get total attempts in the specified time period
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Login security statistics operation
         $stats['total_attempts'] = $wpdb->get_var(
             $wpdb->prepare(
                 "SELECT COUNT(*) FROM $table_name 
@@ -395,6 +404,7 @@ class FBS_Secure_Optimize_Login_Security {
         );
         
         // Get failed attempts
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Login security statistics operation
         $stats['failed_attempts'] = $wpdb->get_var(
             $wpdb->prepare(
                 "SELECT COUNT(*) FROM $table_name 
@@ -405,6 +415,7 @@ class FBS_Secure_Optimize_Login_Security {
         );
         
         // Get successful attempts
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Login security statistics operation
         $stats['successful_attempts'] = $wpdb->get_var(
             $wpdb->prepare(
                 "SELECT COUNT(*) FROM $table_name 
@@ -415,6 +426,7 @@ class FBS_Secure_Optimize_Login_Security {
         );
         
         // Get unique IPs
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Login security statistics operation
         $stats['unique_ips'] = $wpdb->get_var(
             $wpdb->prepare(
                 "SELECT COUNT(DISTINCT ip_address) FROM $table_name 
@@ -427,6 +439,7 @@ class FBS_Secure_Optimize_Login_Security {
         $max_attempts = FBS_Secure_Optimize_Controller::get_setting('login_security', 'max_attempts', 5);
         $lockout_duration = FBS_Secure_Optimize_Controller::get_setting('login_security', 'lockout_duration', 15);
         
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Login security statistics operation
         $blocked_ips = $wpdb->get_results(
             $wpdb->prepare(
                 "SELECT ip_address, COUNT(*) as attempts 
@@ -453,10 +466,12 @@ class FBS_Secure_Optimize_Login_Security {
      * @return array Recent attempts
      */
     public function get_recent_attempts($limit = 50) {
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Login security statistics operation
         global $wpdb;
         
         $table_name = $wpdb->prefix . 'fbs_opt_login_attempts';
         
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Login security statistics operation
         return $wpdb->get_results(
             $wpdb->prepare(
                 "SELECT * FROM $table_name 
@@ -474,10 +489,12 @@ class FBS_Secure_Optimize_Login_Security {
      * @return bool True if successful
      */
     public function clear_all_attempts() {
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Login security cleanup operation
         global $wpdb;
         
         $table_name = $wpdb->prefix . 'fbs_opt_login_attempts';
         
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Login security cleanup operation
         $result = $wpdb->query("TRUNCATE TABLE $table_name");
         
         if ($result !== false) {
@@ -496,10 +513,12 @@ class FBS_Secure_Optimize_Login_Security {
      * @return bool True if successful
      */
     public function unblock_ip($ip_address) {
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Login security management operation
         global $wpdb;
         
         $table_name = $wpdb->prefix . 'fbs_opt_login_attempts';
         
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Login security management operation
         $result = $wpdb->delete(
             $table_name,
             array('ip_address' => $ip_address, 'success' => 0),

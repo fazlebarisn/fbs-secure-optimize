@@ -87,7 +87,7 @@ class FBS_Secure_Optimize {
      */
     public function load_textdomain() {
         load_plugin_textdomain(
-            'fbs-optimize',
+            'fbs-secure-optimize',
             false,
             dirname(plugin_basename(__FILE__)) . '/languages'
         );
