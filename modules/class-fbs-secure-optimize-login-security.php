@@ -122,6 +122,7 @@ class FBS_Secure_Optimize_Login_Security {
             return new WP_Error(
                 'fbs_opt_ip_blocked',
                 sprintf(
+                    /* translators: %d is the number of minutes until the IP address is unblocked */
                     __('Your IP address has been temporarily blocked due to too many failed login attempts. Please try again in %d minutes.', 'fbs-secure-optimize'),
                     $lockout_duration
                 )
