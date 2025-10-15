@@ -468,9 +468,9 @@ class FBS_Secure_Optimize_Asset_Optimizer {
      * @return string|false File path or false if not found
      */
     private function get_file_path($url) {
-        $parsed_url = parse_url($url);
+        $parsed_url = wp_parse_url($url);
         
-        if (isset($parsed_url['host']) && $parsed_url['host'] !== parse_url(home_url(), PHP_URL_HOST)) {
+        if (isset($parsed_url['host']) && $parsed_url['host'] !== wp_parse_url(home_url(), PHP_URL_HOST)) {
             return false; // External URL
         }
         
@@ -492,7 +492,7 @@ class FBS_Secure_Optimize_Asset_Optimizer {
             $files = glob($cache_dir . '/*');
             foreach ($files as $file) {
                 if (is_file($file)) {
-                    unlink($file);
+                    wp_delete_file($file);
                 }
             }
         }
