@@ -1052,6 +1052,20 @@ class FBS_Secure_Optimize_Admin {
      */
     private function display_statistics_tab() {
         $stats = FBS_Secure_Optimize_Controller::get_stats();
+        $asset_optimizer = FBS_Secure_Optimize_Asset_Optimizer::get_instance();
+        $asset_stats = $asset_optimizer->get_asset_stats();
+        $cache_stats = $asset_optimizer->get_cache_stats();
+        
+        // Format file sizes
+        $format_size = function($bytes) {
+            if ($bytes >= 1048576) {
+                return round($bytes / 1048576, 2) . ' MB';
+            } elseif ($bytes >= 1024) {
+                return round($bytes / 1024, 2) . ' KB';
+            } else {
+                return $bytes . ' bytes';
+            }
+        };
         ?>
         <div class="fbs-opt-statistics-tab">
             <div class="fbs-opt-stats-overview">
@@ -1208,6 +1222,94 @@ class FBS_Secure_Optimize_Admin {
                             <div class="fbs-opt-metric-fill" style="width: 80%;"></div>
                         </div>
                         <p class="fbs-opt-metric-value"><?php esc_html_e('20% fewer requests', 'fbs-secure-optimize'); ?></p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Asset Optimization Statistics -->
+            <div class="fbs-opt-section">
+                <div class="fbs-opt-section-header">
+                    <h3 class="fbs-opt-section-title">
+                        <span class="dashicons dashicons-performance"></span>
+                        <?php esc_html_e('Asset Optimization Statistics', 'fbs-secure-optimize'); ?>
+                    </h3>
+                    <p class="fbs-opt-section-description"><?php esc_html_e('Monitor file optimization and performance improvements', 'fbs-secure-optimize'); ?></p>
+                </div>
+                
+                <div class="fbs-opt-stats-grid">
+                    <div class="fbs-opt-stat-card">
+                        <div class="fbs-opt-stat-icon">
+                            <span class="dashicons dashicons-media-code"></span>
+                        </div>
+                        <div class="fbs-opt-stat-content">
+                            <h4><?php esc_html_e('CSS Files', 'fbs-secure-optimize'); ?></h4>
+                            <span class="fbs-opt-stat-number"><?php echo esc_html($asset_stats['css_files']); ?></span>
+                            <p class="fbs-opt-stat-description"><?php esc_html_e('Total CSS files loaded', 'fbs-secure-optimize'); ?></p>
+                        </div>
+                    </div>
+                    
+                    <div class="fbs-opt-stat-card">
+                        <div class="fbs-opt-stat-icon">
+                            <span class="dashicons dashicons-media-code"></span>
+                        </div>
+                        <div class="fbs-opt-stat-content">
+                            <h4><?php esc_html_e('JavaScript Files', 'fbs-secure-optimize'); ?></h4>
+                            <span class="fbs-opt-stat-number"><?php echo esc_html($asset_stats['js_files']); ?></span>
+                            <p class="fbs-opt-stat-description"><?php esc_html_e('Total JS files loaded', 'fbs-secure-optimize'); ?></p>
+                        </div>
+                    </div>
+                    
+                    <div class="fbs-opt-stat-card">
+                        <div class="fbs-opt-stat-icon">
+                            <span class="dashicons dashicons-admin-tools"></span>
+                        </div>
+                        <div class="fbs-opt-stat-content">
+                            <h4><?php esc_html_e('Combined Files', 'fbs-secure-optimize'); ?></h4>
+                            <span class="fbs-opt-stat-number"><?php echo esc_html($cache_stats['files']); ?></span>
+                            <p class="fbs-opt-stat-description"><?php esc_html_e('Optimized combined files', 'fbs-secure-optimize'); ?></p>
+                        </div>
+                    </div>
+                    
+                    <div class="fbs-opt-stat-card">
+                        <div class="fbs-opt-stat-icon">
+                            <span class="dashicons dashicons-chart-line"></span>
+                        </div>
+                        <div class="fbs-opt-stat-content">
+                            <h4><?php esc_html_e('HTTP Requests Saved', 'fbs-secure-optimize'); ?></h4>
+                            <span class="fbs-opt-stat-number"><?php echo esc_html(($asset_stats['css_files'] + $asset_stats['js_files']) - $cache_stats['files']); ?></span>
+                            <p class="fbs-opt-stat-description"><?php esc_html_e('Reduced HTTP requests', 'fbs-secure-optimize'); ?></p>
+                        </div>
+                    </div>
+                    
+                    <div class="fbs-opt-stat-card">
+                        <div class="fbs-opt-stat-icon">
+                            <span class="dashicons dashicons-download"></span>
+                        </div>
+                        <div class="fbs-opt-stat-content">
+                            <h4><?php esc_html_e('Cache Size', 'fbs-secure-optimize'); ?></h4>
+                            <span class="fbs-opt-stat-number"><?php echo esc_html($format_size($cache_stats['size'])); ?></span>
+                            <p class="fbs-opt-stat-description"><?php esc_html_e('Total cached file size', 'fbs-secure-optimize'); ?></p>
+                        </div>
+                    </div>
+                    
+                    <div class="fbs-opt-stat-card">
+                        <div class="fbs-opt-stat-icon">
+                            <span class="dashicons dashicons-chart-pie"></span>
+                        </div>
+                        <div class="fbs-opt-stat-content">
+                            <h4><?php esc_html_e('Optimization Ratio', 'fbs-secure-optimize'); ?></h4>
+                            <span class="fbs-opt-stat-number"><?php 
+                                $total_files = $asset_stats['css_files'] + $asset_stats['js_files'];
+                                $combined_files = $cache_stats['files'];
+                                if ($total_files > 0) {
+                                    $ratio = round((($total_files - $combined_files) / $total_files) * 100, 1);
+                                    echo esc_html($ratio . '%');
+                                } else {
+                                    echo esc_html('0%');
+                                }
+                            ?></span>
+                            <p class="fbs-opt-stat-description"><?php esc_html_e('Files optimized', 'fbs-secure-optimize'); ?></p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1416,4 +1518,5 @@ class FBS_Secure_Optimize_Admin {
             )
         );
     }
+
 }

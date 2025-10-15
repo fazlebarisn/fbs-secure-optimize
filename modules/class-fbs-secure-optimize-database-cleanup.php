@@ -68,6 +68,10 @@ class FBS_Secure_Optimize_Database_Cleanup {
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Database maintenance operation
         global $wpdb;
         
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('FBS Optimize: Database cleanup - Starting cleanup process');
+        }
+        
         $results = array(
             'post_revisions' => 0,
             'auto_drafts' => 0,
@@ -87,38 +91,90 @@ class FBS_Secure_Optimize_Database_Cleanup {
             $cleanup_settings = $options;
         }
 
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('FBS Optimize: Database cleanup - Cleanup settings: ' . print_r($cleanup_settings, true));
+        }
+
         try {
             // Clean post revisions
             if (isset($cleanup_settings['cleanup_revisions']) && $cleanup_settings['cleanup_revisions']) {
+                if (defined('WP_DEBUG') && WP_DEBUG) {
+                    error_log('FBS Optimize: Database cleanup - Cleaning post revisions');
+                }
                 $results['post_revisions'] = $this->cleanup_post_revisions();
+                if (defined('WP_DEBUG') && WP_DEBUG) {
+                    error_log('FBS Optimize: Database cleanup - Removed ' . $results['post_revisions'] . ' post revisions');
+                }
             }
 
             // Clean auto-drafts
             if (isset($cleanup_settings['cleanup_autodrafts']) && $cleanup_settings['cleanup_autodrafts']) {
+                if (defined('WP_DEBUG') && WP_DEBUG) {
+                    error_log('FBS Optimize: Database cleanup - Cleaning auto-drafts');
+                }
                 $results['auto_drafts'] = $this->cleanup_auto_drafts();
+                if (defined('WP_DEBUG') && WP_DEBUG) {
+                    error_log('FBS Optimize: Database cleanup - Removed ' . $results['auto_drafts'] . ' auto-drafts');
+                }
             }
 
             // Clean spam comments
             if (isset($cleanup_settings['cleanup_spam_comments']) && $cleanup_settings['cleanup_spam_comments']) {
+                if (defined('WP_DEBUG') && WP_DEBUG) {
+                    error_log('FBS Optimize: Database cleanup - Cleaning spam comments');
+                }
                 $results['spam_comments'] = $this->cleanup_spam_comments();
+                if (defined('WP_DEBUG') && WP_DEBUG) {
+                    error_log('FBS Optimize: Database cleanup - Removed ' . $results['spam_comments'] . ' spam comments');
+                }
             }
 
             // Clean transients
             if (isset($cleanup_settings['cleanup_transients']) && $cleanup_settings['cleanup_transients']) {
+                if (defined('WP_DEBUG') && WP_DEBUG) {
+                    error_log('FBS Optimize: Database cleanup - Cleaning transients');
+                }
                 $results['transients'] = $this->cleanup_transients();
+                if (defined('WP_DEBUG') && WP_DEBUG) {
+                    error_log('FBS Optimize: Database cleanup - Removed ' . $results['transients'] . ' transients');
+                }
             }
 
             // Clean orphaned post meta
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('FBS Optimize: Database cleanup - Cleaning orphaned post meta');
+            }
             $results['orphaned_meta'] = $this->cleanup_orphaned_post_meta();
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('FBS Optimize: Database cleanup - Removed ' . $results['orphaned_meta'] . ' orphaned meta entries');
+            }
 
             // Clean orphaned relationships
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('FBS Optimize: Database cleanup - Cleaning orphaned relationships');
+            }
             $results['orphaned_relationships'] = $this->cleanup_orphaned_relationships();
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('FBS Optimize: Database cleanup - Removed ' . $results['orphaned_relationships'] . ' orphaned relationships');
+            }
 
             // Clean duplicate meta
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('FBS Optimize: Database cleanup - Cleaning duplicate meta');
+            }
             $results['duplicate_meta'] = $this->cleanup_duplicate_meta();
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('FBS Optimize: Database cleanup - Removed ' . $results['duplicate_meta'] . ' duplicate meta entries');
+            }
 
             // Optimize database tables
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('FBS Optimize: Database cleanup - Optimizing database tables');
+            }
             $results['optimized_tables'] = $this->optimize_database_tables();
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('FBS Optimize: Database cleanup - Optimized ' . $results['optimized_tables'] . ' database tables');
+            }
 
             // Log cleanup results
             FBS_Secure_Optimize_Controller::log(
@@ -138,6 +194,10 @@ class FBS_Secure_Optimize_Database_Cleanup {
 
             // Clear statistics cache since database has been modified
             FBS_Secure_Optimize_Controller::clear_stats_cache();
+
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('FBS Optimize: Database cleanup - Cleanup process completed successfully');
+            }
 
             return $results;
 
