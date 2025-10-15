@@ -1307,7 +1307,7 @@ class FBS_Secure_Optimize_Admin {
      */
     public function ajax_cleanup_database() {
         // Verify nonce
-        if (!wp_verify_nonce($_POST['nonce'], 'fbs_opt_admin_nonce')) {
+        if (!isset($_POST['nonce']) || !wp_verify_nonce(wp_unslash($_POST['nonce']), 'fbs_opt_admin_nonce')) {
             wp_die(esc_html__('Security check failed.', 'fbs-secure-optimize'));
         }
         
@@ -1340,13 +1340,17 @@ class FBS_Secure_Optimize_Admin {
      */
     public function ajax_reset_settings() {
         // Verify nonce
-        if (!wp_verify_nonce($_POST['nonce'], 'fbs_opt_admin_nonce')) {
+        if (!isset($_POST['nonce']) || !wp_verify_nonce(wp_unslash($_POST['nonce']), 'fbs_opt_admin_nonce')) {
             wp_die(esc_html__('Security check failed.', 'fbs-secure-optimize'));
         }
         
         // Check user capabilities
         if (!current_user_can('manage_options')) {
             wp_die(esc_html__('You do not have sufficient permissions.', 'fbs-secure-optimize'));
+        }
+        
+        if (!isset($_POST['tab'])) {
+            wp_die(esc_html__('Invalid request.', 'fbs-secure-optimize'));
         }
         
         $tab = sanitize_text_field(wp_unslash($_POST['tab']));

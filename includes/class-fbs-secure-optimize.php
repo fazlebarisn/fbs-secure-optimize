@@ -241,6 +241,7 @@ class FBS_Secure_Optimize_Controller {
      */
     public static function log($message, $level = 'info') {
         if (defined('WP_DEBUG') && WP_DEBUG) {
+            // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Debug logging only when WP_DEBUG is enabled
             error_log(sprintf('[FBS Secure Optimize %s] %s', strtoupper($level), $message));
         }
     }
