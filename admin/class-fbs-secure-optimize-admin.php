@@ -444,7 +444,9 @@ class FBS_Secure_Optimize_Admin {
      * @return array Sanitized data
      */
     public function sanitize_settings($input) {
-        $sanitized = array();
+        // Get current settings to preserve existing data
+        $current_settings = get_option('fbs_opt_settings', array());
+        $sanitized = $current_settings;
 
         // Sanitize performance settings
         if (isset($input['asset_optimization'])) {
