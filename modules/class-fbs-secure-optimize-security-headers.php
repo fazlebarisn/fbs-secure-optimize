@@ -292,7 +292,7 @@ class FBS_Secure_Optimize_Security_Headers {
         if (!is_ssl()) {
             $recommendations[] = array(
                 'type' => 'warning',
-                'message' => __('Enable SSL/HTTPS for your website to use Strict-Transport-Security header.', 'fbs-optimize'),
+                'message' => __('Enable SSL/HTTPS for your website to use Strict-Transport-Security header.', 'fbs-secure-optimize'),
             );
         }
 
@@ -300,7 +300,7 @@ class FBS_Secure_Optimize_Security_Headers {
         if (!isset($header_settings['hide_wp_version']) || !$header_settings['hide_wp_version']) {
             $recommendations[] = array(
                 'type' => 'info',
-                'message' => __('Consider hiding WordPress version to prevent information disclosure.', 'fbs-optimize'),
+                'message' => __('Consider hiding WordPress version to prevent information disclosure.', 'fbs-secure-optimize'),
             );
         }
 
@@ -308,21 +308,21 @@ class FBS_Secure_Optimize_Security_Headers {
         if (!isset($header_settings['x_content_type_options']) || !$header_settings['x_content_type_options']) {
             $recommendations[] = array(
                 'type' => 'warning',
-                'message' => __('Enable X-Content-Type-Options header to prevent MIME type sniffing attacks.', 'fbs-optimize'),
+                'message' => __('Enable X-Content-Type-Options header to prevent MIME type sniffing attacks.', 'fbs-secure-optimize'),
             );
         }
 
         if (!isset($header_settings['x_frame_options']) || !$header_settings['x_frame_options']) {
             $recommendations[] = array(
                 'type' => 'warning',
-                'message' => __('Enable X-Frame-Options header to prevent clickjacking attacks.', 'fbs-optimize'),
+                'message' => __('Enable X-Frame-Options header to prevent clickjacking attacks.', 'fbs-secure-optimize'),
             );
         }
 
         if (!isset($header_settings['x_xss_protection']) || !$header_settings['x_xss_protection']) {
             $recommendations[] = array(
                 'type' => 'info',
-                'message' => __('Enable X-XSS-Protection header for additional XSS protection.', 'fbs-optimize'),
+                'message' => __('Enable X-XSS-Protection header for additional XSS protection.', 'fbs-secure-optimize'),
             );
         }
 
@@ -348,12 +348,12 @@ class FBS_Secure_Optimize_Security_Headers {
         // Check if any security headers are enabled
         $enabled_headers = array_filter($header_settings);
         if (empty($enabled_headers)) {
-            $validation['warnings'][] = __('No security headers are currently enabled.', 'fbs-optimize');
+            $validation['warnings'][] = __('No security headers are currently enabled.', 'fbs-secure-optimize');
         }
 
         // Check Strict-Transport-Security without SSL
         if (isset($header_settings['strict_transport_security']) && $header_settings['strict_transport_security'] && !is_ssl()) {
-            $validation['warnings'][] = __('Strict-Transport-Security header is enabled but SSL is not active.', 'fbs-optimize');
+            $validation['warnings'][] = __('Strict-Transport-Security header is enabled but SSL is not active.', 'fbs-secure-optimize');
         }
 
         return $validation;
@@ -433,48 +433,48 @@ class FBS_Secure_Optimize_Security_Headers {
         $max_score += 20;
         if (isset($header_settings['x_content_type_options']) && $header_settings['x_content_type_options']) {
             $score += 20;
-            $details[] = __('X-Content-Type-Options header enabled', 'fbs-optimize');
+            $details[] = __('X-Content-Type-Options header enabled', 'fbs-secure-optimize');
         } else {
-            $details[] = __('X-Content-Type-Options header disabled', 'fbs-optimize');
+            $details[] = __('X-Content-Type-Options header disabled', 'fbs-secure-optimize');
         }
 
         // X-Frame-Options
         $max_score += 20;
         if (isset($header_settings['x_frame_options']) && $header_settings['x_frame_options']) {
             $score += 20;
-            $details[] = __('X-Frame-Options header enabled', 'fbs-optimize');
+            $details[] = __('X-Frame-Options header enabled', 'fbs-secure-optimize');
         } else {
-            $details[] = __('X-Frame-Options header disabled', 'fbs-optimize');
+            $details[] = __('X-Frame-Options header disabled', 'fbs-secure-optimize');
         }
 
         // X-XSS-Protection
         $max_score += 15;
         if (isset($header_settings['x_xss_protection']) && $header_settings['x_xss_protection']) {
             $score += 15;
-            $details[] = __('X-XSS-Protection header enabled', 'fbs-optimize');
+            $details[] = __('X-XSS-Protection header enabled', 'fbs-secure-optimize');
         } else {
-            $details[] = __('X-XSS-Protection header disabled', 'fbs-optimize');
+            $details[] = __('X-XSS-Protection header disabled', 'fbs-secure-optimize');
         }
 
         // Strict-Transport-Security
         $max_score += 25;
         if (isset($header_settings['strict_transport_security']) && $header_settings['strict_transport_security'] && is_ssl()) {
             $score += 25;
-            $details[] = __('Strict-Transport-Security header enabled', 'fbs-optimize');
+            $details[] = __('Strict-Transport-Security header enabled', 'fbs-secure-optimize');
         } elseif (isset($header_settings['strict_transport_security']) && $header_settings['strict_transport_security'] && !is_ssl()) {
             $score += 10;
-            $details[] = __('Strict-Transport-Security header enabled but SSL not active', 'fbs-optimize');
+            $details[] = __('Strict-Transport-Security header enabled but SSL not active', 'fbs-secure-optimize');
         } else {
-            $details[] = __('Strict-Transport-Security header disabled', 'fbs-optimize');
+            $details[] = __('Strict-Transport-Security header disabled', 'fbs-secure-optimize');
         }
 
         // Hide WordPress version
         $max_score += 20;
         if (isset($header_settings['hide_wp_version']) && $header_settings['hide_wp_version']) {
             $score += 20;
-            $details[] = __('WordPress version hidden', 'fbs-optimize');
+            $details[] = __('WordPress version hidden', 'fbs-secure-optimize');
         } else {
-            $details[] = __('WordPress version visible', 'fbs-optimize');
+            $details[] = __('WordPress version visible', 'fbs-secure-optimize');
         }
 
         $percentage = $max_score > 0 ? round(($score / $max_score) * 100) : 0;

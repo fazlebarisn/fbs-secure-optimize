@@ -8,12 +8,11 @@
  * Author URI: https://github.com/fazlebarisn
  * License: GPL v2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
- * Text Domain: fbs-optimize
+ * Text Domain: fbs-secure-optimize
  * Domain Path: /languages
  * Requires at least: 5.0
- * Tested up to: 6.4
+ * Tested up to: 6.8
  * Requires PHP: 7.4
- * Network: false
  *
  * @package FBS_Optimize
  */
@@ -74,23 +73,9 @@ class FBS_Secure_Optimize {
      * @author Fazle Bari <fazlebarisn@gmail.com>
      */
     private function init_hooks() {
-        add_action('init', array($this, 'load_textdomain'));
         add_action('plugins_loaded', array($this, 'init_plugin'));
         register_activation_hook(__FILE__, array($this, 'activate'));
         register_deactivation_hook(__FILE__, array($this, 'deactivate'));
-    }
-
-    /**
-     * Load plugin textdomain for translations
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     */
-    public function load_textdomain() {
-        load_plugin_textdomain(
-            'fbs-optimize',
-            false,
-            dirname(plugin_basename(__FILE__)) . '/languages'
-        );
     }
 
     /**

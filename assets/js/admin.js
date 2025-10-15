@@ -26,6 +26,7 @@
             this.bindEvents();
             this.initTabs();
             this.initTooltips();
+            this.initDependentOptions();
         },
 
         /**
@@ -188,6 +189,9 @@
             setTimeout(function() {
                 $container.removeClass('changing');
             }, 200);
+            
+            // Handle dependent options
+            FBSOptimizeAdmin.updateDependentOptions($toggle);
         },
 
         /**
@@ -436,6 +440,52 @@
             }
             
             $progressBar.find('.fbs-opt-progress-fill').css('width', progress + '%');
+        },
+
+        /**
+         * Initialize dependent options
+         * @since 1.0.0
+         * @author Fazle Bari <fazlebarisn@gmail.com>
+         */
+        initDependentOptions: function() {
+            // Initialize all dependent options based on their parent toggles
+            $('.fbs-opt-dependent-option').each(function() {
+                var $dependentOption = $(this);
+                var dependsOn = $dependentOption.data('depends-on');
+                
+                if (dependsOn) {
+                    var $parentToggle = $('#' + dependsOn);
+                    if ($parentToggle.length) {
+                        FBSOptimizeAdmin.updateDependentOptions($parentToggle);
+                    }
+                }
+            });
+        },
+
+        /**
+         * Update dependent options based on toggle state
+         * @since 1.0.0
+         * @author Fazle Bari <fazlebarisn@gmail.com>
+         * @param {jQuery} $toggle The toggle element that controls dependent options
+         */
+        updateDependentOptions: function($toggle) {
+            var toggleId = $toggle.attr('id');
+            var isChecked = $toggle.is(':checked');
+            
+            // Find all dependent options that depend on this toggle
+            $('.fbs-opt-dependent-option[data-depends-on="' + toggleId + '"]').each(function() {
+                var $dependentOption = $(this);
+                
+                if (isChecked) {
+                    // Enable the dependent option
+                    $dependentOption.removeClass('disabled');
+                    $dependentOption.find('select, input, textarea').prop('disabled', false);
+                } else {
+                    // Disable the dependent option
+                    $dependentOption.addClass('disabled');
+                    $dependentOption.find('select, input, textarea').prop('disabled', true);
+                }
+            });
         },
 
         /**

@@ -221,6 +221,9 @@ class FBS_Secure_Optimize_Asset_Optimizer {
         // Remove spaces around specific characters
         $buffer = str_replace(array(' {', '{ ', ' }', '} ', '; ', ' ;', ': ', ' :', ', ', ' ,'), array('{', '{', '}', '}', ';', ';', ':', ':', ',', ','), $buffer);
         
+        // Trim final result
+        $buffer = trim($buffer);
+        
         return $buffer;
     }
 
@@ -253,6 +256,9 @@ class FBS_Secure_Optimize_Asset_Optimizer {
         // Remove spaces around operators
         $buffer = preg_replace('/\s*([{}();,=+\-*\/])\s*/', '$1', $buffer);
         
+        // Trim final result
+        $buffer = trim($buffer);
+        
         return $buffer;
     }
 
@@ -269,7 +275,6 @@ class FBS_Secure_Optimize_Asset_Optimizer {
         }
 
         $combined_css = array();
-        $combined_url = $this->get_combined_css_url();
 
         // Collect CSS files to combine
         foreach ($wp_styles->queue as $handle) {
@@ -290,15 +295,21 @@ class FBS_Secure_Optimize_Asset_Optimizer {
             }
         }
 
+        // Only proceed if we have files to combine
+        if (empty($combined_css)) {
+            return;
+        }
+
+        // Get combined URL after populating the array
+        $combined_url = $this->get_combined_css_url();
+
         // Remove original styles
         foreach ($this->combined_css as $handle) {
             wp_dequeue_style($handle);
         }
 
         // Add combined CSS
-        if (!empty($combined_css)) {
-            wp_enqueue_style('fbs-opt-combined-css', $combined_url, array(), FBS_SECURE_OPTIMIZE_VERSION);
-        }
+        wp_enqueue_style('fbs-opt-combined-css', $combined_url, array(), FBS_SECURE_OPTIMIZE_VERSION);
     }
 
     /**
@@ -314,7 +325,6 @@ class FBS_Secure_Optimize_Asset_Optimizer {
         }
 
         $combined_js = array();
-        $combined_url = $this->get_combined_js_url();
 
         // Collect JS files to combine
         foreach ($wp_scripts->queue as $handle) {
@@ -335,15 +345,21 @@ class FBS_Secure_Optimize_Asset_Optimizer {
             }
         }
 
+        // Only proceed if we have files to combine
+        if (empty($combined_js)) {
+            return;
+        }
+
+        // Get combined URL after populating the array
+        $combined_url = $this->get_combined_js_url();
+
         // Remove original scripts
         foreach ($this->combined_js as $handle) {
             wp_dequeue_script($handle);
         }
 
         // Add combined JS
-        if (!empty($combined_js)) {
-            wp_enqueue_script('fbs-opt-combined-js', $combined_url, array(), FBS_SECURE_OPTIMIZE_VERSION, true);
-        }
+        wp_enqueue_script('fbs-opt-combined-js', $combined_url, array(), FBS_SECURE_OPTIMIZE_VERSION, true);
     }
 
     /**
@@ -468,9 +484,9 @@ class FBS_Secure_Optimize_Asset_Optimizer {
      * @return string|false File path or false if not found
      */
     private function get_file_path($url) {
-        $parsed_url = parse_url($url);
+        $parsed_url = wp_parse_url($url);
         
-        if (isset($parsed_url['host']) && $parsed_url['host'] !== parse_url(home_url(), PHP_URL_HOST)) {
+        if (isset($parsed_url['host']) && $parsed_url['host'] !== wp_parse_url(home_url(), PHP_URL_HOST)) {
             return false; // External URL
         }
         
@@ -492,7 +508,7 @@ class FBS_Secure_Optimize_Asset_Optimizer {
             $files = glob($cache_dir . '/*');
             foreach ($files as $file) {
                 if (is_file($file)) {
-                    unlink($file);
+                    wp_delete_file($file);
                 }
             }
         }
@@ -527,4 +543,63 @@ class FBS_Secure_Optimize_Asset_Optimizer {
         
         return $stats;
     }
+
+    /**
+     * Get asset optimization statistics
+     * @since 1.0.0
+     * @author Fazle Bari <fazlebarisn@gmail.com>
+     * @return array Asset optimization statistics
+     */
+    public function get_asset_stats() {
+        global $wp_styles, $wp_scripts;
+        
+        $stats = array(
+            'css_files' => 0,
+            'js_files' => 0,
+            'css_size' => 0,
+            'js_size' => 0,
+            'combined_css_files' => 0,
+            'combined_js_files' => 0,
+            'combined_css_size' => 0,
+            'combined_js_size' => 0,
+        );
+        
+        // Count CSS files
+        if (!empty($wp_styles->queue)) {
+            $stats['css_files'] = count($wp_styles->queue);
+            foreach ($wp_styles->queue as $handle) {
+                if (isset($wp_styles->registered[$handle])) {
+                    $style = $wp_styles->registered[$handle];
+                    $file_path = $this->get_file_path($style->src);
+                    if ($file_path && file_exists($file_path)) {
+                        $stats['css_size'] += filesize($file_path);
+                    }
+                }
+            }
+        }
+        
+        // Count JS files
+        if (!empty($wp_scripts->queue)) {
+            $stats['js_files'] = count($wp_scripts->queue);
+            foreach ($wp_scripts->queue as $handle) {
+                if (isset($wp_scripts->registered[$handle])) {
+                    $script = $wp_scripts->registered[$handle];
+                    $file_path = $this->get_file_path($script->src);
+                    if ($file_path && file_exists($file_path)) {
+                        $stats['js_size'] += filesize($file_path);
+                    }
+                }
+            }
+        }
+        
+        // Get combined file stats
+        $cache_stats = $this->get_cache_stats();
+        $stats['combined_css_files'] = $cache_stats['files'] > 0 ? 1 : 0; // Assuming 1 combined CSS file
+        $stats['combined_js_files'] = $cache_stats['files'] > 1 ? 1 : 0; // Assuming 1 combined JS file
+        $stats['combined_css_size'] = $cache_stats['size'] / 2; // Rough estimate
+        $stats['combined_js_size'] = $cache_stats['size'] / 2; // Rough estimate
+        
+        return $stats;
+    }
+
 }
