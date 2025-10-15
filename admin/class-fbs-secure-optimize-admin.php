@@ -863,17 +863,17 @@ class FBS_Secure_Optimize_Admin {
                             <div class="fbs-opt-option-header">
                                 <h4><?php esc_html_e('Automatic Cleanup', 'fbs-secure-optimize'); ?></h4>
                                 <div class="fbs-opt-toggle">
-                                    <input type="checkbox" name="fbs_opt_settings[database_cleanup][auto_cleanup]" value="1" <?php checked(1, $this->get_setting_value('database_cleanup', 'auto_cleanup')); ?> />
+                                    <input type="checkbox" name="fbs_opt_settings[database_cleanup][auto_cleanup]" value="1" id="auto_cleanup_toggle" <?php checked(1, $this->get_setting_value('database_cleanup', 'auto_cleanup')); ?> />
                                     <span class="fbs-opt-slider"></span>
                                 </div>
                             </div>
                             <p class="fbs-opt-option-description"><?php esc_html_e('Automatically perform database cleanup on a schedule', 'fbs-secure-optimize'); ?></p>
                         </div>
                         
-                        <div class="fbs-opt-option-card">
+                        <div class="fbs-opt-option-card fbs-opt-dependent-option" data-depends-on="auto_cleanup_toggle">
                             <div class="fbs-opt-option-header">
                                 <h4><?php esc_html_e('Cleanup Frequency', 'fbs-secure-optimize'); ?></h4>
-                                <select name="fbs_opt_settings[database_cleanup][cleanup_frequency]" class="fbs-opt-select">
+                                <select name="fbs_opt_settings[database_cleanup][cleanup_frequency]" class="fbs-opt-select" id="cleanup_frequency_select">
                                     <option value="daily" <?php selected($this->get_setting_value('database_cleanup', 'cleanup_frequency'), 'daily'); ?>><?php esc_html_e('Daily', 'fbs-secure-optimize'); ?></option>
                                     <option value="weekly" <?php selected($this->get_setting_value('database_cleanup', 'cleanup_frequency'), 'weekly'); ?>><?php esc_html_e('Weekly', 'fbs-secure-optimize'); ?></option>
                                     <option value="monthly" <?php selected($this->get_setting_value('database_cleanup', 'cleanup_frequency'), 'monthly'); ?>><?php esc_html_e('Monthly', 'fbs-secure-optimize'); ?></option>

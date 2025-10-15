@@ -767,6 +767,35 @@
 }
 
 /* ==========================================================================
+   Dependent Options
+   ========================================================================== */
+
+.fbs-opt-admin-wrap .fbs-opt-dependent-option {
+    transition: all 0.3s ease;
+}
+
+.fbs-opt-admin-wrap .fbs-opt-dependent-option.disabled {
+    opacity: 0.5;
+    pointer-events: none;
+    background: #f1f3f4;
+    border-color: #e1e5e9;
+}
+
+.fbs-opt-admin-wrap .fbs-opt-dependent-option.disabled .fbs-opt-option-header h4 {
+    color: #9aa0a6;
+}
+
+.fbs-opt-admin-wrap .fbs-opt-dependent-option.disabled .fbs-opt-option-description {
+    color: #9aa0a6;
+}
+
+.fbs-opt-admin-wrap .fbs-opt-dependent-option.disabled .fbs-opt-select {
+    background: #f8f9fa;
+    color: #9aa0a6;
+    cursor: not-allowed;
+}
+
+/* ==========================================================================
    Accessibility
    ========================================================================== */
 
