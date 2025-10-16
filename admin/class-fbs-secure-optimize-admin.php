@@ -786,18 +786,18 @@ class FBS_Secure_Optimize_Admin {
                             <div class="fbs-opt-option-header">
                                 <h4><?php esc_html_e('Lazy Load Images', 'fbs-secure-optimize'); ?></h4>
                                 <div class="fbs-opt-toggle">
-                                    <input type="checkbox" name="fbs_opt_settings[asset_optimization][lazy_load_images]" value="1" id="lazy_load_images_toggle" <?php checked(1, $this->get_setting_value('asset_optimization', 'lazy_load_images')); ?> />
+                                    <input type="checkbox" name="fbs_opt_settings[asset_optimization][lazy_load_images]" value="1" <?php checked(1, $this->get_setting_value('asset_optimization', 'lazy_load_images')); ?> />
                                     <span class="fbs-opt-slider"></span>
                                 </div>
                             </div>
                             <p class="fbs-opt-option-description"><?php esc_html_e('Load images only when they are about to enter the viewport', 'fbs-secure-optimize'); ?></p>
                         </div>
                         
-                        <div class="fbs-opt-option-card fbs-opt-dependent-option" data-depends-on="lazy_load_images_toggle">
+                        <div class="fbs-opt-option-card">
                             <div class="fbs-opt-option-header">
                                 <h4><?php esc_html_e('Lazy Load Iframes', 'fbs-secure-optimize'); ?></h4>
                                 <div class="fbs-opt-toggle">
-                                    <input type="checkbox" name="fbs_opt_settings[asset_optimization][lazy_load_iframes]" value="1" id="lazy_load_iframes_input" <?php checked(1, $this->get_setting_value('asset_optimization', 'lazy_load_iframes')); ?> />
+                                    <input type="checkbox" name="fbs_opt_settings[asset_optimization][lazy_load_iframes]" value="1" <?php checked(1, $this->get_setting_value('asset_optimization', 'lazy_load_iframes')); ?> />
                                     <span class="fbs-opt-slider"></span>
                                 </div>
                             </div>
