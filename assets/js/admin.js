@@ -52,8 +52,6 @@
             $(document).on('click', '.fbs-opt-export-btn', this.handleExportClick);
             $(document).on('click', '.fbs-opt-import-btn', this.handleImportClick);
             
-            // Reset to defaults
-            $(document).on('click', '.fbs-opt-reset-btn', this.handleResetClick);
         },
 
         /**
@@ -317,47 +315,6 @@
             input.click();
         },
 
-        /**
-         * Handle reset button click
-         * @since 1.0.0
-         * @author Fazle Bari <fazlebarisn@gmail.com>
-         */
-        handleResetClick: function(e) {
-            e.preventDefault();
-            
-            var $btn = $(this);
-            var tab = $btn.data('tab');
-            var tabName = tab === 'performance' ? 'Performance' : 'Security';
-            
-            if (!confirm('Are you sure you want to reset all ' + tabName + ' settings to defaults? This action cannot be undone.')) {
-                return;
-            }
-            
-            $btn.prop('disabled', true).html('<span class="dashicons dashicons-update"></span> Resetting...');
-            
-            $.ajax({
-                url: fbsOptAdmin.ajaxUrl,
-                type: 'POST',
-                data: {
-                    action: 'fbs_opt_reset_settings',
-                    tab: tab,
-                    nonce: fbsOptAdmin.nonce
-                },
-                success: function(response) {
-                    if (response.success) {
-                        location.reload();
-                    } else {
-                        alert('Failed to reset settings.');
-                    }
-                },
-                error: function() {
-                    alert('Failed to reset settings.');
-                },
-                complete: function() {
-                    $btn.prop('disabled', false).html('<span class="dashicons dashicons-undo"></span> Reset to Defaults');
-                }
-            });
-        },
 
         /**
          * Get current settings

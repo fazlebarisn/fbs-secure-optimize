@@ -75,7 +75,10 @@ class FBS_Secure_Optimize_Controller {
      * @author Fazle Bari <fazlebarisn@gmail.com>
      */
     public function init() {
-        // Plugin initialization logic can be added here if needed
+        // Initialize admin interface
+        if (is_admin()) {
+            FBS_Secure_Optimize_Admin::get_instance();
+        }
     }
 
     /**
@@ -152,6 +155,7 @@ class FBS_Secure_Optimize_Controller {
                 'confirmCleanup' => __('Are you sure you want to perform database cleanup? This action cannot be undone.', 'fbs-secure-optimize'),
                 'cleanupSuccess' => __('Database cleanup completed successfully.', 'fbs-secure-optimize'),
                 'cleanupError' => __('An error occurred during database cleanup.', 'fbs-secure-optimize'),
+                'cleaning' => __('Cleaning database...', 'fbs-secure-optimize'),
             ),
         ));
     }

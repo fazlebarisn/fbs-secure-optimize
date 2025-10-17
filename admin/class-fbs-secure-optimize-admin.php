@@ -76,7 +76,6 @@ class FBS_Secure_Optimize_Admin {
         add_action('admin_notices', array($this, 'admin_notices'));
         add_action('wp_ajax_fbs_opt_cleanup_database', array($this, 'ajax_cleanup_database'));
         add_action('wp_ajax_fbs_opt_clear_cache', array($this, 'ajax_clear_cache'));
-        add_action('wp_ajax_fbs_opt_reset_settings', array($this, 'ajax_reset_settings'));
     }
 
     /**
@@ -472,10 +471,6 @@ class FBS_Secure_Optimize_Admin {
                 
                 <div class="fbs-opt-form-actions">
                     <?php submit_button(__('Save Performance Settings', 'fbs-secure-optimize'), 'primary fbs-opt-button-primary', 'submit', false); ?>
-                    <button type="button" class="fbs-opt-reset-btn fbs-opt-button fbs-opt-button-secondary" data-tab="performance">
-                        <span class="dashicons dashicons-undo"></span>
-                        <?php esc_html_e('Reset to Defaults', 'fbs-secure-optimize'); ?>
-                    </button>
                 </div>
             </form>
         </div>
@@ -611,10 +606,6 @@ class FBS_Secure_Optimize_Admin {
                 
                 <div class="fbs-opt-form-actions">
                     <?php submit_button(__('Save Security Settings', 'fbs-secure-optimize'), 'primary fbs-opt-button-primary', 'submit', false); ?>
-                    <button type="button" class="fbs-opt-reset-btn fbs-opt-button fbs-opt-button-secondary" data-tab="security">
-                        <span class="dashicons dashicons-undo"></span>
-                        <?php esc_html_e('Reset to Defaults', 'fbs-secure-optimize'); ?>
-                    </button>
                 </div>
             </form>
         </div>
@@ -970,49 +961,6 @@ class FBS_Secure_Optimize_Admin {
         }
     }
 
-    /**
-     * AJAX handler for resetting settings
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     */
-    public function ajax_reset_settings() {
-        // Verify nonce
-        if (!isset($_POST['nonce']) || !wp_verify_nonce(wp_unslash($_POST['nonce']), 'fbs_opt_admin_nonce')) {
-            wp_die(esc_html__('Security check failed.', 'fbs-secure-optimize'));
-        }
-        
-        // Check user capabilities
-        if (!current_user_can('manage_options')) {
-            wp_die(esc_html__('You do not have sufficient permissions.', 'fbs-secure-optimize'));
-        }
-        
-        if (!isset($_POST['tab'])) {
-            wp_die(esc_html__('Invalid request.', 'fbs-secure-optimize'));
-        }
-        
-        $tab = sanitize_text_field(wp_unslash($_POST['tab']));
-        $defaults = FBS_Secure_Optimize_Controller::get_default_settings();
-        
-        if ($tab === 'performance') {
-            // Reset performance settings
-            $current_settings = get_option('fbs_opt_settings', array());
-            $current_settings['asset_optimization'] = $defaults['asset_optimization'];
-            $current_settings['database_cleanup'] = $defaults['database_cleanup'];
-            update_option('fbs_opt_settings', $current_settings);
-            
-            wp_send_json_success(array('message' => __('Performance settings reset to defaults.', 'fbs-secure-optimize')));
-        } elseif ($tab === 'security') {
-            // Reset security settings
-            $current_settings = get_option('fbs_opt_settings', array());
-            $current_settings['login_security'] = $defaults['login_security'];
-            $current_settings['security_headers'] = $defaults['security_headers'];
-            update_option('fbs_opt_settings', $current_settings);
-            
-            wp_send_json_success(array('message' => __('Security settings reset to defaults.', 'fbs-secure-optimize')));
-        } else {
-            wp_send_json_error(array('message' => __('Invalid tab specified.', 'fbs-secure-optimize')));
-        }
-    }
 
 
 }

@@ -394,26 +394,6 @@ class FBS_Secure_Optimize_Security_Headers {
         return update_option('fbs_opt_settings', $settings);
     }
 
-    /**
-     * Reset security headers to defaults
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     * @return bool True if successful
-     */
-    public function reset_to_defaults() {
-        $default_headers = array(
-            'x_content_type_options' => 1,
-            'x_frame_options' => 1,
-            'x_xss_protection' => 1,
-            'strict_transport_security' => 0,
-            'hide_wp_version' => 1,
-        );
-
-        $settings = get_option('fbs_opt_settings', array());
-        $settings['security_headers'] = $default_headers;
-
-        return update_option('fbs_opt_settings', $settings);
-    }
 
     /**
      * Get security score

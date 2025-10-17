@@ -107,11 +107,6 @@ class FBS_Secure_Optimize {
     public function init_plugin() {
         // Initialize main controller
         FBS_Secure_Optimize_Controller::get_instance();
-        
-        // Initialize admin interface
-        if (is_admin()) {
-            FBS_Secure_Optimize_Admin::get_instance();
-        }
     }
 
     /**
