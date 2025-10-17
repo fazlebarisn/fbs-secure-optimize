@@ -308,19 +308,19 @@ class FBS_Secure_Optimize_Controller {
     public static function get_default_settings() {
         return array(
             'asset_optimization' => array(
-                'minify_css' => 0,
-                'minify_js' => 0,
-                'combine_css' => 0,
+                'minify_css' => 0,  
+                'minify_js' => 0, 
+                'combine_css' => 0, 
                 'combine_js' => 0,
                 'lazy_load_images' => 1,
                 'lazy_load_iframes' => 1,
             ),
             'database_cleanup' => array(
-                'cleanup_revisions' => 0,
-                'cleanup_autodrafts' => 0,
-                'cleanup_spam_comments' => 0,
-                'cleanup_transients' => 0,
-                'auto_cleanup' => 0,
+                'cleanup_revisions' => 1,
+                'cleanup_autodrafts' => 1,
+                'cleanup_spam_comments' => 1,
+                'cleanup_transients' => 1,
+                'auto_cleanup' => 1,
                 'cleanup_frequency' => 'weekly',
             ),
             'login_security' => array(
