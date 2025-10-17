@@ -150,51 +150,51 @@ class FBS_Secure_Optimize_Admin {
         $current_settings = get_option('fbs_opt_settings', array());
         $sanitized = $current_settings;
 
-        // Sanitize asset optimization settings
+        // Sanitize asset optimization settings (Performance tab)
         if (isset($input['asset_optimization'])) {
             $sanitized['asset_optimization'] = array(
-                'minify_css' => isset($input['asset_optimization']['minify_css']) ? 1 : 0,
-                'minify_js' => isset($input['asset_optimization']['minify_js']) ? 1 : 0,
-                'combine_css' => isset($input['asset_optimization']['combine_css']) ? 1 : 0,
-                'combine_js' => isset($input['asset_optimization']['combine_js']) ? 1 : 0,
-                'lazy_load_images' => isset($input['asset_optimization']['lazy_load_images']) ? 1 : 0,
-                'lazy_load_iframes' => isset($input['asset_optimization']['lazy_load_iframes']) ? 1 : 0,
+                'minify_css' => isset($input['asset_optimization']['minify_css']) ? (int)$input['asset_optimization']['minify_css'] : 0,
+                'minify_js' => isset($input['asset_optimization']['minify_js']) ? (int)$input['asset_optimization']['minify_js'] : 0,
+                'combine_css' => isset($input['asset_optimization']['combine_css']) ? (int)$input['asset_optimization']['combine_css'] : 0,
+                'combine_js' => isset($input['asset_optimization']['combine_js']) ? (int)$input['asset_optimization']['combine_js'] : 0,
+                'lazy_load_images' => isset($input['asset_optimization']['lazy_load_images']) ? (int)$input['asset_optimization']['lazy_load_images'] : 0,
+                'lazy_load_iframes' => isset($input['asset_optimization']['lazy_load_iframes']) ? (int)$input['asset_optimization']['lazy_load_iframes'] : 0,
             );
         }
 
-        // Sanitize database cleanup settings
+        // Sanitize database cleanup settings (Performance tab)
         if (isset($input['database_cleanup'])) {
             $frequency = isset($input['database_cleanup']['cleanup_frequency']) ? sanitize_text_field($input['database_cleanup']['cleanup_frequency']) : 'weekly';
             $allowed_frequencies = array('daily', 'weekly', 'monthly');
             
             $sanitized['database_cleanup'] = array(
-                'cleanup_revisions' => isset($input['database_cleanup']['cleanup_revisions']) ? 1 : 0,
-                'cleanup_autodrafts' => isset($input['database_cleanup']['cleanup_autodrafts']) ? 1 : 0,
-                'cleanup_spam_comments' => isset($input['database_cleanup']['cleanup_spam_comments']) ? 1 : 0,
-                'cleanup_transients' => isset($input['database_cleanup']['cleanup_transients']) ? 1 : 0,
-                'auto_cleanup' => isset($input['database_cleanup']['auto_cleanup']) ? 1 : 0,
+                'cleanup_revisions' => isset($input['database_cleanup']['cleanup_revisions']) ? (int)$input['database_cleanup']['cleanup_revisions'] : 0,
+                'cleanup_autodrafts' => isset($input['database_cleanup']['cleanup_autodrafts']) ? (int)$input['database_cleanup']['cleanup_autodrafts'] : 0,
+                'cleanup_spam_comments' => isset($input['database_cleanup']['cleanup_spam_comments']) ? (int)$input['database_cleanup']['cleanup_spam_comments'] : 0,
+                'cleanup_transients' => isset($input['database_cleanup']['cleanup_transients']) ? (int)$input['database_cleanup']['cleanup_transients'] : 0,
+                'auto_cleanup' => isset($input['database_cleanup']['auto_cleanup']) ? (int)$input['database_cleanup']['auto_cleanup'] : 0,
                 'cleanup_frequency' => in_array($frequency, $allowed_frequencies) ? $frequency : 'weekly',
             );
         }
 
-        // Sanitize login security settings
+        // Sanitize login security settings (Security tab)
         if (isset($input['login_security'])) {
             $sanitized['login_security'] = array(
-                'limit_login_attempts' => isset($input['login_security']['limit_login_attempts']) ? 1 : 0,
+                'limit_login_attempts' => isset($input['login_security']['limit_login_attempts']) ? (int)$input['login_security']['limit_login_attempts'] : 0,
                 'max_attempts' => isset($input['login_security']['max_attempts']) ? max(3, min(20, absint($input['login_security']['max_attempts']))) : 5,
                 'lockout_duration' => isset($input['login_security']['lockout_duration']) ? max(5, min(1440, absint($input['login_security']['lockout_duration']))) : 15,
                 'whitelist_ips' => isset($input['login_security']['whitelist_ips']) ? sanitize_textarea_field($input['login_security']['whitelist_ips']) : '',
             );
         }
 
-        // Sanitize security headers settings
+        // Sanitize security headers settings (Security tab)
         if (isset($input['security_headers'])) {
             $sanitized['security_headers'] = array(
-                'x_content_type_options' => isset($input['security_headers']['x_content_type_options']) ? 1 : 0,
-                'x_frame_options' => isset($input['security_headers']['x_frame_options']) ? 1 : 0,
-                'x_xss_protection' => isset($input['security_headers']['x_xss_protection']) ? 1 : 0,
-                'strict_transport_security' => isset($input['security_headers']['strict_transport_security']) ? 1 : 0,
-                'hide_wp_version' => isset($input['security_headers']['hide_wp_version']) ? 1 : 0,
+                'x_content_type_options' => isset($input['security_headers']['x_content_type_options']) ? (int)$input['security_headers']['x_content_type_options'] : 0,
+                'x_frame_options' => isset($input['security_headers']['x_frame_options']) ? (int)$input['security_headers']['x_frame_options'] : 0,
+                'x_xss_protection' => isset($input['security_headers']['x_xss_protection']) ? (int)$input['security_headers']['x_xss_protection'] : 0,
+                'strict_transport_security' => isset($input['security_headers']['strict_transport_security']) ? (int)$input['security_headers']['strict_transport_security'] : 0,
+                'hide_wp_version' => isset($input['security_headers']['hide_wp_version']) ? (int)$input['security_headers']['hide_wp_version'] : 0,
             );
         }
 
@@ -212,7 +212,7 @@ class FBS_Secure_Optimize_Admin {
      */
     private function get_setting_value($section, $key) {
         $settings = get_option('fbs_opt_settings', array());
-        return isset($settings[$section][$key]) ? $settings[$section][$key] : '';
+        return isset($settings[$section][$key]) ? $settings[$section][$key] : 0;
     }
 
     /**
@@ -304,6 +304,7 @@ class FBS_Secure_Optimize_Admin {
                             <div class="fbs-opt-option-header">
                                 <h4><?php esc_html_e('Minify CSS', 'fbs-secure-optimize'); ?></h4>
                                 <div class="fbs-opt-toggle">
+                                    <input type="hidden" name="fbs_opt_settings[asset_optimization][minify_css]" value="0" />
                                     <input type="checkbox" name="fbs_opt_settings[asset_optimization][minify_css]" value="1" <?php checked(1, $this->get_setting_value('asset_optimization', 'minify_css')); ?> />
                                     <span class="fbs-opt-slider"></span>
                                 </div>
@@ -315,6 +316,7 @@ class FBS_Secure_Optimize_Admin {
                             <div class="fbs-opt-option-header">
                                 <h4><?php esc_html_e('Minify JavaScript', 'fbs-secure-optimize'); ?></h4>
                                 <div class="fbs-opt-toggle">
+                                    <input type="hidden" name="fbs_opt_settings[asset_optimization][minify_js]" value="0" />
                                     <input type="checkbox" name="fbs_opt_settings[asset_optimization][minify_js]" value="1" <?php checked(1, $this->get_setting_value('asset_optimization', 'minify_js')); ?> />
                                     <span class="fbs-opt-slider"></span>
                                 </div>
@@ -326,6 +328,7 @@ class FBS_Secure_Optimize_Admin {
                             <div class="fbs-opt-option-header">
                                 <h4><?php esc_html_e('Combine CSS Files', 'fbs-secure-optimize'); ?></h4>
                                 <div class="fbs-opt-toggle">
+                                    <input type="hidden" name="fbs_opt_settings[asset_optimization][combine_css]" value="0" />
                                     <input type="checkbox" name="fbs_opt_settings[asset_optimization][combine_css]" value="1" <?php checked(1, $this->get_setting_value('asset_optimization', 'combine_css')); ?> />
                                     <span class="fbs-opt-slider"></span>
                                 </div>
@@ -337,6 +340,7 @@ class FBS_Secure_Optimize_Admin {
                             <div class="fbs-opt-option-header">
                                 <h4><?php esc_html_e('Combine JavaScript Files', 'fbs-secure-optimize'); ?></h4>
                                 <div class="fbs-opt-toggle">
+                                    <input type="hidden" name="fbs_opt_settings[asset_optimization][combine_js]" value="0" />
                                     <input type="checkbox" name="fbs_opt_settings[asset_optimization][combine_js]" value="1" <?php checked(1, $this->get_setting_value('asset_optimization', 'combine_js')); ?> />
                                     <span class="fbs-opt-slider"></span>
                                 </div>
@@ -348,6 +352,7 @@ class FBS_Secure_Optimize_Admin {
                             <div class="fbs-opt-option-header">
                                 <h4><?php esc_html_e('Lazy Load Images', 'fbs-secure-optimize'); ?></h4>
                                 <div class="fbs-opt-toggle">
+                                    <input type="hidden" name="fbs_opt_settings[asset_optimization][lazy_load_images]" value="0" />
                                     <input type="checkbox" name="fbs_opt_settings[asset_optimization][lazy_load_images]" value="1" <?php checked(1, $this->get_setting_value('asset_optimization', 'lazy_load_images')); ?> />
                                     <span class="fbs-opt-slider"></span>
                                 </div>
@@ -359,6 +364,7 @@ class FBS_Secure_Optimize_Admin {
                             <div class="fbs-opt-option-header">
                                 <h4><?php esc_html_e('Lazy Load Iframes', 'fbs-secure-optimize'); ?></h4>
                                 <div class="fbs-opt-toggle">
+                                    <input type="hidden" name="fbs_opt_settings[asset_optimization][lazy_load_iframes]" value="0" />
                                     <input type="checkbox" name="fbs_opt_settings[asset_optimization][lazy_load_iframes]" value="1" <?php checked(1, $this->get_setting_value('asset_optimization', 'lazy_load_iframes')); ?> />
                                     <span class="fbs-opt-slider"></span>
                                 </div>
@@ -382,6 +388,7 @@ class FBS_Secure_Optimize_Admin {
                             <div class="fbs-opt-option-header">
                                 <h4><?php esc_html_e('Clean Post Revisions', 'fbs-secure-optimize'); ?></h4>
                                 <div class="fbs-opt-toggle">
+                                    <input type="hidden" name="fbs_opt_settings[database_cleanup][cleanup_revisions]" value="0" />
                                     <input type="checkbox" name="fbs_opt_settings[database_cleanup][cleanup_revisions]" value="1" <?php checked(1, $this->get_setting_value('database_cleanup', 'cleanup_revisions')); ?> />
                                     <span class="fbs-opt-slider"></span>
                                 </div>
@@ -393,6 +400,7 @@ class FBS_Secure_Optimize_Admin {
                             <div class="fbs-opt-option-header">
                                 <h4><?php esc_html_e('Clean Auto-drafts', 'fbs-secure-optimize'); ?></h4>
                                 <div class="fbs-opt-toggle">
+                                    <input type="hidden" name="fbs_opt_settings[database_cleanup][cleanup_autodrafts]" value="0" />
                                     <input type="checkbox" name="fbs_opt_settings[database_cleanup][cleanup_autodrafts]" value="1" <?php checked(1, $this->get_setting_value('database_cleanup', 'cleanup_autodrafts')); ?> />
                                     <span class="fbs-opt-slider"></span>
                                 </div>
@@ -404,6 +412,7 @@ class FBS_Secure_Optimize_Admin {
                             <div class="fbs-opt-option-header">
                                 <h4><?php esc_html_e('Clean Spam Comments', 'fbs-secure-optimize'); ?></h4>
                                 <div class="fbs-opt-toggle">
+                                    <input type="hidden" name="fbs_opt_settings[database_cleanup][cleanup_spam_comments]" value="0" />
                                     <input type="checkbox" name="fbs_opt_settings[database_cleanup][cleanup_spam_comments]" value="1" <?php checked(1, $this->get_setting_value('database_cleanup', 'cleanup_spam_comments')); ?> />
                                     <span class="fbs-opt-slider"></span>
                                 </div>
@@ -415,6 +424,7 @@ class FBS_Secure_Optimize_Admin {
                             <div class="fbs-opt-option-header">
                                 <h4><?php esc_html_e('Clean Transients', 'fbs-secure-optimize'); ?></h4>
                                 <div class="fbs-opt-toggle">
+                                    <input type="hidden" name="fbs_opt_settings[database_cleanup][cleanup_transients]" value="0" />
                                     <input type="checkbox" name="fbs_opt_settings[database_cleanup][cleanup_transients]" value="1" <?php checked(1, $this->get_setting_value('database_cleanup', 'cleanup_transients')); ?> />
                                     <span class="fbs-opt-slider"></span>
                                 </div>
@@ -426,6 +436,7 @@ class FBS_Secure_Optimize_Admin {
                             <div class="fbs-opt-option-header">
                                 <h4><?php esc_html_e('Automatic Cleanup', 'fbs-secure-optimize'); ?></h4>
                                 <div class="fbs-opt-toggle">
+                                    <input type="hidden" name="fbs_opt_settings[database_cleanup][auto_cleanup]" value="0" />
                                     <input type="checkbox" name="fbs_opt_settings[database_cleanup][auto_cleanup]" value="1" id="auto_cleanup_toggle" <?php checked(1, $this->get_setting_value('database_cleanup', 'auto_cleanup')); ?> />
                                     <span class="fbs-opt-slider"></span>
                                 </div>
@@ -504,6 +515,7 @@ class FBS_Secure_Optimize_Admin {
                             <div class="fbs-opt-option-header">
                                 <h4><?php esc_html_e('Limit Login Attempts', 'fbs-secure-optimize'); ?></h4>
                                 <div class="fbs-opt-toggle">
+                                    <input type="hidden" name="fbs_opt_settings[login_security][limit_login_attempts]" value="0" />
                                     <input type="checkbox" name="fbs_opt_settings[login_security][limit_login_attempts]" value="1" id="limit_login_attempts_toggle" <?php checked(1, $this->get_setting_value('login_security', 'limit_login_attempts')); ?> />
                                     <span class="fbs-opt-slider"></span>
                                 </div>
@@ -551,6 +563,7 @@ class FBS_Secure_Optimize_Admin {
                             <div class="fbs-opt-option-header">
                                 <h4><?php esc_html_e('X-Content-Type-Options', 'fbs-secure-optimize'); ?></h4>
                                 <div class="fbs-opt-toggle">
+                                    <input type="hidden" name="fbs_opt_settings[security_headers][x_content_type_options]" value="0" />
                                     <input type="checkbox" name="fbs_opt_settings[security_headers][x_content_type_options]" value="1" <?php checked(1, $this->get_setting_value('security_headers', 'x_content_type_options')); ?> />
                                     <span class="fbs-opt-slider"></span>
                                 </div>
@@ -562,6 +575,7 @@ class FBS_Secure_Optimize_Admin {
                             <div class="fbs-opt-option-header">
                                 <h4><?php esc_html_e('X-Frame-Options', 'fbs-secure-optimize'); ?></h4>
                                 <div class="fbs-opt-toggle">
+                                    <input type="hidden" name="fbs_opt_settings[security_headers][x_frame_options]" value="0" />
                                     <input type="checkbox" name="fbs_opt_settings[security_headers][x_frame_options]" value="1" <?php checked(1, $this->get_setting_value('security_headers', 'x_frame_options')); ?> />
                                     <span class="fbs-opt-slider"></span>
                                 </div>
@@ -573,6 +587,7 @@ class FBS_Secure_Optimize_Admin {
                             <div class="fbs-opt-option-header">
                                 <h4><?php esc_html_e('X-XSS-Protection', 'fbs-secure-optimize'); ?></h4>
                                 <div class="fbs-opt-toggle">
+                                    <input type="hidden" name="fbs_opt_settings[security_headers][x_xss_protection]" value="0" />
                                     <input type="checkbox" name="fbs_opt_settings[security_headers][x_xss_protection]" value="1" <?php checked(1, $this->get_setting_value('security_headers', 'x_xss_protection')); ?> />
                                     <span class="fbs-opt-slider"></span>
                                 </div>
@@ -584,6 +599,7 @@ class FBS_Secure_Optimize_Admin {
                             <div class="fbs-opt-option-header">
                                 <h4><?php esc_html_e('Strict-Transport-Security', 'fbs-secure-optimize'); ?></h4>
                                 <div class="fbs-opt-toggle">
+                                    <input type="hidden" name="fbs_opt_settings[security_headers][strict_transport_security]" value="0" />
                                     <input type="checkbox" name="fbs_opt_settings[security_headers][strict_transport_security]" value="1" <?php checked(1, $this->get_setting_value('security_headers', 'strict_transport_security')); ?> />
                                     <span class="fbs-opt-slider"></span>
                                 </div>
@@ -595,6 +611,7 @@ class FBS_Secure_Optimize_Admin {
                             <div class="fbs-opt-option-header">
                                 <h4><?php esc_html_e('Hide WordPress Version', 'fbs-secure-optimize'); ?></h4>
                                 <div class="fbs-opt-toggle">
+                                    <input type="hidden" name="fbs_opt_settings[security_headers][hide_wp_version]" value="0" />
                                     <input type="checkbox" name="fbs_opt_settings[security_headers][hide_wp_version]" value="1" <?php checked(1, $this->get_setting_value('security_headers', 'hide_wp_version')); ?> />
                                     <span class="fbs-opt-slider"></span>
                                 </div>

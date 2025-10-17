@@ -6,6 +6,27 @@
  */
 
 /* ==========================================================================
+   Dependent Options
+   ========================================================================== */
+
+.fbs-opt-dependent-option.disabled {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.fbs-opt-dependent-option.disabled .fbs-opt-option-header h4 {
+    color: #999;
+}
+
+.fbs-opt-dependent-option.disabled select,
+.fbs-opt-dependent-option.disabled input,
+.fbs-opt-dependent-option.disabled textarea {
+    background-color: #f5f5f5;
+    color: #999;
+    cursor: not-allowed;
+}
+
+/* ==========================================================================
    Main Admin Layout
    ========================================================================== */
 
