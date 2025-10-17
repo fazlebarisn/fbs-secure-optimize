@@ -989,7 +989,7 @@ class FBS_Secure_Optimize_Admin {
         }
         
         $tab = sanitize_text_field(wp_unslash($_POST['tab']));
-        $defaults = $this->get_default_settings();
+        $defaults = FBS_Secure_Optimize_Controller::get_default_settings();
         
         if ($tab === 'performance') {
             // Reset performance settings
@@ -1012,44 +1012,5 @@ class FBS_Secure_Optimize_Admin {
         }
     }
 
-    /**
-     * Get default settings
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     * @return array
-     */
-    private function get_default_settings() {
-        return array(
-            'asset_optimization' => array(
-                'minify_css' => 0,
-                'minify_js' => 0,
-                'combine_css' => 0,
-                'combine_js' => 0,
-                'lazy_load_images' => 0,
-                'lazy_load_iframes' => 0
-            ),
-            'database_cleanup' => array(
-                'cleanup_revisions' => 0,
-                'cleanup_autodrafts' => 0,
-                'cleanup_spam_comments' => 0,
-                'cleanup_transients' => 0,
-                'auto_cleanup' => 0,
-                'cleanup_frequency' => 'weekly'
-            ),
-            'login_security' => array(
-                'limit_login_attempts' => 0,
-                'max_attempts' => 5,
-                'lockout_duration' => 15,
-                'whitelist_ips' => ''
-            ),
-            'security_headers' => array(
-                'x_content_type_options' => 0,
-                'x_frame_options' => 0,
-                'x_xss_protection' => 0,
-                'strict_transport_security' => 0,
-                'hide_wp_version' => 0
-            )
-        );
-    }
 
 }

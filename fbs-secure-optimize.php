@@ -177,38 +177,8 @@ class FBS_Secure_Optimize {
      * @author Fazle Bari <fazlebarisn@gmail.com>
      */
     private function set_default_options() {
-        $default_options = array(
-            'asset_optimization' => array(
-                'minify_css' => 0,
-                'minify_js' => 0,
-                'combine_css' => 0,
-                'combine_js' => 0,
-                'lazy_load_images' => 1,
-                'lazy_load_iframes' => 1,
-            ),
-            'database_cleanup' => array(
-                'cleanup_revisions' => 0,
-                'cleanup_autodrafts' => 0,
-                'cleanup_spam_comments' => 0,
-                'cleanup_transients' => 0,
-                'auto_cleanup' => 0,
-                'cleanup_frequency' => 'weekly',
-            ),
-            'login_security' => array(
-                'limit_login_attempts' => 1,
-                'max_attempts' => 5,
-                'lockout_duration' => 15,
-                'whitelist_ips' => '',
-            ),
-            'security_headers' => array(
-                'x_content_type_options' => 1,
-                'x_frame_options' => 1,
-                'x_xss_protection' => 1,
-                'strict_transport_security' => 0,
-                'hide_wp_version' => 1,
-            ),
-        );
-        
+        // Use centralized default settings from controller
+        $default_options = FBS_Secure_Optimize_Controller::get_default_settings();
         add_option('fbs_opt_settings', $default_options);
     }
 }
