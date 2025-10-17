@@ -75,10 +75,7 @@ class FBS_Secure_Optimize_Controller {
      * @author Fazle Bari <fazlebarisn@gmail.com>
      */
     public function init() {
-        // Initialize admin interface
-        if (is_admin()) {
-            new FBS_Secure_Optimize_Admin();
-        }
+        // Plugin initialization logic can be added here if needed
     }
 
     /**

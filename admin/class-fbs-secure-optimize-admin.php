@@ -135,307 +135,9 @@ class FBS_Secure_Optimize_Admin {
             'fbs_opt_settings',
             array($this, 'sanitize_settings')
         );
-
-        // Performance section
-        add_settings_section(
-            'fbs_opt_performance',
-            __('Performance Settings', 'fbs-secure-optimize'),
-            array($this, 'performance_section_callback'),
-            'fbs_opt_settings'
-        );
-
-        // Security section
-        add_settings_section(
-            'fbs_opt_security',
-            __('Security Settings', 'fbs-secure-optimize'),
-            array($this, 'security_section_callback'),
-            'fbs_opt_settings'
-        );
-
-        // Register settings fields
-        $this->register_performance_fields();
-        $this->register_security_fields();
     }
 
-    /**
-     * Register performance settings fields
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     */
-    private function register_performance_fields() {
-        // Asset Optimization
-        add_settings_field(
-            'minify_css',
-            __('Minify CSS', 'fbs-secure-optimize'),
-            array($this, 'checkbox_field_callback'),
-            'fbs_opt_settings',
-            'fbs_opt_performance',
-            array(
-                'label_for' => 'minify_css',
-                'description' => __('Minify CSS files to reduce file size.', 'fbs-secure-optimize'),
-            )
-        );
 
-        add_settings_field(
-            'minify_js',
-            __('Minify JavaScript', 'fbs-secure-optimize'),
-            array($this, 'checkbox_field_callback'),
-            'fbs_opt_settings',
-            'fbs_opt_performance',
-            array(
-                'label_for' => 'minify_js',
-                'description' => __('Minify JavaScript files to reduce file size.', 'fbs-secure-optimize'),
-            )
-        );
-
-        add_settings_field(
-            'combine_css',
-            __('Combine CSS Files', 'fbs-secure-optimize'),
-            array($this, 'checkbox_field_callback'),
-            'fbs_opt_settings',
-            'fbs_opt_performance',
-            array(
-                'label_for' => 'combine_css',
-                'description' => __('Combine multiple CSS files into one to reduce HTTP requests.', 'fbs-secure-optimize'),
-            )
-        );
-
-        add_settings_field(
-            'combine_js',
-            __('Combine JavaScript Files', 'fbs-secure-optimize'),
-            array($this, 'checkbox_field_callback'),
-            'fbs_opt_settings',
-            'fbs_opt_performance',
-            array(
-                'label_for' => 'combine_js',
-                'description' => __('Combine multiple JavaScript files into one to reduce HTTP requests.', 'fbs-secure-optimize'),
-            )
-        );
-
-        add_settings_field(
-            'lazy_load_images',
-            __('Lazy Load Images', 'fbs-secure-optimize'),
-            array($this, 'checkbox_field_callback'),
-            'fbs_opt_settings',
-            'fbs_opt_performance',
-            array(
-                'label_for' => 'lazy_load_images',
-                'description' => __('Load images only when they are about to enter the viewport.', 'fbs-secure-optimize'),
-            )
-        );
-
-        add_settings_field(
-            'lazy_load_iframes',
-            __('Lazy Load Iframes', 'fbs-secure-optimize'),
-            array($this, 'checkbox_field_callback'),
-            'fbs_opt_settings',
-            'fbs_opt_performance',
-            array(
-                'label_for' => 'lazy_load_iframes',
-                'description' => __('Load iframes only when they are about to enter the viewport.', 'fbs-secure-optimize'),
-            )
-        );
-
-        // Database Cleanup
-        add_settings_field(
-            'cleanup_revisions',
-            __('Clean Post Revisions', 'fbs-secure-optimize'),
-            array($this, 'checkbox_field_callback'),
-            'fbs_opt_settings',
-            'fbs_opt_performance',
-            array(
-                'label_for' => 'cleanup_revisions',
-                'description' => __('Remove old post revisions to reduce database size.', 'fbs-secure-optimize'),
-            )
-        );
-
-        add_settings_field(
-            'cleanup_autodrafts',
-            __('Clean Auto-drafts', 'fbs-secure-optimize'),
-            array($this, 'checkbox_field_callback'),
-            'fbs_opt_settings',
-            'fbs_opt_performance',
-            array(
-                'label_for' => 'cleanup_autodrafts',
-                'description' => __('Remove auto-draft posts to reduce database size.', 'fbs-secure-optimize'),
-            )
-        );
-
-        add_settings_field(
-            'cleanup_spam_comments',
-            __('Clean Spam Comments', 'fbs-secure-optimize'),
-            array($this, 'checkbox_field_callback'),
-            'fbs_opt_settings',
-            'fbs_opt_performance',
-            array(
-                'label_for' => 'cleanup_spam_comments',
-                'description' => __('Remove spam comments to reduce database size.', 'fbs-secure-optimize'),
-            )
-        );
-
-        add_settings_field(
-            'cleanup_transients',
-            __('Clean Transients', 'fbs-secure-optimize'),
-            array($this, 'checkbox_field_callback'),
-            'fbs_opt_settings',
-            'fbs_opt_performance',
-            array(
-                'label_for' => 'cleanup_transients',
-                'description' => __('Remove expired transients to reduce database size.', 'fbs-secure-optimize'),
-            )
-        );
-
-        add_settings_field(
-            'auto_cleanup',
-            __('Automatic Cleanup', 'fbs-secure-optimize'),
-            array($this, 'checkbox_field_callback'),
-            'fbs_opt_settings',
-            'fbs_opt_performance',
-            array(
-                'label_for' => 'auto_cleanup',
-                'description' => __('Automatically perform database cleanup on a schedule.', 'fbs-secure-optimize'),
-            )
-        );
-
-        add_settings_field(
-            'cleanup_frequency',
-            __('Cleanup Frequency', 'fbs-secure-optimize'),
-            array($this, 'select_field_callback'),
-            'fbs_opt_settings',
-            'fbs_opt_performance',
-            array(
-                'label_for' => 'cleanup_frequency',
-                'options' => array(
-                    'daily' => __('Daily', 'fbs-secure-optimize'),
-                    'weekly' => __('Weekly', 'fbs-secure-optimize'),
-                    'monthly' => __('Monthly', 'fbs-secure-optimize'),
-                ),
-                'description' => __('How often to perform automatic cleanup.', 'fbs-secure-optimize'),
-            )
-        );
-    }
-
-    /**
-     * Register security settings fields
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     */
-    private function register_security_fields() {
-        // Login Security
-        add_settings_field(
-            'limit_login_attempts',
-            __('Limit Login Attempts', 'fbs-secure-optimize'),
-            array($this, 'checkbox_field_callback'),
-            'fbs_opt_settings',
-            'fbs_opt_security',
-            array(
-                'label_for' => 'limit_login_attempts',
-                'description' => __('Limit the number of login attempts to prevent brute force attacks.', 'fbs-secure-optimize'),
-            )
-        );
-
-        add_settings_field(
-            'max_attempts',
-            __('Maximum Attempts', 'fbs-secure-optimize'),
-            array($this, 'number_field_callback'),
-            'fbs_opt_settings',
-            'fbs_opt_security',
-            array(
-                'label_for' => 'max_attempts',
-                'min' => 3,
-                'max' => 20,
-                'description' => __('Maximum number of login attempts before lockout.', 'fbs-secure-optimize'),
-            )
-        );
-
-        add_settings_field(
-            'lockout_duration',
-            __('Lockout Duration (minutes)', 'fbs-secure-optimize'),
-            array($this, 'number_field_callback'),
-            'fbs_opt_settings',
-            'fbs_opt_security',
-            array(
-                'label_for' => 'lockout_duration',
-                'min' => 5,
-                'max' => 1440,
-                'description' => __('How long to lock out users after exceeding maximum attempts.', 'fbs-secure-optimize'),
-            )
-        );
-
-        add_settings_field(
-            'whitelist_ips',
-            __('Whitelist IP Addresses', 'fbs-secure-optimize'),
-            array($this, 'textarea_field_callback'),
-            'fbs_opt_settings',
-            'fbs_opt_security',
-            array(
-                'label_for' => 'whitelist_ips',
-                'rows' => 3,
-                'description' => __('IP addresses that are exempt from login attempt limits (one per line).', 'fbs-secure-optimize'),
-            )
-        );
-
-        // Security Headers
-        add_settings_field(
-            'x_content_type_options',
-            __('X-Content-Type-Options', 'fbs-secure-optimize'),
-            array($this, 'checkbox_field_callback'),
-            'fbs_opt_settings',
-            'fbs_opt_security',
-            array(
-                'label_for' => 'x_content_type_options',
-                'description' => __('Prevent MIME type sniffing attacks.', 'fbs-secure-optimize'),
-            )
-        );
-
-        add_settings_field(
-            'x_frame_options',
-            __('X-Frame-Options', 'fbs-secure-optimize'),
-            array($this, 'checkbox_field_callback'),
-            'fbs_opt_settings',
-            'fbs_opt_security',
-            array(
-                'label_for' => 'x_frame_options',
-                'description' => __('Prevent clickjacking attacks.', 'fbs-secure-optimize'),
-            )
-        );
-
-        add_settings_field(
-            'x_xss_protection',
-            __('X-XSS-Protection', 'fbs-secure-optimize'),
-            array($this, 'checkbox_field_callback'),
-            'fbs_opt_settings',
-            'fbs_opt_security',
-            array(
-                'label_for' => 'x_xss_protection',
-                'description' => __('Enable XSS filtering in browsers.', 'fbs-secure-optimize'),
-            )
-        );
-
-        add_settings_field(
-            'strict_transport_security',
-            __('Strict-Transport-Security', 'fbs-secure-optimize'),
-            array($this, 'checkbox_field_callback'),
-            'fbs_opt_settings',
-            'fbs_opt_security',
-            array(
-                'label_for' => 'strict_transport_security',
-                'description' => __('Force HTTPS connections (requires SSL certificate).', 'fbs-secure-optimize'),
-            )
-        );
-
-        add_settings_field(
-            'hide_wp_version',
-            __('Hide WordPress Version', 'fbs-secure-optimize'),
-            array($this, 'checkbox_field_callback'),
-            'fbs_opt_settings',
-            'fbs_opt_security',
-            array(
-                'label_for' => 'hide_wp_version',
-                'description' => __('Remove WordPress version from head and RSS feeds.', 'fbs-secure-optimize'),
-            )
-        );
-    }
 
     /**
      * Sanitize settings
@@ -445,200 +147,59 @@ class FBS_Secure_Optimize_Admin {
      * @return array Sanitized data
      */
     public function sanitize_settings($input) {
-        // Get current settings to preserve existing data
-        $current_settings = get_option('fbs_opt_settings', array());
-        $sanitized = $current_settings;
+        $sanitized = array();
 
-        // Sanitize performance settings
+        // Sanitize asset optimization settings
         if (isset($input['asset_optimization'])) {
-            $sanitized['asset_optimization'] = array();
-            $asset_fields = array('minify_css', 'minify_js', 'combine_css', 'combine_js', 'lazy_load_images', 'lazy_load_iframes');
-            
-            foreach ($asset_fields as $field) {
-                $sanitized['asset_optimization'][$field] = isset($input['asset_optimization'][$field]) ? 1 : 0;
-            }
+            $sanitized['asset_optimization'] = array(
+                'minify_css' => isset($input['asset_optimization']['minify_css']) ? 1 : 0,
+                'minify_js' => isset($input['asset_optimization']['minify_js']) ? 1 : 0,
+                'combine_css' => isset($input['asset_optimization']['combine_css']) ? 1 : 0,
+                'combine_js' => isset($input['asset_optimization']['combine_js']) ? 1 : 0,
+                'lazy_load_images' => isset($input['asset_optimization']['lazy_load_images']) ? 1 : 0,
+                'lazy_load_iframes' => isset($input['asset_optimization']['lazy_load_iframes']) ? 1 : 0,
+            );
         }
 
+        // Sanitize database cleanup settings
         if (isset($input['database_cleanup'])) {
-            $sanitized['database_cleanup'] = array();
-            $cleanup_fields = array('cleanup_revisions', 'cleanup_autodrafts', 'cleanup_spam_comments', 'cleanup_transients', 'auto_cleanup');
+            $frequency = isset($input['database_cleanup']['cleanup_frequency']) ? sanitize_text_field($input['database_cleanup']['cleanup_frequency']) : 'weekly';
+            $allowed_frequencies = array('daily', 'weekly', 'monthly');
             
-            foreach ($cleanup_fields as $field) {
-                $sanitized['database_cleanup'][$field] = isset($input['database_cleanup'][$field]) ? 1 : 0;
-            }
-            
-            if (isset($input['database_cleanup']['cleanup_frequency'])) {
-                $frequency = sanitize_text_field($input['database_cleanup']['cleanup_frequency']);
-                $allowed_frequencies = array('daily', 'weekly', 'monthly');
-                $sanitized['database_cleanup']['cleanup_frequency'] = in_array($frequency, $allowed_frequencies) ? $frequency : 'weekly';
-            }
+            $sanitized['database_cleanup'] = array(
+                'cleanup_revisions' => isset($input['database_cleanup']['cleanup_revisions']) ? 1 : 0,
+                'cleanup_autodrafts' => isset($input['database_cleanup']['cleanup_autodrafts']) ? 1 : 0,
+                'cleanup_spam_comments' => isset($input['database_cleanup']['cleanup_spam_comments']) ? 1 : 0,
+                'cleanup_transients' => isset($input['database_cleanup']['cleanup_transients']) ? 1 : 0,
+                'auto_cleanup' => isset($input['database_cleanup']['auto_cleanup']) ? 1 : 0,
+                'cleanup_frequency' => in_array($frequency, $allowed_frequencies) ? $frequency : 'weekly',
+            );
         }
 
-        // Sanitize security settings
+        // Sanitize login security settings
         if (isset($input['login_security'])) {
-            $sanitized['login_security'] = array();
-            $sanitized['login_security']['limit_login_attempts'] = isset($input['login_security']['limit_login_attempts']) ? 1 : 0;
-            $sanitized['login_security']['max_attempts'] = isset($input['login_security']['max_attempts']) ? absint($input['login_security']['max_attempts']) : 5;
-            $sanitized['login_security']['lockout_duration'] = isset($input['login_security']['lockout_duration']) ? absint($input['login_security']['lockout_duration']) : 15;
-            $sanitized['login_security']['whitelist_ips'] = isset($input['login_security']['whitelist_ips']) ? sanitize_textarea_field($input['login_security']['whitelist_ips']) : '';
+            $sanitized['login_security'] = array(
+                'limit_login_attempts' => isset($input['login_security']['limit_login_attempts']) ? 1 : 0,
+                'max_attempts' => isset($input['login_security']['max_attempts']) ? max(3, min(20, absint($input['login_security']['max_attempts']))) : 5,
+                'lockout_duration' => isset($input['login_security']['lockout_duration']) ? max(5, min(1440, absint($input['login_security']['lockout_duration']))) : 15,
+                'whitelist_ips' => isset($input['login_security']['whitelist_ips']) ? sanitize_textarea_field($input['login_security']['whitelist_ips']) : '',
+            );
         }
 
+        // Sanitize security headers settings
         if (isset($input['security_headers'])) {
-            $sanitized['security_headers'] = array();
-            $header_fields = array('x_content_type_options', 'x_frame_options', 'x_xss_protection', 'strict_transport_security', 'hide_wp_version');
-            
-            foreach ($header_fields as $field) {
-                $sanitized['security_headers'][$field] = isset($input['security_headers'][$field]) ? 1 : 0;
-            }
+            $sanitized['security_headers'] = array(
+                'x_content_type_options' => isset($input['security_headers']['x_content_type_options']) ? 1 : 0,
+                'x_frame_options' => isset($input['security_headers']['x_frame_options']) ? 1 : 0,
+                'x_xss_protection' => isset($input['security_headers']['x_xss_protection']) ? 1 : 0,
+                'strict_transport_security' => isset($input['security_headers']['strict_transport_security']) ? 1 : 0,
+                'hide_wp_version' => isset($input['security_headers']['hide_wp_version']) ? 1 : 0,
+            );
         }
 
         return $sanitized;
     }
 
-    /**
-     * Performance section callback
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     */
-    public function performance_section_callback() {
-        echo '<p>' . esc_html__('Configure performance optimization settings to improve your website speed.', 'fbs-secure-optimize') . '</p>';
-    }
-
-    /**
-     * Security section callback
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     */
-    public function security_section_callback() {
-        echo '<p>' . esc_html__('Configure security settings to protect your website from common threats.', 'fbs-secure-optimize') . '</p>';
-    }
-
-    /**
-     * Checkbox field callback
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     * @param array $args Field arguments
-     */
-    public function checkbox_field_callback($args) {
-        $settings = get_option('fbs_opt_settings', array());
-        $section = $this->get_current_section();
-        $value = isset($settings[$section][$args['label_for']]) ? $settings[$section][$args['label_for']] : 0;
-        
-        printf(
-            '<input type="checkbox" id="%1$s" name="fbs_opt_settings[%2$s][%1$s]" value="1" %3$s />',
-            esc_attr($args['label_for']),
-            esc_attr($section),
-            checked(1, $value, false)
-        );
-        
-        if (isset($args['description'])) {
-            printf('<p class="description">%s</p>', esc_html($args['description']));
-        }
-    }
-
-    /**
-     * Number field callback
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     * @param array $args Field arguments
-     */
-    public function number_field_callback($args) {
-        $settings = get_option('fbs_opt_settings', array());
-        $section = $this->get_current_section();
-        $value = isset($settings[$section][$args['label_for']]) ? $settings[$section][$args['label_for']] : '';
-        
-        $attributes = array();
-        if (isset($args['min'])) {
-            $attributes[] = 'min="' . esc_attr($args['min']) . '"';
-        }
-        if (isset($args['max'])) {
-            $attributes[] = 'max="' . esc_attr($args['max']) . '"';
-        }
-        
-        printf(
-            '<input type="number" id="%1$s" name="fbs_opt_settings[%2$s][%1$s]" value="%3$s" %4$s />',
-            esc_attr($args['label_for']),
-            esc_attr($section),
-            esc_attr($value),
-            wp_kses_data(implode(' ', $attributes))
-        );
-        
-        if (isset($args['description'])) {
-            printf('<p class="description">%s</p>', esc_html($args['description']));
-        }
-    }
-
-    /**
-     * Select field callback
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     * @param array $args Field arguments
-     */
-    public function select_field_callback($args) {
-        $settings = get_option('fbs_opt_settings', array());
-        $section = $this->get_current_section();
-        $value = isset($settings[$section][$args['label_for']]) ? $settings[$section][$args['label_for']] : '';
-        
-        printf('<select id="%1$s" name="fbs_opt_settings[%2$s][%1$s]">', esc_attr($args['label_for']), esc_attr($section));
-        
-        foreach ($args['options'] as $option_value => $option_label) {
-            printf(
-                '<option value="%1$s" %2$s>%3$s</option>',
-                esc_attr($option_value),
-                selected($value, $option_value, false),
-                esc_html($option_label)
-            );
-        }
-        
-        echo '</select>';
-        
-        if (isset($args['description'])) {
-            printf('<p class="description">%s</p>', esc_html($args['description']));
-        }
-    }
-
-    /**
-     * Textarea field callback
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     * @param array $args Field arguments
-     */
-    public function textarea_field_callback($args) {
-        $settings = get_option('fbs_opt_settings', array());
-        $section = $this->get_current_section();
-        $value = isset($settings[$section][$args['label_for']]) ? $settings[$section][$args['label_for']] : '';
-        
-        $rows = isset($args['rows']) ? $args['rows'] : 3;
-        
-        printf(
-            '<textarea id="%1$s" name="fbs_opt_settings[%2$s][%1$s]" rows="%3$s" cols="50">%4$s</textarea>',
-            esc_attr($args['label_for']),
-            esc_attr($section),
-            esc_attr($rows),
-            esc_textarea($value)
-        );
-        
-        if (isset($args['description'])) {
-            printf('<p class="description">%s</p>', esc_html($args['description']));
-        }
-    }
-
-    /**
-     * Get current section based on tab
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     * @return string Section name
-     */
-    private function get_current_section() {
-        switch ($this->current_tab) {
-            case 'performance':
-                return 'asset_optimization';
-            case 'security':
-                return 'login_security';
-            default:
-                return 'asset_optimization';
-        }
-    }
 
     /**
      * Get setting value
@@ -1330,79 +891,6 @@ class FBS_Secure_Optimize_Admin {
         <?php
     }
 
-    /**
-     * Render a settings field
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     * @param string $field_name Field name
-     * @param string $section Section name
-     */
-    private function render_field($field_name, $section) {
-        $settings = get_option('fbs_opt_settings', array());
-        $value = isset($settings[$section][$field_name]) ? $settings[$section][$field_name] : '';
-        
-        echo '<tr>';
-        echo '<th scope="row">' . esc_html(ucwords(str_replace('_', ' ', $field_name))) . '</th>';
-        echo '<td>';
-        
-        switch ($field_name) {
-            case 'minify_css':
-            case 'minify_js':
-            case 'combine_css':
-            case 'combine_js':
-            case 'lazy_load_images':
-            case 'lazy_load_iframes':
-            case 'cleanup_revisions':
-            case 'cleanup_autodrafts':
-            case 'cleanup_spam_comments':
-            case 'cleanup_transients':
-            case 'auto_cleanup':
-            case 'limit_login_attempts':
-            case 'x_content_type_options':
-            case 'x_frame_options':
-            case 'x_xss_protection':
-            case 'strict_transport_security':
-            case 'hide_wp_version':
-                printf(
-                    '<input type="checkbox" name="fbs_opt_settings[%1$s][%2$s]" value="1" %3$s />',
-                    esc_attr($section),
-                    esc_attr($field_name),
-                    checked(1, $value, false)
-                );
-                break;
-                
-            case 'max_attempts':
-            case 'lockout_duration':
-                printf(
-                    '<input type="number" name="fbs_opt_settings[%1$s][%2$s]" value="%3$s" min="1" />',
-                    esc_attr($section),
-                    esc_attr($field_name),
-                    esc_attr($value)
-                );
-                break;
-                
-            case 'cleanup_frequency':
-                $options = array('daily' => __('Daily', 'fbs-secure-optimize'), 'weekly' => __('Weekly', 'fbs-secure-optimize'), 'monthly' => __('Monthly', 'fbs-secure-optimize'));
-                echo '<select name="fbs_opt_settings[' . esc_attr($section) . '][' . esc_attr($field_name) . ']">';
-                foreach ($options as $option_value => $option_label) {
-                    printf('<option value="%1$s" %2$s>%3$s</option>', esc_attr($option_value), selected($value, $option_value, false), esc_html($option_label));
-                }
-                echo '</select>';
-                break;
-                
-            case 'whitelist_ips':
-                printf(
-                    '<textarea name="fbs_opt_settings[%1$s][%2$s]" rows="3" cols="50">%3$s</textarea>',
-                    esc_attr($section),
-                    esc_attr($field_name),
-                    esc_textarea($value)
-                );
-                break;
-        }
-        
-        echo '</td>';
-        echo '</tr>';
-    }
 
     /**
      * Display admin notices
