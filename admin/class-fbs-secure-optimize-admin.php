@@ -486,7 +486,6 @@ class FBS_Secure_Optimize_Admin {
                         <span class="dashicons dashicons-yes-alt"></span>
                         <?php esc_html_e('Save Performance Settings', 'fbs-secure-optimize'); ?>
                     </button>
-                    <span class="fbs-opt-save-status" id="performance-save-status"></span>
                 </div>
             </form>
         </div>
@@ -631,7 +630,6 @@ class FBS_Secure_Optimize_Admin {
                         <span class="dashicons dashicons-yes-alt"></span>
                         <?php esc_html_e('Save Security Settings', 'fbs-secure-optimize'); ?>
                     </button>
-                    <span class="fbs-opt-save-status" id="security-save-status"></span>
                 </div>
             </form>
         </div>

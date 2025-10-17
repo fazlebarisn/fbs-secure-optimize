@@ -714,7 +714,6 @@
             
             // Disable submit button and show loading state
             $submitBtn.prop('disabled', true).addClass('loading');
-            $statusSpan.html('<span class="dashicons dashicons-update spin"></span> Saving...');
             
             // Collect form data
             var formData = $form.serializeArray();
@@ -755,12 +754,7 @@
             if (!hasSettings) {
                 // No settings to save
                 $submitBtn.prop('disabled', false).removeClass('loading');
-                $statusSpan.html('<span class="dashicons dashicons-info" style="color: #0073aa;"></span> No settings to save');
                 FBSOptimizeAdmin.showInfo('No settings to save', 2000);
-                
-                setTimeout(function() {
-                    $statusSpan.empty();
-                }, 2000);
                 return;
             }
             
@@ -775,25 +769,17 @@
                 },
                 success: function(response) {
                     if (response.success) {
-                        $statusSpan.html('<span class="dashicons dashicons-yes-alt" style="color: #46b450;"></span> ' + response.data.message);
                         FBSOptimizeAdmin.showSuccess(response.data.message, 3000);
                     } else {
-                        $statusSpan.html('<span class="dashicons dashicons-warning" style="color: #dc3232;"></span> ' + (response.data.message || 'Save failed'));
                         FBSOptimizeAdmin.showError(response.data.message || 'Save failed', 5000);
                     }
                 },
                 error: function() {
-                    $statusSpan.html('<span class="dashicons dashicons-warning" style="color: #dc3232;"></span> Network error');
                     FBSOptimizeAdmin.showError('Network error occurred. Please check your connection and try again.', 5000);
                 },
                 complete: function() {
                     // Re-enable submit button
                     $submitBtn.prop('disabled', false).removeClass('loading');
-                    
-                    // Clear status message after 3 seconds
-                    setTimeout(function() {
-                        $statusSpan.empty();
-                    }, 3000);
                 }
             });
         },
