@@ -319,7 +319,9 @@ class FBS_Secure_Optimize_Login_Security {
         
         foreach ($ip_keys as $key) {
             if (array_key_exists($key, $_SERVER) === true) {
-                foreach (explode(',', wp_unslash($_SERVER[$key])) as $ip) {
+                // Sanitize the server variable before using it
+                $server_value = sanitize_text_field(wp_unslash($_SERVER[$key]));
+                foreach (explode(',', $server_value) as $ip) {
                     $ip = trim($ip);
                     
                     if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) !== false) {
@@ -329,7 +331,9 @@ class FBS_Secure_Optimize_Login_Security {
             }
         }
         
-        return isset($_SERVER['REMOTE_ADDR']) ? wp_unslash($_SERVER['REMOTE_ADDR']) : '0.0.0.0';
+        // Sanitize REMOTE_ADDR before using it
+        $remote_addr = isset($_SERVER['REMOTE_ADDR']) ? sanitize_text_field(wp_unslash($_SERVER['REMOTE_ADDR'])) : '0.0.0.0';
+        return $remote_addr;
     }
 
     /**
