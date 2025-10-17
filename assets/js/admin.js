@@ -48,6 +48,9 @@
             // Cache clear button
             $(document).on('click', '#fbs-opt-clear-cache-btn', this.handleCacheClearClick);
             
+            // Form submission handlers
+            $(document).on('submit', '.fbs-opt-form', this.handleFormSubmit);
+            
             // Settings form submission
             $(document).on('submit', 'form[action*="options.php"]', this.handleFormSubmit);
             
@@ -446,6 +449,84 @@
                     $(this).remove();
                 });
             }, 5000);
+        },
+
+        /**
+         * Handle form submission via AJAX
+         * @since 1.0.0
+         * @author Fazle Bari <fazlebarisn@gmail.com>
+         */
+        handleFormSubmit: function(e) {
+            e.preventDefault();
+            
+            var $form = $(this);
+            var tab = $form.data('tab');
+            var $submitBtn = $form.find('button[type="submit"]');
+            var $statusSpan = $form.find('.fbs-opt-save-status');
+            
+            // Disable submit button and show loading state
+            $submitBtn.prop('disabled', true).addClass('loading');
+            $statusSpan.html('<span class="dashicons dashicons-update spin"></span> Saving...');
+            
+            // Collect form data
+            var formData = $form.serializeArray();
+            var settings = {};
+            
+            // Convert form data to nested object structure
+            $.each(formData, function(i, field) {
+                var name = field.name;
+                var value = field.value;
+                
+                // Skip WordPress nonce and action fields
+                if (name === '_wpnonce' || name === '_wp_http_referer' || name === 'option_page') {
+                    return;
+                }
+                
+                // Parse nested field names like "fbs_opt_settings[section][field]"
+                var matches = name.match(/^fbs_opt_settings\[([^\]]+)\]\[([^\]]+)\]$/);
+                if (matches) {
+                    var section = matches[1];
+                    var field = matches[2];
+                    
+                    if (!settings[section]) {
+                        settings[section] = {};
+                    }
+                    settings[section][field] = value;
+                }
+            });
+            
+            // Send AJAX request
+            $.ajax({
+                url: fbsOptAdmin.ajaxUrl,
+                type: 'POST',
+                data: {
+                    action: 'fbs_opt_save_settings',
+                    nonce: fbsOptAdmin.nonce,
+                    settings: settings
+                },
+                success: function(response) {
+                    if (response.success) {
+                        $statusSpan.html('<span class="dashicons dashicons-yes-alt" style="color: #46b450;"></span> ' + response.data.message);
+                        FBSOptimizeAdmin.showNotification(response.data.message, 'success');
+                    } else {
+                        $statusSpan.html('<span class="dashicons dashicons-warning" style="color: #dc3232;"></span> ' + (response.data.message || 'Save failed'));
+                        FBSOptimizeAdmin.showNotification(response.data.message || 'Save failed', 'error');
+                    }
+                },
+                error: function() {
+                    $statusSpan.html('<span class="dashicons dashicons-warning" style="color: #dc3232;"></span> Network error');
+                    FBSOptimizeAdmin.showNotification('Network error occurred', 'error');
+                },
+                complete: function() {
+                    // Re-enable submit button
+                    $submitBtn.prop('disabled', false).removeClass('loading');
+                    
+                    // Clear status message after 3 seconds
+                    setTimeout(function() {
+                        $statusSpan.empty();
+                    }, 3000);
+                }
+            });
         },
 
         /**

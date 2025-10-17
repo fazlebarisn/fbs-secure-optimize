@@ -76,6 +76,7 @@ class FBS_Secure_Optimize_Admin {
         add_action('admin_notices', array($this, 'admin_notices'));
         add_action('wp_ajax_fbs_opt_cleanup_database', array($this, 'ajax_cleanup_database'));
         add_action('wp_ajax_fbs_opt_clear_cache', array($this, 'ajax_clear_cache'));
+        add_action('wp_ajax_fbs_opt_save_settings', array($this, 'ajax_save_settings'));
     }
 
     /**
@@ -285,7 +286,7 @@ class FBS_Secure_Optimize_Admin {
     private function display_performance_tab() {
         ?>
         <div class="fbs-opt-performance-tab">
-            <form method="post" action="options.php" class="fbs-opt-form">
+            <form class="fbs-opt-form" data-tab="performance">
                 <?php
                 settings_fields('fbs_opt_settings');
                 ?>
@@ -481,7 +482,11 @@ class FBS_Secure_Optimize_Admin {
                 </div>
                 
                 <div class="fbs-opt-form-actions">
-                    <?php submit_button(__('Save Performance Settings', 'fbs-secure-optimize'), 'primary fbs-opt-button-primary', 'submit', false); ?>
+                    <button type="submit" class="button button-primary fbs-opt-button-primary" id="save-performance-settings">
+                        <span class="dashicons dashicons-yes-alt"></span>
+                        <?php esc_html_e('Save Performance Settings', 'fbs-secure-optimize'); ?>
+                    </button>
+                    <span class="fbs-opt-save-status" id="performance-save-status"></span>
                 </div>
             </form>
         </div>
@@ -496,7 +501,7 @@ class FBS_Secure_Optimize_Admin {
     private function display_security_tab() {
         ?>
         <div class="fbs-opt-security-tab">
-            <form method="post" action="options.php" class="fbs-opt-form">
+            <form class="fbs-opt-form" data-tab="security">
                 <?php
                 settings_fields('fbs_opt_settings');
                 ?>
@@ -622,7 +627,11 @@ class FBS_Secure_Optimize_Admin {
                 </div>
                 
                 <div class="fbs-opt-form-actions">
-                    <?php submit_button(__('Save Security Settings', 'fbs-secure-optimize'), 'primary fbs-opt-button-primary', 'submit', false); ?>
+                    <button type="submit" class="button button-primary fbs-opt-button-primary" id="save-security-settings">
+                        <span class="dashicons dashicons-yes-alt"></span>
+                        <?php esc_html_e('Save Security Settings', 'fbs-secure-optimize'); ?>
+                    </button>
+                    <span class="fbs-opt-save-status" id="security-save-status"></span>
                 </div>
             </form>
         </div>
@@ -975,6 +984,38 @@ class FBS_Secure_Optimize_Admin {
             wp_send_json_success(array('message' => __('Asset cache cleared successfully.', 'fbs-secure-optimize')));
         } else {
             wp_send_json_error(array('message' => __('Asset optimizer module not found.', 'fbs-secure-optimize')));
+        }
+    }
+
+    /**
+     * AJAX handler for saving settings
+     * @since 1.0.0
+     * @author Fazle Bari <fazlebarisn@gmail.com>
+     */
+    public function ajax_save_settings() {
+        // Verify nonce
+        if (!isset($_POST['nonce']) || !wp_verify_nonce(wp_unslash($_POST['nonce']), 'fbs_opt_admin_nonce')) {
+            wp_die(esc_html__('Security check failed.', 'fbs-secure-optimize'));
+        }
+        
+        // Check user capabilities
+        if (!current_user_can('manage_options')) {
+            wp_die(esc_html__('You do not have sufficient permissions.', 'fbs-secure-optimize'));
+        }
+        
+        // Get the settings data
+        $settings_data = isset($_POST['settings']) ? wp_unslash($_POST['settings']) : array();
+        
+        // Sanitize the settings
+        $sanitized_settings = $this->sanitize_settings($settings_data);
+        
+        // Save the settings
+        $result = update_option('fbs_opt_settings', $sanitized_settings);
+        
+        if ($result) {
+            wp_send_json_success(array('message' => __('Settings saved successfully.', 'fbs-secure-optimize')));
+        } else {
+            wp_send_json_error(array('message' => __('Failed to save settings.', 'fbs-secure-optimize')));
         }
     }
 
