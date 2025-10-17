@@ -13,7 +13,7 @@
     $(document).ready(function() {
         FBSOptimizeAdmin.init();
     });
-    
+
     // Also initialize after a short delay to ensure all elements are rendered
     $(window).on('load', function() {
         setTimeout(function() {
@@ -742,6 +742,27 @@
                     settings[section][field] = value;
                 }
             });
+            
+            // Check if any settings were actually provided
+            var hasSettings = false;
+            for (var section in settings) {
+                if (settings[section] && Object.keys(settings[section]).length > 0) {
+                    hasSettings = true;
+                    break;
+                }
+            }
+            
+            if (!hasSettings) {
+                // No settings to save
+                $submitBtn.prop('disabled', false).removeClass('loading');
+                $statusSpan.html('<span class="dashicons dashicons-info" style="color: #0073aa;"></span> No settings to save');
+                FBSOptimizeAdmin.showInfo('No settings to save', 2000);
+                
+                setTimeout(function() {
+                    $statusSpan.empty();
+                }, 2000);
+                return;
+            }
             
             // Send AJAX request
             $.ajax({

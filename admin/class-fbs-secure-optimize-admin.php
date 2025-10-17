@@ -1009,11 +1009,21 @@ class FBS_Secure_Optimize_Admin {
         // Sanitize the settings
         $sanitized_settings = $this->sanitize_settings($settings_data);
         
+        // Get current settings to compare
+        $current_settings = get_option('fbs_opt_settings', array());
+        
         // Save the settings
         $result = update_option('fbs_opt_settings', $sanitized_settings);
         
-        if ($result) {
-            wp_send_json_success(array('message' => __('Settings saved successfully.', 'fbs-secure-optimize')));
+        // Check if settings were actually changed
+        $settings_changed = ($current_settings !== $sanitized_settings);
+        
+        if ($result || !$settings_changed) {
+            // Success if update_option returned true OR if no changes were made
+            $message = $settings_changed ? 
+                __('Settings saved successfully.', 'fbs-secure-optimize') : 
+                __('No changes detected. Settings are already up to date.', 'fbs-secure-optimize');
+            wp_send_json_success(array('message' => $message));
         } else {
             wp_send_json_error(array('message' => __('Failed to save settings.', 'fbs-secure-optimize')));
         }
