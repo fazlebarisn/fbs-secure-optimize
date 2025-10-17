@@ -51,6 +51,9 @@
             // Form submission handlers
             $(document).on('submit', '.fbs-opt-form', this.handleFormSubmit);
             
+            // Window resize handler for popup positioning
+            $(window).on('resize', this.handleWindowResize);
+            
             // Settings form submission
             $(document).on('submit', 'form[action*="options.php"]', this.handleFormSubmit);
             
@@ -146,6 +149,7 @@
                 success: function(response) {
                     if (response.success) {
                         $status.html('<span class="fbs-opt-cleanup-status success">✓ ' + response.data.message + '</span>');
+                        FBSOptimizeAdmin.showSuccess(response.data.message, 4000);
                         
                         // Refresh statistics if on statistics tab
                         if ($('.nav-tab-active').data('tab') === 'statistics') {
@@ -153,10 +157,12 @@
                         }
                     } else {
                         $status.html('<span class="fbs-opt-cleanup-status error">✗ ' + response.data.message + '</span>');
+                        FBSOptimizeAdmin.showError(response.data.message, 5000);
                     }
                 },
                 error: function() {
                     $status.html('<span class="fbs-opt-cleanup-status error">✗ ' + fbsOptAdmin.strings.cleanupError + '</span>');
+                    FBSOptimizeAdmin.showError(fbsOptAdmin.strings.cleanupError, 5000);
                 },
                 complete: function() {
                     $btn.prop('disabled', false);
@@ -202,6 +208,7 @@
                 success: function(response) {
                     if (response.success) {
                         $status.html('<span class="fbs-opt-cleanup-status success">✓ ' + response.data.message + '</span>');
+                        FBSOptimizeAdmin.showSuccess(response.data.message, 4000);
                         
                         // Refresh statistics if on statistics tab
                         if ($('.nav-tab-active').data('tab') === 'statistics') {
@@ -209,10 +216,12 @@
                         }
                     } else {
                         $status.html('<span class="fbs-opt-cleanup-status error">✗ ' + response.data.message + '</span>');
+                        FBSOptimizeAdmin.showError(response.data.message, 5000);
                     }
                 },
                 error: function() {
                     $status.html('<span class="fbs-opt-cleanup-status error">✗ Failed to clear cache</span>');
+                    FBSOptimizeAdmin.showError('Failed to clear cache. Please try again.', 5000);
                 },
                 complete: function() {
                     $btn.prop('disabled', false);
@@ -432,23 +441,262 @@
         },
 
         /**
-         * Show notification
+         * Show beautiful popup notification
          * @since 1.0.0
          * @author Fazle Bari <fazlebarisn@gmail.com>
          */
-        showNotification: function(message, type) {
+        showNotification: function(message, type, duration) {
             type = type || 'info';
+            duration = duration || 4000;
             
-            var $notification = $('<div class="fbs-opt-notice ' + type + '">' + message + '</div>');
+            // Create popup container if it doesn't exist
+            if (!$('#fbs-opt-popup-container').length) {
+                $('body').append('<div id="fbs-opt-popup-container"></div>');
+                this.adjustPopupPosition();
+            }
             
-            $('.wrap h1').after($notification);
+            // Get icon and colors based on type
+            var iconClass, bgColor, borderColor, textColor;
+            switch(type) {
+                case 'success':
+                    iconClass = 'dashicons-yes-alt';
+                    bgColor = '#d4edda';
+                    borderColor = '#28a745';
+                    textColor = '#155724';
+                    break;
+                case 'error':
+                    iconClass = 'dashicons-warning';
+                    bgColor = '#f8d7da';
+                    borderColor = '#dc3545';
+                    textColor = '#721c24';
+                    break;
+                case 'warning':
+                    iconClass = 'dashicons-warning';
+                    bgColor = '#fff3cd';
+                    borderColor = '#ffc107';
+                    textColor = '#856404';
+                    break;
+                default: // info
+                    iconClass = 'dashicons-info';
+                    bgColor = '#d1ecf1';
+                    borderColor = '#17a2b8';
+                    textColor = '#0c5460';
+            }
             
-            // Auto-hide after 5 seconds
+            // Create popup element
+            var popupId = 'fbs-opt-popup-' + Date.now();
+            var $popup = $('<div class="fbs-opt-popup" id="' + popupId + '">' +
+                '<div class="fbs-opt-popup-content">' +
+                    '<div class="fbs-opt-popup-icon">' +
+                        '<span class="dashicons ' + iconClass + '"></span>' +
+                    '</div>' +
+                    '<div class="fbs-opt-popup-message">' + message + '</div>' +
+                    '<button class="fbs-opt-popup-close" type="button">' +
+                        '<span class="dashicons dashicons-no-alt"></span>' +
+                    '</button>' +
+                '</div>' +
+                '<div class="fbs-opt-popup-progress"></div>' +
+            '</div>');
+            
+            // Set colors
+            $popup.css({
+                'background-color': bgColor,
+                'border-left-color': borderColor,
+                'color': textColor
+            });
+            
+            // Add to container
+            $('#fbs-opt-popup-container').append($popup);
+            
+            // Set initial state (off-screen to the right)
+            $popup.css({
+                'transform': 'translateX(100%)',
+                'opacity': '0',
+                'transition': 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+            });
+            
+            // Force a reflow to ensure initial state is applied
+            $popup[0].offsetHeight;
+            
+            // Animate in (slide from right to left)
             setTimeout(function() {
-                $notification.fadeOut(function() {
-                    $(this).remove();
+                $popup.css({
+                    'transform': 'translateX(0)',
+                    'opacity': '1'
                 });
-            }, 5000);
+            }, 10);
+            
+            // Start progress bar animation
+            $popup.find('.fbs-opt-popup-progress').animate({
+                'width': '100%'
+            }, duration, 'linear');
+            
+            // Auto-hide after duration
+            var hideTimeout = setTimeout(function() {
+                FBSOptimizeAdmin.hideNotification(popupId);
+            }, duration);
+            
+            // Close button click
+            $popup.find('.fbs-opt-popup-close').on('click', function() {
+                clearTimeout(hideTimeout);
+                FBSOptimizeAdmin.hideNotification(popupId);
+            });
+            
+            // Click to dismiss
+            $popup.on('click', function(e) {
+                if (!$(e.target).closest('.fbs-opt-popup-close').length) {
+                    clearTimeout(hideTimeout);
+                    FBSOptimizeAdmin.hideNotification(popupId);
+                }
+            });
+        },
+
+        /**
+         * Hide notification popup
+         * @since 1.0.0
+         * @author Fazle Bari <fazlebarisn@gmail.com>
+         */
+        hideNotification: function(popupId) {
+            var $popup = $('#' + popupId);
+            if ($popup.length) {
+                // Animate out (slide to the right)
+                $popup.css({
+                    'transform': 'translateX(100%)',
+                    'opacity': '0'
+                });
+                
+                // Remove after animation completes
+                setTimeout(function() {
+                    $popup.remove();
+                }, 300);
+            }
+        },
+
+        /**
+         * Show success notification
+         * @since 1.0.0
+         * @author Fazle Bari <fazlebarisn@gmail.com>
+         */
+        showSuccess: function(message, duration) {
+            this.showNotification(message, 'success', duration);
+        },
+
+        /**
+         * Show error notification
+         * @since 1.0.0
+         * @author Fazle Bari <fazlebarisn@gmail.com>
+         */
+        showError: function(message, duration) {
+            this.showNotification(message, 'error', duration);
+        },
+
+        /**
+         * Show warning notification
+         * @since 1.0.0
+         * @author Fazle Bari <fazlebarisn@gmail.com>
+         */
+        showWarning: function(message, duration) {
+            this.showNotification(message, 'warning', duration);
+        },
+
+        /**
+         * Show info notification
+         * @since 1.0.0
+         * @author Fazle Bari <fazlebarisn@gmail.com>
+         */
+        showInfo: function(message, duration) {
+            this.showNotification(message, 'info', duration);
+        },
+
+        /**
+         * Clear all notifications
+         * @since 1.0.0
+         * @author Fazle Bari <fazlebarisn@gmail.com>
+         */
+        clearAllNotifications: function() {
+            $('#fbs-opt-popup-container .fbs-opt-popup').each(function() {
+                var popupId = $(this).attr('id');
+                FBSOptimizeAdmin.hideNotification(popupId);
+            });
+        },
+
+        /**
+         * Adjust popup position based on viewport and WordPress admin bar
+         * @since 1.0.0
+         * @author Fazle Bari <fazlebarisn@gmail.com>
+         */
+        adjustPopupPosition: function() {
+            var $container = $('#fbs-opt-popup-container');
+            if (!$container.length) return;
+            
+            var windowWidth = $(window).width();
+            var windowHeight = $(window).height();
+            var adminBarHeight = $('#wpadminbar').length ? $('#wpadminbar').outerHeight() : 0;
+            
+            // Adjust top position based on admin bar
+            var topPosition = Math.max(20, adminBarHeight + 10);
+            
+            // Reset all positioning first
+            $container.css({
+                'left': 'auto',
+                'right': 'auto',
+                'top': 'auto',
+                'max-width': 'none',
+                'width': 'auto'
+            });
+            
+            // Adjust positioning based on screen size
+            if (windowWidth < 600) {
+                // On very small screens, use full width with margins
+                $container.css({
+                    'position': 'fixed',
+                    'top': topPosition + 'px',
+                    'left': '10px',
+                    'right': '10px',
+                    'max-width': (windowWidth - 20) + 'px',
+                    'width': 'auto'
+                });
+            } else if (windowWidth < 782) {
+                // On mobile screens
+                $container.css({
+                    'position': 'fixed',
+                    'top': topPosition + 'px',
+                    'left': '10px',
+                    'right': '10px',
+                    'max-width': Math.min(400, windowWidth - 20) + 'px',
+                    'width': 'auto'
+                });
+            } else {
+                // On desktop screens - ensure it's positioned correctly
+                $container.css({
+                    'position': 'fixed',
+                    'top': topPosition + 'px',
+                    'right': '20px',
+                    'left': 'auto',
+                    'max-width': '400px',
+                    'width': 'auto'
+                });
+            }
+            
+            // Ensure container doesn't go below viewport
+            var containerHeight = $container.outerHeight();
+            if (containerHeight > windowHeight - topPosition - 20) {
+                $container.css('max-height', (windowHeight - topPosition - 20) + 'px');
+                $container.css('overflow-y', 'auto');
+            }
+        },
+
+        /**
+         * Handle window resize for popup positioning
+         * @since 1.0.0
+         * @author Fazle Bari <fazlebarisn@gmail.com>
+         */
+        handleWindowResize: function() {
+            // Debounce the resize handler
+            clearTimeout(FBSOptimizeAdmin.resizeTimeout);
+            FBSOptimizeAdmin.resizeTimeout = setTimeout(function() {
+                FBSOptimizeAdmin.adjustPopupPosition();
+            }, 250);
         },
 
         /**
@@ -507,15 +755,15 @@
                 success: function(response) {
                     if (response.success) {
                         $statusSpan.html('<span class="dashicons dashicons-yes-alt" style="color: #46b450;"></span> ' + response.data.message);
-                        FBSOptimizeAdmin.showNotification(response.data.message, 'success');
+                        FBSOptimizeAdmin.showSuccess(response.data.message, 3000);
                     } else {
                         $statusSpan.html('<span class="dashicons dashicons-warning" style="color: #dc3232;"></span> ' + (response.data.message || 'Save failed'));
-                        FBSOptimizeAdmin.showNotification(response.data.message || 'Save failed', 'error');
+                        FBSOptimizeAdmin.showError(response.data.message || 'Save failed', 5000);
                     }
                 },
                 error: function() {
                     $statusSpan.html('<span class="dashicons dashicons-warning" style="color: #dc3232;"></span> Network error');
-                    FBSOptimizeAdmin.showNotification('Network error occurred', 'error');
+                    FBSOptimizeAdmin.showError('Network error occurred. Please check your connection and try again.', 5000);
                 },
                 complete: function() {
                     // Re-enable submit button
