@@ -100,10 +100,17 @@ class FBS_Secure_Optimize_Admin {
             ),
         );
 
-        // Get current tab from URL
-        if (isset($_GET['tab']) && array_key_exists($_GET['tab'], $this->tabs)) {
-            $this->current_tab = sanitize_text_field(wp_unslash($_GET['tab']));
+        // Get current tab from URL (safe for display purposes only)
+        // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+        if ( isset( $_GET['tab'] ) ) {
+            // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+            $tab = sanitize_text_field( wp_unslash( $_GET['tab'] ) );
+
+            if ( array_key_exists( $tab, $this->tabs ) ) {
+                $this->current_tab = $tab;
+            }
         }
+
     }
 
     /**
@@ -915,10 +922,18 @@ class FBS_Secure_Optimize_Admin {
      * @author Fazle Bari <fazlebarisn@gmail.com>
      */
     public function admin_notices() {
-        if (isset($_GET['settings-updated']) && wp_unslash($_GET['settings-updated'])) {
-            echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__('Settings saved successfully.', 'fbs-secure-optimize') . '</p></div>';
+        // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+        if ( isset( $_GET['settings-updated'] ) ) {
+            // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+            $settings_updated = ! empty( sanitize_text_field( wp_unslash( $_GET['settings-updated'] ) ) );
+    
+            if ( $settings_updated ) {
+                echo '<div class="notice notice-success is-dismissible"><p>' .
+                    esc_html__( 'Settings saved successfully.', 'fbs-secure-optimize' ) .
+                    '</p></div>';
+            }
         }
-    }
+    }    
 
     /**
      * AJAX handler for database cleanup
@@ -927,7 +942,8 @@ class FBS_Secure_Optimize_Admin {
      */
     public function ajax_cleanup_database() {
         // Verify nonce
-        if (!isset($_POST['nonce']) || !wp_verify_nonce(wp_unslash($_POST['nonce']), 'fbs_opt_admin_nonce')) {
+        $nonce = isset($_POST['nonce']) ? sanitize_text_field(wp_unslash($_POST['nonce'])) : '';
+        if (!$nonce || !wp_verify_nonce($nonce, 'fbs_opt_admin_nonce')) {
             wp_die(esc_html__('Security check failed.', 'fbs-secure-optimize'));
         }
         
@@ -960,7 +976,8 @@ class FBS_Secure_Optimize_Admin {
      */
     public function ajax_clear_cache() {
         // Verify nonce
-        if (!isset($_POST['nonce']) || !wp_verify_nonce(wp_unslash($_POST['nonce']), 'fbs_opt_admin_nonce')) {
+        $nonce = isset($_POST['nonce']) ? sanitize_text_field(wp_unslash($_POST['nonce'])) : '';
+        if (!$nonce || !wp_verify_nonce($nonce, 'fbs_opt_admin_nonce')) {
             wp_die(esc_html__('Security check failed.', 'fbs-secure-optimize'));
         }
         
@@ -992,7 +1009,8 @@ class FBS_Secure_Optimize_Admin {
      */
     public function ajax_save_settings() {
         // Verify nonce
-        if (!isset($_POST['nonce']) || !wp_verify_nonce(wp_unslash($_POST['nonce']), 'fbs_opt_admin_nonce')) {
+        $nonce = isset($_POST['nonce']) ? sanitize_text_field(wp_unslash($_POST['nonce'])) : '';
+        if (!$nonce || !wp_verify_nonce($nonce, 'fbs_opt_admin_nonce')) {
             wp_die(esc_html__('Security check failed.', 'fbs-secure-optimize'));
         }
         
@@ -1001,9 +1019,16 @@ class FBS_Secure_Optimize_Admin {
             wp_die(esc_html__('You do not have sufficient permissions.', 'fbs-secure-optimize'));
         }
         
-        // Get the settings data
-        $settings_data = isset($_POST['settings']) ? wp_unslash($_POST['settings']) : array();
+        $settings_data = array();
+
+        if ( isset( $_POST['settings'] ) && is_array( $_POST['settings'] ) ) {
+            // phpcs:ignore WordPress.Security.NonceVerification.Missing, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized, WordPress.Security.ValidatedSanitizedInput.MissingUnslash
+            $posted_settings = $_POST['settings'];
         
+            $posted_settings = wp_unslash( $posted_settings );
+            $settings_data   = map_deep( $posted_settings, 'sanitize_text_field' );
+        }
+               
         // Sanitize the settings
         $sanitized_settings = $this->sanitize_settings($settings_data);
         
