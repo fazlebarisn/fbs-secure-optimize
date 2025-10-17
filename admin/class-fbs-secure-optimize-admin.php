@@ -114,7 +114,7 @@ class FBS_Secure_Optimize_Admin {
     public function add_admin_menu() {
         add_menu_page(
             __('FBS Secure Optimize', 'fbs-secure-optimize'),
-            __('FBS Secure Optimize', 'fbs-secure-optimize'),
+            __('FBS Optimize', 'fbs-secure-optimize'),
             'manage_options',
             'fbs-secure-optimize',
             array($this, 'admin_page'),
