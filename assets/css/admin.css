@@ -6,6 +6,27 @@
  */
 
 /* ==========================================================================
+   Dependent Options
+   ========================================================================== */
+
+.fbs-opt-dependent-option.disabled {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.fbs-opt-dependent-option.disabled .fbs-opt-option-header h4 {
+    color: #999;
+}
+
+.fbs-opt-dependent-option.disabled select,
+.fbs-opt-dependent-option.disabled input,
+.fbs-opt-dependent-option.disabled textarea {
+    background-color: #f5f5f5;
+    color: #999;
+    cursor: not-allowed;
+}
+
+/* ==========================================================================
    Main Admin Layout
    ========================================================================== */
 
@@ -334,6 +355,9 @@
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
     margin: 30px 0;
     overflow: hidden;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 0;
 }
 
 .fbs-opt-admin-wrap .fbs-opt-action-card {
@@ -341,6 +365,11 @@
     text-align: center;
     background: linear-gradient(135deg, #fff5f5 0%, #fed7d7 100%);
     border-left: 4px solid #e53e3e;
+}
+
+.fbs-opt-admin-wrap .fbs-opt-action-card:last-child {
+    background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+    border-left-color: #0ea5e9;
 }
 
 .fbs-opt-admin-wrap .fbs-opt-action-card h3 {
@@ -354,6 +383,57 @@
     margin: 0 0 20px 0;
     color: #4a5568;
     font-size: 14px;
+}
+
+/* ==========================================================================
+   Cache Management
+   ========================================================================== */
+
+.fbs-opt-admin-wrap .fbs-opt-cache-management {
+    padding: 30px;
+}
+
+.fbs-opt-admin-wrap .fbs-opt-cache-info {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 30px;
+}
+
+.fbs-opt-admin-wrap .fbs-opt-cache-details h4,
+.fbs-opt-admin-wrap .fbs-opt-cache-actions h4 {
+    margin: 0 0 15px 0;
+    color: #2c3e50;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.fbs-opt-admin-wrap .fbs-opt-cache-details ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.fbs-opt-admin-wrap .fbs-opt-cache-details li {
+    padding: 8px 0;
+    border-bottom: 1px solid #f1f3f4;
+    color: #6c757d;
+    font-size: 14px;
+}
+
+.fbs-opt-admin-wrap .fbs-opt-cache-details li:last-child {
+    border-bottom: none;
+}
+
+.fbs-opt-admin-wrap .fbs-opt-cache-details strong {
+    color: #2c3e50;
+    font-weight: 600;
+}
+
+.fbs-opt-admin-wrap .fbs-opt-cache-actions p {
+    margin: 0 0 20px 0;
+    color: #6c757d;
+    font-size: 14px;
+    line-height: 1.5;
 }
 
 /* ==========================================================================
@@ -618,10 +698,13 @@
    Status and Notifications
    ========================================================================== */
 
-.fbs-opt-admin-wrap #fbs-opt-cleanup-status {
+.fbs-opt-admin-wrap #fbs-opt-cleanup-status,
+.fbs-opt-admin-wrap #fbs-opt-cache-status {
     margin-left: 15px;
     font-weight: 500;
     font-size: 14px;
+    display: inline-block;
+    min-height: 20px;
 }
 
 .fbs-opt-admin-wrap .fbs-opt-cleanup-status.success {
@@ -703,6 +786,15 @@
     .fbs-opt-admin-wrap .fbs-opt-tabs .nav-tab {
         padding: 15px 20px;
         font-size: 14px;
+    }
+    
+    .fbs-opt-admin-wrap .fbs-opt-cache-info {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+    
+    .fbs-opt-admin-wrap .fbs-opt-cleanup-actions {
+        grid-template-columns: 1fr;
     }
 }
 
@@ -937,4 +1029,281 @@
     border-radius: 4px;
     min-width: 60px;
     text-align: center;
+}
+
+/* ==========================================================================
+   AJAX Form Handling
+   ========================================================================== */
+
+.fbs-opt-button-primary.loading {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+.fbs-opt-button-primary.loading .dashicons {
+    animation: spin 1s linear infinite;
+}
+
+.fbs-opt-save-status {
+    margin-left: 10px;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.fbs-opt-save-status .dashicons {
+    margin-right: 5px;
+    vertical-align: middle;
+}
+
+.fbs-opt-save-status .dashicons.spin {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.fbs-opt-notice {
+    padding: 12px 16px;
+    margin: 15px 0;
+    border-radius: 4px;
+    font-weight: 500;
+    border-left: 4px solid;
+}
+
+.fbs-opt-notice.success {
+    background: #d4edda;
+    color: #155724;
+    border-left-color: #28a745;
+}
+
+.fbs-opt-notice.error {
+    background: #f8d7da;
+    color: #721c24;
+    border-left-color: #dc3545;
+}
+
+.fbs-opt-notice.info {
+    background: #d1ecf1;
+    color: #0c5460;
+    border-left-color: #17a2b8;
+}
+
+/* ==========================================================================
+   Beautiful Popup Notification System
+   ========================================================================== */
+
+#fbs-opt-popup-container {
+    position: fixed;
+    top: 32px;
+    right: 20px;
+    z-index: 999999;
+    max-width: min(400px, calc(100vw - 40px));
+    width: auto;
+    pointer-events: none;
+}
+
+.fbs-opt-popup {
+    position: relative;
+    margin-bottom: 15px;
+    border-radius: 8px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+    border-left: 4px solid;
+    overflow: hidden;
+    pointer-events: auto;
+    backdrop-filter: blur(10px);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transform: translateX(0);
+    opacity: 1;
+}
+
+.fbs-opt-popup:hover {
+    transform: translateX(-5px) !important;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+}
+
+.fbs-opt-popup-content {
+    display: flex;
+    align-items: flex-start;
+    padding: 16px 20px;
+    position: relative;
+    z-index: 2;
+}
+
+.fbs-opt-popup-icon {
+    flex-shrink: 0;
+    margin-right: 12px;
+    margin-top: 2px;
+}
+
+.fbs-opt-popup-icon .dashicons {
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+    line-height: 1;
+}
+
+.fbs-opt-popup-message {
+    flex: 1;
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.4;
+    margin: 0;
+    padding-right: 8px;
+}
+
+.fbs-opt-popup-close {
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    padding: 4px;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background-color 0.2s ease;
+    opacity: 0.7;
+}
+
+.fbs-opt-popup-close:hover {
+    background-color: rgba(0, 0, 0, 0.1);
+    opacity: 1;
+}
+
+.fbs-opt-popup-close .dashicons {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+    line-height: 1;
+}
+
+.fbs-opt-popup-progress {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 3px;
+    background-color: rgba(0, 0, 0, 0.2);
+    width: 0%;
+    transition: width 0.1s linear;
+}
+
+/* Popup Type Variations */
+.fbs-opt-popup.success {
+    background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+    border-left-color: #28a745;
+    color: #155724;
+}
+
+.fbs-opt-popup.error {
+    background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
+    border-left-color: #dc3545;
+    color: #721c24;
+}
+
+.fbs-opt-popup.warning {
+    background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+    border-left-color: #ffc107;
+    color: #856404;
+}
+
+.fbs-opt-popup.info {
+    background: linear-gradient(135deg, #d1ecf1 0%, #bee5eb 100%);
+    border-left-color: #17a2b8;
+    color: #0c5460;
+}
+
+/* Animation for multiple popups */
+.fbs-opt-popup:nth-child(2) {
+    animation-delay: 0.1s;
+}
+
+.fbs-opt-popup:nth-child(3) {
+    animation-delay: 0.2s;
+}
+
+.fbs-opt-popup:nth-child(4) {
+    animation-delay: 0.3s;
+}
+
+/* Responsive adjustments */
+@media (max-width: 782px) {
+    #fbs-opt-popup-container {
+        top: 46px;
+        right: 10px;
+        left: 10px;
+        max-width: none;
+        width: auto;
+    }
+    
+    .fbs-opt-popup {
+        margin-bottom: 10px;
+    }
+    
+    .fbs-opt-popup-content {
+        padding: 14px 16px;
+    }
+    
+    .fbs-opt-popup-message {
+        font-size: 13px;
+    }
+}
+
+/* Ensure popup is always visible on smaller screens */
+@media (max-width: 600px) {
+    #fbs-opt-popup-container {
+        top: 20px;
+        right: 10px;
+        left: 10px;
+        max-width: none;
+    }
+}
+
+/* WordPress admin bar adjustments */
+@media screen and (max-width: 782px) {
+    #fbs-opt-popup-container {
+        top: 46px;
+    }
+}
+
+@media screen and (min-width: 783px) {
+    #fbs-opt-popup-container {
+        top: 32px;
+    }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+    .fbs-opt-popup {
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+    
+    .fbs-opt-popup:hover {
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+    }
+    
+    .fbs-opt-popup-close:hover {
+        background-color: rgba(255, 255, 255, 0.1);
+    }
+}
+
+/* Accessibility improvements */
+.fbs-opt-popup:focus-within {
+    outline: 2px solid #0073aa;
+    outline-offset: 2px;
+}
+
+.fbs-opt-popup-close:focus {
+    outline: 2px solid #0073aa;
+    outline-offset: 2px;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    .fbs-opt-popup {
+        border: 2px solid;
+        box-shadow: none;
+    }
+    
+    .fbs-opt-popup-close {
+        border: 1px solid;
+    }
 }

@@ -260,16 +260,22 @@ class FBS_Secure_Optimize_Database_Cleanup {
         // Delete expired transients
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Database maintenance operation
         $deleted_count = $wpdb->query(
-            "DELETE FROM {$wpdb->options} 
-             WHERE option_name LIKE '_transient_timeout_%' 
-             AND option_value < UNIX_TIMESTAMP()"
+            $wpdb->prepare(
+                "DELETE FROM {$wpdb->options} 
+                 WHERE option_name LIKE %s 
+                 AND option_value < UNIX_TIMESTAMP()",
+                '_transient_timeout_%'
+            )
         );
         
         // Delete the corresponding transient values (using a different approach to avoid MySQL restriction)
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Database maintenance operation
         $transient_timeouts = $wpdb->get_col(
-            "SELECT option_name FROM {$wpdb->options} 
-             WHERE option_name LIKE '_transient_timeout_%'"
+            $wpdb->prepare(
+                "SELECT option_name FROM {$wpdb->options} 
+                 WHERE option_name LIKE %s",
+                '_transient_timeout_%'
+            )
         );
         
         if (!empty($transient_timeouts)) {
@@ -280,15 +286,26 @@ class FBS_Secure_Optimize_Database_Cleanup {
             }
             
             if (!empty($valid_transients)) {
-                $placeholders = implode(',', array_fill(0, count($valid_transients), '%s'));
+                // Delete each valid transient individually to avoid variable interpolation
+                foreach ($valid_transients as $transient_name) {
+                    // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Database maintenance operation
+                    $wpdb->query(
+                        $wpdb->prepare(
+                            "DELETE FROM {$wpdb->options} WHERE option_name = %s",
+                            $transient_name
+                        )
+                    );
+                }
+                
+                // Delete remaining transients that are not in our valid list
                 // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Database maintenance operation
                 $wpdb->query(
                     $wpdb->prepare(
                         "DELETE FROM {$wpdb->options} 
-                         WHERE option_name LIKE '_transient_%' 
-                         AND option_name NOT LIKE '_transient_timeout_%' 
-                         AND option_name NOT IN ($placeholders)",
-                        $valid_transients
+                         WHERE option_name LIKE %s 
+                         AND option_name NOT LIKE %s",
+                        '_transient_%',
+                        '_transient_timeout_%'
                     )
                 );
             }
@@ -297,16 +314,22 @@ class FBS_Secure_Optimize_Database_Cleanup {
         // Delete expired site transients
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Database maintenance operation
         $wpdb->query(
-            "DELETE FROM {$wpdb->options} 
-             WHERE option_name LIKE '_site_transient_timeout_%' 
-             AND option_value < UNIX_TIMESTAMP()"
+            $wpdb->prepare(
+                "DELETE FROM {$wpdb->options} 
+                 WHERE option_name LIKE %s 
+                 AND option_value < UNIX_TIMESTAMP()",
+                '_site_transient_timeout_%'
+            )
         );
         
         // Delete site transient values (using a different approach to avoid MySQL restriction)
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Database maintenance operation
         $site_transient_timeouts = $wpdb->get_col(
-            "SELECT option_name FROM {$wpdb->options} 
-             WHERE option_name LIKE '_site_transient_timeout_%'"
+            $wpdb->prepare(
+                "SELECT option_name FROM {$wpdb->options} 
+                 WHERE option_name LIKE %s",
+                '_site_transient_timeout_%'
+            )
         );
         
         if (!empty($site_transient_timeouts)) {
@@ -317,15 +340,26 @@ class FBS_Secure_Optimize_Database_Cleanup {
             }
             
             if (!empty($valid_site_transients)) {
-                $placeholders = implode(',', array_fill(0, count($valid_site_transients), '%s'));
+                // Delete each valid site transient individually to avoid variable interpolation
+                foreach ($valid_site_transients as $transient_name) {
+                    // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Database maintenance operation
+                    $wpdb->query(
+                        $wpdb->prepare(
+                            "DELETE FROM {$wpdb->options} WHERE option_name = %s",
+                            $transient_name
+                        )
+                    );
+                }
+                
+                // Delete remaining site transients that are not in our valid list
                 // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Database maintenance operation
                 $wpdb->query(
                     $wpdb->prepare(
                         "DELETE FROM {$wpdb->options} 
-                         WHERE option_name LIKE '_site_transient_%' 
-                         AND option_name NOT LIKE '_site_transient_timeout_%' 
-                         AND option_name NOT IN ($placeholders)",
-                        $valid_site_transients
+                         WHERE option_name LIKE %s 
+                         AND option_name NOT LIKE %s",
+                        '_site_transient_%',
+                        '_site_transient_timeout_%'
                     )
                 );
             }
@@ -492,8 +526,12 @@ class FBS_Secure_Optimize_Database_Cleanup {
         // Transients
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Statistics gathering operation
         $stats['transients'] = $wpdb->get_var(
-            "SELECT COUNT(*) FROM {$wpdb->options} 
-             WHERE option_name LIKE '_transient_%' OR option_name LIKE '_site_transient_%'"
+            $wpdb->prepare(
+                "SELECT COUNT(*) FROM {$wpdb->options} 
+                 WHERE option_name LIKE %s OR option_name LIKE %s",
+                '_transient_%',
+                '_site_transient_%'
+            )
         );
         
         // Orphaned post meta

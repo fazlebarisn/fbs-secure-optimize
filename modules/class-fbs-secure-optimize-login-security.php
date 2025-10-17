@@ -53,10 +53,13 @@ class FBS_Secure_Optimize_Login_Security {
      * @author Fazle Bari <fazlebarisn@gmail.com>
      */
     private function init_hooks() {
-        // Only run if login security is enabled
+        // Always initialize hooks for login tracking, regardless of settings
+        // This ensures failed login statistics are always recorded
+        add_action('wp_login_failed', array($this, 'handle_failed_login'));
+        add_action('wp_login', array($this, 'handle_successful_login'));
+        
+        // Only add blocking functionality if login security is enabled
         if (FBS_Secure_Optimize_Controller::is_feature_enabled('login_security', 'limit_login_attempts')) {
-            add_action('wp_login_failed', array($this, 'handle_failed_login'));
-            add_action('wp_login', array($this, 'handle_successful_login'));
             add_filter('authenticate', array($this, 'check_login_attempts'), 30, 3);
             add_action('login_enqueue_scripts', array($this, 'enqueue_login_styles'));
             add_action('login_footer', array($this, 'add_login_scripts'));
@@ -73,9 +76,12 @@ class FBS_Secure_Optimize_Login_Security {
         $ip_address = $this->get_client_ip();
         $this->log_login_attempt($ip_address, $username, false);
         
-        // Check if IP should be blocked
-        if ($this->is_ip_blocked($ip_address)) {
-            $this->block_ip($ip_address);
+        // Only perform blocking actions if login security is enabled
+        if (FBS_Secure_Optimize_Controller::is_feature_enabled('login_security', 'limit_login_attempts')) {
+            // Check if IP should be blocked
+            if ($this->is_ip_blocked($ip_address)) {
+                $this->block_ip($ip_address);
+            }
         }
     }
 
@@ -89,8 +95,11 @@ class FBS_Secure_Optimize_Login_Security {
         $ip_address = $this->get_client_ip();
         $this->log_login_attempt($ip_address, $username, true);
         
-        // Clear failed attempts for this IP
-        $this->clear_failed_attempts($ip_address);
+        // Only clear failed attempts if login security is enabled
+        if (FBS_Secure_Optimize_Controller::is_feature_enabled('login_security', 'limit_login_attempts')) {
+            // Clear failed attempts for this IP
+            $this->clear_failed_attempts($ip_address);
+        }
     }
 
     /**
@@ -310,7 +319,9 @@ class FBS_Secure_Optimize_Login_Security {
         
         foreach ($ip_keys as $key) {
             if (array_key_exists($key, $_SERVER) === true) {
-                foreach (explode(',', wp_unslash($_SERVER[$key])) as $ip) {
+                // Sanitize the server variable before using it
+                $server_value = sanitize_text_field(wp_unslash($_SERVER[$key]));
+                foreach (explode(',', $server_value) as $ip) {
                     $ip = trim($ip);
                     
                     if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) !== false) {
@@ -320,7 +331,9 @@ class FBS_Secure_Optimize_Login_Security {
             }
         }
         
-        return isset($_SERVER['REMOTE_ADDR']) ? wp_unslash($_SERVER['REMOTE_ADDR']) : '0.0.0.0';
+        // Sanitize REMOTE_ADDR before using it
+        $remote_addr = isset($_SERVER['REMOTE_ADDR']) ? sanitize_text_field(wp_unslash($_SERVER['REMOTE_ADDR'])) : '0.0.0.0';
+        return $remote_addr;
     }
 
     /**

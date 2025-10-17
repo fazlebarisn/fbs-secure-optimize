@@ -77,7 +77,7 @@ class FBS_Secure_Optimize_Controller {
     public function init() {
         // Initialize admin interface
         if (is_admin()) {
-            new FBS_Secure_Optimize_Admin();
+            FBS_Secure_Optimize_Admin::get_instance();
         }
     }
 
@@ -155,6 +155,7 @@ class FBS_Secure_Optimize_Controller {
                 'confirmCleanup' => __('Are you sure you want to perform database cleanup? This action cannot be undone.', 'fbs-secure-optimize'),
                 'cleanupSuccess' => __('Database cleanup completed successfully.', 'fbs-secure-optimize'),
                 'cleanupError' => __('An error occurred during database cleanup.', 'fbs-secure-optimize'),
+                'cleaning' => __('Cleaning database...', 'fbs-secure-optimize'),
             ),
         ));
     }
@@ -296,5 +297,45 @@ class FBS_Secure_Optimize_Controller {
      */
     public static function clear_stats_cache() {
         wp_cache_delete('fbs_opt_stats', 'fbs_optimize');
+    }
+
+    /**
+     * Get default plugin settings
+     * @since 1.0.0
+     * @author Fazle Bari <fazlebarisn@gmail.com>
+     * @return array Default settings array
+     */
+    public static function get_default_settings() {
+        return array(
+            'asset_optimization' => array(
+                'minify_css' => 0,  
+                'minify_js' => 0, 
+                'combine_css' => 0, 
+                'combine_js' => 0,
+                'lazy_load_images' => 1,
+                'lazy_load_iframes' => 1,
+            ),
+            'database_cleanup' => array(
+                'cleanup_revisions' => 1,
+                'cleanup_autodrafts' => 1,
+                'cleanup_spam_comments' => 1,
+                'cleanup_transients' => 1,
+                'auto_cleanup' => 1,
+                'cleanup_frequency' => 'weekly',
+            ),
+            'login_security' => array(
+                'limit_login_attempts' => 1,
+                'max_attempts' => 5,
+                'lockout_duration' => 15,
+                'whitelist_ips' => '',
+            ),
+            'security_headers' => array(
+                'x_content_type_options' => 1,
+                'x_frame_options' => 1,
+                'x_xss_protection' => 1,
+                'strict_transport_security' => 0,
+                'hide_wp_version' => 1,
+            ),
+        );
     }
 }
