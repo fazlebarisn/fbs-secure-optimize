@@ -153,7 +153,7 @@ class FBS_Secure_Optimize_Login_Security {
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Login security logging operation
         global $wpdb;
         
-        $table_name = $wpdb->prefix . 'fbs_opt_login_attempts';
+        $table_name = $wpdb->prefix . 'fbsseop_login_attempts';
         
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Login security logging operation
         $wpdb->insert(
@@ -188,7 +188,7 @@ class FBS_Secure_Optimize_Login_Security {
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Login security check operation
         global $wpdb;
         
-        $table_name = $wpdb->prefix . 'fbs_opt_login_attempts';
+        $table_name = $wpdb->prefix . 'fbsseop_login_attempts';
         $max_attempts = FBS_Secure_Optimize_Controller::get_setting('login_security', 'max_attempts', 5);
         $lockout_duration = FBS_Secure_Optimize_Controller::get_setting('login_security', 'lockout_duration', 15);
         
@@ -235,7 +235,7 @@ class FBS_Secure_Optimize_Login_Security {
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Login security cleanup operation
         global $wpdb;
         
-        $table_name = $wpdb->prefix . 'fbs_opt_login_attempts';
+        $table_name = $wpdb->prefix . 'fbsseop_login_attempts';
         
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Login security cleanup operation
         $wpdb->delete(
@@ -343,7 +343,7 @@ class FBS_Secure_Optimize_Login_Security {
      */
     public function enqueue_login_styles() {
         wp_enqueue_style(
-            'fbs-opt-login',
+            'fbsseop-login',
             FBS_SECURE_OPTIMIZE_PLUGIN_URL . 'assets/css/admin.css',
             array(),
             FBS_SECURE_OPTIMIZE_VERSION
@@ -356,20 +356,19 @@ class FBS_Secure_Optimize_Login_Security {
      * @author Fazle Bari <fazlebarisn@gmail.com>
      */
     public function add_login_scripts() {
-        ?>
-        <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Add rate limiting notice
-            const loginForm = document.getElementById('loginform');
-            if (loginForm) {
-                const notice = document.createElement('div');
-                notice.className = 'fbs-opt-login-warning';
-                notice.innerHTML = '<?php echo esc_js(__('For security purposes, login attempts are limited. Multiple failed attempts will result in temporary IP blocking.', 'fbs-secure-optimize')); ?>';
-                loginForm.parentNode.insertBefore(notice, loginForm);
-            }
-        });
-        </script>
-        <?php
+        // Enqueue the login security script
+        wp_enqueue_script(
+            'fbsseop-login-security',
+            FBS_SECURE_OPTIMIZE_PLUGIN_URL . 'assets/js/login-security.js',
+            array(),
+            FBS_SECURE_OPTIMIZE_VERSION,
+            true
+        );
+
+        // Localize script with translated strings
+        wp_localize_script('fbsseop-login-security', 'fbsseopLoginSecurity', array(
+            'loginWarning' => __('For security purposes, login attempts are limited. Multiple failed attempts will result in temporary IP blocking.', 'fbs-secure-optimize'),
+        ));
     }
 
     /**
@@ -383,7 +382,7 @@ class FBS_Secure_Optimize_Login_Security {
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Login security statistics operation
         global $wpdb;
         
-        $table_name = $wpdb->prefix . 'fbs_opt_login_attempts';
+        $table_name = $wpdb->prefix . 'fbsseop_login_attempts';
         
         $stats = array(
             'total_attempts' => 0,
@@ -469,7 +468,7 @@ class FBS_Secure_Optimize_Login_Security {
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Login security statistics operation
         global $wpdb;
         
-        $table_name = $wpdb->prefix . 'fbs_opt_login_attempts';
+        $table_name = $wpdb->prefix . 'fbsseop_login_attempts';
         
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Login security statistics operation
         return $wpdb->get_results(
@@ -492,7 +491,7 @@ class FBS_Secure_Optimize_Login_Security {
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Login security cleanup operation
         global $wpdb;
         
-        $table_name = $wpdb->prefix . 'fbs_opt_login_attempts';
+        $table_name = $wpdb->prefix . 'fbsseop_login_attempts';
         
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Login security cleanup operation
         $result = $wpdb->query("TRUNCATE TABLE " . esc_sql($table_name));
@@ -516,7 +515,7 @@ class FBS_Secure_Optimize_Login_Security {
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Login security management operation
         global $wpdb;
         
-        $table_name = $wpdb->prefix . 'fbs_opt_login_attempts';
+        $table_name = $wpdb->prefix . 'fbsseop_login_attempts';
         
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Login security management operation
         $result = $wpdb->delete(

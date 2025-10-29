@@ -86,7 +86,7 @@ class FBS_Secure_Optimize_Asset_Optimizer {
      * @author Fazle Bari <fazlebarisn@gmail.com>
      */
     public function optimize_assets() {
-        $settings = get_option('fbs_opt_settings', array());
+        $settings = get_option('fbsseop_settings', array());
         $asset_settings = isset($settings['asset_optimization']) ? $settings['asset_optimization'] : array();
 
         // Minify CSS
@@ -116,34 +116,18 @@ class FBS_Secure_Optimize_Asset_Optimizer {
      * @author Fazle Bari <fazlebarisn@gmail.com>
      */
     public function add_lazy_loading_script() {
-        $settings = get_option('fbs_opt_settings', array());
+        $settings = get_option('fbsseop_settings', array());
         $asset_settings = isset($settings['asset_optimization']) ? $settings['asset_optimization'] : array();
 
         if (isset($asset_settings['lazy_load_images']) && $asset_settings['lazy_load_images']) {
-            ?>
-            <script>
-            document.addEventListener('DOMContentLoaded', function() {
-                // Simple lazy loading implementation
-                const lazyImages = document.querySelectorAll('img[data-src]');
-                const lazyIframes = document.querySelectorAll('iframe[data-src]');
-                
-                const imageObserver = new IntersectionObserver((entries, observer) => {
-                    entries.forEach(entry => {
-                        if (entry.isIntersecting) {
-                            const img = entry.target;
-                            img.src = img.dataset.src;
-                            img.classList.remove('lazy');
-                            img.classList.add('lazy-loaded');
-                            observer.unobserve(img);
-                        }
-                    });
-                });
-                
-                lazyImages.forEach(img => imageObserver.observe(img));
-                lazyIframes.forEach(iframe => imageObserver.observe(iframe));
-            });
-            </script>
-            <?php
+            // Enqueue the lazy loading script
+            wp_enqueue_script(
+                'fbsseop-lazy-load',
+                FBS_SECURE_OPTIMIZE_PLUGIN_URL . 'assets/js/lazy-load.js',
+                array(),
+                FBS_SECURE_OPTIMIZE_VERSION,
+                true
+            );
         }
     }
 
@@ -156,7 +140,7 @@ class FBS_Secure_Optimize_Asset_Optimizer {
      * @return string Modified script tag
      */
     public function add_lazy_loading_attributes($tag, $handle) {
-        $settings = get_option('fbs_opt_settings', array());
+        $settings = get_option('fbsseop_settings', array());
         $asset_settings = isset($settings['asset_optimization']) ? $settings['asset_optimization'] : array();
 
         if (isset($asset_settings['lazy_load_iframes']) && $asset_settings['lazy_load_iframes']) {
@@ -179,7 +163,7 @@ class FBS_Secure_Optimize_Asset_Optimizer {
      * @return array Modified attributes
      */
     public function add_lazy_loading_to_images($attr, $attachment, $size) {
-        $settings = get_option('fbs_opt_settings', array());
+        $settings = get_option('fbsseop_settings', array());
         $asset_settings = isset($settings['asset_optimization']) ? $settings['asset_optimization'] : array();
 
         if (isset($asset_settings['lazy_load_images']) && $asset_settings['lazy_load_images']) {
@@ -309,7 +293,7 @@ class FBS_Secure_Optimize_Asset_Optimizer {
         }
 
         // Add combined CSS
-        wp_enqueue_style('fbs-opt-combined-css', $combined_url, array(), FBS_SECURE_OPTIMIZE_VERSION);
+        wp_enqueue_style('fbsseop-combined-css', $combined_url, array(), FBS_SECURE_OPTIMIZE_VERSION);
     }
 
     /**
@@ -359,7 +343,7 @@ class FBS_Secure_Optimize_Asset_Optimizer {
         }
 
         // Add combined JS
-        wp_enqueue_script('fbs-opt-combined-js', $combined_url, array(), FBS_SECURE_OPTIMIZE_VERSION, true);
+        wp_enqueue_script('fbsseop-combined-js', $combined_url, array(), FBS_SECURE_OPTIMIZE_VERSION, true);
     }
 
     /**
@@ -370,7 +354,7 @@ class FBS_Secure_Optimize_Asset_Optimizer {
      */
     private function get_combined_css_url() {
         $upload_dir = wp_upload_dir();
-        $cache_dir = $upload_dir['basedir'] . '/fbs-opt-cache';
+        $cache_dir = $upload_dir['basedir'] . '/fbsseop-cache';
         
         // Create cache directory if it doesn't exist
         if (!file_exists($cache_dir)) {
@@ -378,7 +362,7 @@ class FBS_Secure_Optimize_Asset_Optimizer {
         }
         
         $cache_file = $cache_dir . '/combined-' . md5(serialize($this->combined_css)) . '.css';
-        $cache_url = $upload_dir['baseurl'] . '/fbs-opt-cache/combined-' . md5(serialize($this->combined_css)) . '.css';
+        $cache_url = $upload_dir['baseurl'] . '/fbsseop-cache/combined-' . md5(serialize($this->combined_css)) . '.css';
         
         // Generate combined CSS if cache doesn't exist
         if (!file_exists($cache_file)) {
@@ -396,7 +380,7 @@ class FBS_Secure_Optimize_Asset_Optimizer {
      */
     private function get_combined_js_url() {
         $upload_dir = wp_upload_dir();
-        $cache_dir = $upload_dir['basedir'] . '/fbs-opt-cache';
+        $cache_dir = $upload_dir['basedir'] . '/fbsseop-cache';
         
         // Create cache directory if it doesn't exist
         if (!file_exists($cache_dir)) {
@@ -404,7 +388,7 @@ class FBS_Secure_Optimize_Asset_Optimizer {
         }
         
         $cache_file = $cache_dir . '/combined-' . md5(serialize($this->combined_js)) . '.js';
-        $cache_url = $upload_dir['baseurl'] . '/fbs-opt-cache/combined-' . md5(serialize($this->combined_js)) . '.js';
+        $cache_url = $upload_dir['baseurl'] . '/fbsseop-cache/combined-' . md5(serialize($this->combined_js)) . '.js';
         
         // Generate combined JS if cache doesn't exist
         if (!file_exists($cache_file)) {
@@ -502,7 +486,7 @@ class FBS_Secure_Optimize_Asset_Optimizer {
      */
     public function clear_cache() {
         $upload_dir = wp_upload_dir();
-        $cache_dir = $upload_dir['basedir'] . '/fbs-opt-cache';
+        $cache_dir = $upload_dir['basedir'] . '/fbsseop-cache';
         
         if (file_exists($cache_dir)) {
             $files = glob($cache_dir . '/*');
@@ -523,7 +507,7 @@ class FBS_Secure_Optimize_Asset_Optimizer {
      */
     public function get_cache_stats() {
         $upload_dir = wp_upload_dir();
-        $cache_dir = $upload_dir['basedir'] . '/fbs-opt-cache';
+        $cache_dir = $upload_dir['basedir'] . '/fbsseop-cache';
         
         $stats = array(
             'files' => 0,

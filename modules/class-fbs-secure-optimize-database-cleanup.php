@@ -54,7 +54,7 @@ class FBS_Secure_Optimize_Database_Cleanup {
      */
     private function init_hooks() {
         add_action('wp_scheduled_delete', array($this, 'scheduled_cleanup'));
-        add_action('fbs_opt_cleanup_database', array($this, 'perform_cleanup'));
+        add_action('fbsseop_cleanup_database', array($this, 'perform_cleanup'));
     }
 
     /**
@@ -81,7 +81,7 @@ class FBS_Secure_Optimize_Database_Cleanup {
 
         // Get settings if options not provided
         if ($options === null) {
-            $settings = get_option('fbs_opt_settings', array());
+            $settings = get_option('fbsseop_settings', array());
             $cleanup_settings = isset($settings['database_cleanup']) ? $settings['database_cleanup'] : array();
         } else {
             $cleanup_settings = $options;
@@ -153,7 +153,7 @@ class FBS_Secure_Optimize_Database_Cleanup {
      * @author Fazle Bari <fazlebarisn@gmail.com>
      */
     public function scheduled_cleanup() {
-        $settings = get_option('fbs_opt_settings', array());
+        $settings = get_option('fbsseop_settings', array());
         $cleanup_settings = isset($settings['database_cleanup']) ? $settings['database_cleanup'] : array();
         
         // Only run if auto cleanup is enabled
@@ -466,30 +466,30 @@ class FBS_Secure_Optimize_Database_Cleanup {
      * @author Fazle Bari <fazlebarisn@gmail.com>
      */
     public function schedule_cleanup() {
-        $settings = get_option('fbs_opt_settings', array());
+        $settings = get_option('fbsseop_settings', array());
         $cleanup_settings = isset($settings['database_cleanup']) ? $settings['database_cleanup'] : array();
         
         if (isset($cleanup_settings['auto_cleanup']) && $cleanup_settings['auto_cleanup']) {
             $frequency = isset($cleanup_settings['cleanup_frequency']) ? $cleanup_settings['cleanup_frequency'] : 'weekly';
             
             // Clear existing scheduled event
-            wp_clear_scheduled_hook('fbs_opt_cleanup_database');
+            wp_clear_scheduled_hook('fbsseop_cleanup_database');
             
             // Schedule new event
             switch ($frequency) {
                 case 'daily':
-                    wp_schedule_event(time(), 'daily', 'fbs_opt_cleanup_database');
+                    wp_schedule_event(time(), 'daily', 'fbsseop_cleanup_database');
                     break;
                 case 'weekly':
-                    wp_schedule_event(time(), 'weekly', 'fbs_opt_cleanup_database');
+                    wp_schedule_event(time(), 'weekly', 'fbsseop_cleanup_database');
                     break;
                 case 'monthly':
-                    wp_schedule_event(time(), 'monthly', 'fbs_opt_cleanup_database');
+                    wp_schedule_event(time(), 'monthly', 'fbsseop_cleanup_database');
                     break;
             }
         } else {
             // Clear scheduled event if auto cleanup is disabled
-            wp_clear_scheduled_hook('fbs_opt_cleanup_database');
+            wp_clear_scheduled_hook('fbsseop_cleanup_database');
         }
     }
 

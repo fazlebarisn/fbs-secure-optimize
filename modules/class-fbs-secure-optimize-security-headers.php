@@ -75,7 +75,7 @@ class FBS_Secure_Optimize_Security_Headers {
      * @author Fazle Bari <fazlebarisn@gmail.com>
      */
     public function add_security_headers() {
-        $settings = get_option('fbs_opt_settings', array());
+        $settings = get_option('fbsseop_settings', array());
         $header_settings = isset($settings['security_headers']) ? $settings['security_headers'] : array();
 
         // X-Content-Type-Options
@@ -136,8 +136,8 @@ class FBS_Secure_Optimize_Security_Headers {
         
         header('Permissions-Policy: ' . $policy_string);
         
-        // Content Security Policy (basic)
-        $csp = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' *.googleapis.com *.gstatic.com *.google-analytics.com *.googletagmanager.com; style-src 'self' 'unsafe-inline' *.googleapis.com *.gstatic.com; img-src 'self' data: *.gravatar.com *.wp.com; font-src 'self' *.googleapis.com *.gstatic.com; connect-src 'self' *.google-analytics.com *.googletagmanager.com; frame-src 'self' *.youtube.com *.vimeo.com;";
+        // Content Security Policy (basic) - Remove external dependencies
+        $csp = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-src 'self';";
         
         header('Content-Security-Policy: ' . $csp);
         
@@ -181,7 +181,7 @@ class FBS_Secure_Optimize_Security_Headers {
      * @return array Security headers status
      */
     public function get_security_headers_status() {
-        $settings = get_option('fbs_opt_settings', array());
+        $settings = get_option('fbsseop_settings', array());
         $header_settings = isset($settings['security_headers']) ? $settings['security_headers'] : array();
 
         $status = array(
@@ -213,7 +213,7 @@ class FBS_Secure_Optimize_Security_Headers {
             'X-XSS-Protection' => '1; mode=block',
             'Referrer-Policy' => 'strict-origin-when-cross-origin',
             'Permissions-Policy' => 'camera=(), microphone=(), geolocation=(), payment=(), usb=(), magnetometer=(), gyroscope=(), speaker=(), vibrate=(), fullscreen=(), sync-xhr=()',
-            'Content-Security-Policy' => 'default-src \'self\'; script-src \'self\' \'unsafe-inline\' \'unsafe-eval\' *.googleapis.com *.gstatic.com *.google-analytics.com *.googletagmanager.com; style-src \'self\' \'unsafe-inline\' *.googleapis.com *.gstatic.com; img-src \'self\' data: *.gravatar.com *.wp.com; font-src \'self\' *.googleapis.com *.gstatic.com; connect-src \'self\' *.google-analytics.com *.googletagmanager.com; frame-src \'self\' *.youtube.com *.vimeo.com;',
+            'Content-Security-Policy' => 'default-src \'self\'; script-src \'self\' \'unsafe-inline\' \'unsafe-eval\'; style-src \'self\' \'unsafe-inline\'; img-src \'self\' data:; font-src \'self\'; connect-src \'self\'; frame-src \'self\';',
             'Cross-Origin-Embedder-Policy' => 'require-corp',
             'Cross-Origin-Opener-Policy' => 'same-origin',
             'Cross-Origin-Resource-Policy' => 'same-origin',
@@ -285,7 +285,7 @@ class FBS_Secure_Optimize_Security_Headers {
      */
     private function get_security_recommendations() {
         $recommendations = array();
-        $settings = get_option('fbs_opt_settings', array());
+        $settings = get_option('fbsseop_settings', array());
         $header_settings = isset($settings['security_headers']) ? $settings['security_headers'] : array();
 
         // Check SSL
@@ -342,7 +342,7 @@ class FBS_Secure_Optimize_Security_Headers {
             'warnings' => array(),
         );
 
-        $settings = get_option('fbs_opt_settings', array());
+        $settings = get_option('fbsseop_settings', array());
         $header_settings = isset($settings['security_headers']) ? $settings['security_headers'] : array();
 
         // Check if any security headers are enabled
@@ -366,7 +366,7 @@ class FBS_Secure_Optimize_Security_Headers {
      * @return array Security configuration
      */
     public function export_configuration() {
-        $settings = get_option('fbs_opt_settings', array());
+        $settings = get_option('fbsseop_settings', array());
         $header_settings = isset($settings['security_headers']) ? $settings['security_headers'] : array();
 
         return array(
@@ -388,7 +388,7 @@ class FBS_Secure_Optimize_Security_Headers {
             return false;
         }
 
-        $settings = get_option('fbs_opt_settings', array());
+        $settings = get_option('fbsseop_settings', array());
         $settings['security_headers'] = $config['security_headers'];
 
         return update_option('fbs_opt_settings', $settings);
@@ -402,7 +402,7 @@ class FBS_Secure_Optimize_Security_Headers {
      * @return array Security score
      */
     public function get_security_score() {
-        $settings = get_option('fbs_opt_settings', array());
+        $settings = get_option('fbsseop_settings', array());
         $header_settings = isset($settings['security_headers']) ? $settings['security_headers'] : array();
 
         $score = 0;

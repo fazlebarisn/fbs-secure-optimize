@@ -132,7 +132,7 @@ class FBS_Secure_Optimize {
      */
     public function deactivate() {
         // Clean up scheduled events
-        wp_clear_scheduled_hook('fbs_opt_cleanup_database');
+        wp_clear_scheduled_hook('fbsseop_cleanup_database');
         
         // Flush rewrite rules
         flush_rewrite_rules();
@@ -149,7 +149,7 @@ class FBS_Secure_Optimize {
         $charset_collate = $wpdb->get_charset_collate();
         
         // Login attempts table
-        $table_name = $wpdb->prefix . 'fbs_opt_login_attempts';
+        $table_name = $wpdb->prefix . 'fbsseop_login_attempts';
         
         $sql = "CREATE TABLE $table_name (
             id mediumint(9) NOT NULL AUTO_INCREMENT,
@@ -174,7 +174,7 @@ class FBS_Secure_Optimize {
     private function set_default_options() {
         // Use centralized default settings from controller
         $default_options = FBS_Secure_Optimize_Controller::get_default_settings();
-        add_option('fbs_opt_settings', $default_options);
+        add_option('fbsseop_settings', $default_options);
     }
 }
 

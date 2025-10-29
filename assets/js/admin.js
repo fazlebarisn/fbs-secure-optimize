@@ -127,7 +127,7 @@
         handleCleanupClick: function(e) {
             e.preventDefault();
             
-            if (!confirm(fbsOptAdmin.strings.confirmCleanup)) {
+            if (!confirm(fbsseopAdmin.strings.confirmCleanup)) {
                 return;
             }
             
@@ -136,15 +136,15 @@
             
             // Disable button and show loading
             $btn.prop('disabled', true);
-            $status.html('<span class="fbs-opt-loading"></span> ' + fbsOptAdmin.strings.cleaning);
+            $status.html('<span class="fbs-opt-loading"></span> ' + fbsseopAdmin.strings.cleaning);
             
             // Perform AJAX request
             $.ajax({
-                url: fbsOptAdmin.ajaxUrl,
+                url: fbsseopAdmin.ajaxUrl,
                 type: 'POST',
                 data: {
-                    action: 'fbs_opt_cleanup_database',
-                    nonce: fbsOptAdmin.nonce
+                    action: 'fbsseop_cleanup_database',
+                    nonce: fbsseopAdmin.nonce
                 },
                 success: function(response) {
                     if (response.success) {
@@ -161,8 +161,8 @@
                     }
                 },
                 error: function() {
-                    $status.html('<span class="fbs-opt-cleanup-status error">✗ ' + fbsOptAdmin.strings.cleanupError + '</span>');
-                    FBSOptimizeAdmin.showError(fbsOptAdmin.strings.cleanupError, 5000);
+                    $status.html('<span class="fbs-opt-cleanup-status error">✗ ' + fbsseopAdmin.strings.cleanupError + '</span>');
+                    FBSOptimizeAdmin.showError(fbsseopAdmin.strings.cleanupError, 5000);
                 },
                 complete: function() {
                     $btn.prop('disabled', false);
@@ -199,11 +199,11 @@
             
             // Perform AJAX request
             $.ajax({
-                url: fbsOptAdmin.ajaxUrl,
+                url: fbsseopAdmin.ajaxUrl,
                 type: 'POST',
                 data: {
-                    action: 'fbs_opt_clear_cache',
-                    nonce: fbsOptAdmin.nonce
+                    action: 'fbsseop_clear_cache',
+                    nonce: fbsseopAdmin.nonce
                 },
                 success: function(response) {
                     if (response.success) {
@@ -347,7 +347,7 @@
                 var $field = $(this);
                 var name = $field.attr('name');
                 
-                if (name && name.startsWith('fbs_opt_settings')) {
+                if (name && name.startsWith('fbsseop_settings')) {
                     var value = $field.val();
                     
                     if ($field.attr('type') === 'checkbox') {
@@ -355,7 +355,7 @@
                     }
                     
                     // Parse nested setting structure
-                    var parts = name.match(/fbs_opt_settings\[([^\]]+)\]\[([^\]]+)\]/);
+                    var parts = name.match(/fbsseop_settings\[([^\]]+)\]\[([^\]]+)\]/);
                     if (parts) {
                         var section = parts[1];
                         var option = parts[2];
@@ -382,11 +382,11 @@
             }
             
             $.ajax({
-                url: fbsOptAdmin.ajaxUrl,
+                url: fbsseopAdmin.ajaxUrl,
                 type: 'POST',
                 data: {
-                    action: 'fbs_opt_import_settings',
-                    nonce: fbsOptAdmin.nonce,
+                    action: 'fbsseop_import_settings',
+                    nonce: fbsseopAdmin.nonce,
                     settings: JSON.stringify(settings)
                 },
                 success: function(response) {
@@ -409,11 +409,11 @@
          */
         refreshStatistics: function() {
             $.ajax({
-                url: fbsOptAdmin.ajaxUrl,
+                url: fbsseopAdmin.ajaxUrl,
                 type: 'POST',
                 data: {
-                    action: 'fbs_opt_get_stats',
-                    nonce: fbsOptAdmin.nonce
+                    action: 'fbsseop_get_stats',
+                    nonce: fbsseopAdmin.nonce
                 },
                 success: function(response) {
                     if (response.success) {
@@ -729,8 +729,8 @@
                     return;
                 }
                 
-                // Parse nested field names like "fbs_opt_settings[section][field]"
-                var matches = name.match(/^fbs_opt_settings\[([^\]]+)\]\[([^\]]+)\]$/);
+                // Parse nested field names like "fbsseop_settings[section][field]"
+                var matches = name.match(/^fbsseop_settings\[([^\]]+)\]\[([^\]]+)\]$/);
                 if (matches) {
                     var section = matches[1];
                     var field = matches[2];
@@ -760,11 +760,11 @@
             
             // Send AJAX request
             $.ajax({
-                url: fbsOptAdmin.ajaxUrl,
+                url: fbsseopAdmin.ajaxUrl,
                 type: 'POST',
                 data: {
-                    action: 'fbs_opt_save_settings',
-                    nonce: fbsOptAdmin.nonce,
+                    action: 'fbsseop_save_settings',
+                    nonce: fbsseopAdmin.nonce,
                     settings: settings
                 },
                 success: function(response) {

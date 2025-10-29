@@ -107,17 +107,17 @@ class FBS_Secure_Optimize_Controller {
      */
     public function enqueue_frontend_scripts() {
         // Only enqueue if lazy loading is enabled
-        $settings = get_option('fbs_opt_settings', array());
+        $settings = get_option('fbsseop_settings', array());
         $asset_settings = isset($settings['asset_optimization']) ? $settings['asset_optimization'] : array();
         
         if (isset($asset_settings['lazy_load_images']) && $asset_settings['lazy_load_images']) {
-            wp_enqueue_script(
-                'fbs-opt-lazy-load',
-                FBS_SECURE_OPTIMIZE_PLUGIN_URL . 'assets/js/lazy-load.js',
-                array(),
-                FBS_SECURE_OPTIMIZE_VERSION,
-                true
-            );
+        wp_enqueue_script(
+            'fbsseop-lazy-load',
+            FBS_SECURE_OPTIMIZE_PLUGIN_URL . 'assets/js/lazy-load.js',
+            array(),
+            FBS_SECURE_OPTIMIZE_VERSION,
+            true
+        );
         }
     }
 
@@ -133,14 +133,14 @@ class FBS_Secure_Optimize_Controller {
         }
 
         wp_enqueue_style(
-            'fbs-opt-admin',
+            'fbsseop-admin',
             FBS_SECURE_OPTIMIZE_PLUGIN_URL . 'assets/css/admin.css',
             array(),
             FBS_SECURE_OPTIMIZE_VERSION
         );
 
         wp_enqueue_script(
-            'fbs-opt-admin',
+            'fbsseop-admin',
             FBS_SECURE_OPTIMIZE_PLUGIN_URL . 'assets/js/admin.js',
             array('jquery'),
             FBS_SECURE_OPTIMIZE_VERSION,
@@ -148,9 +148,9 @@ class FBS_Secure_Optimize_Controller {
         );
 
         // Localize script for AJAX
-        wp_localize_script('fbs-opt-admin', 'fbsOptAdmin', array(
+        wp_localize_script('fbsseop-admin', 'fbsseopAdmin', array(
             'ajaxUrl' => admin_url('admin-ajax.php'),
-            'nonce' => wp_create_nonce('fbs_opt_admin_nonce'),
+            'nonce' => wp_create_nonce('fbsseop_admin_nonce'),
             'strings' => array(
                 'confirmCleanup' => __('Are you sure you want to perform database cleanup? This action cannot be undone.', 'fbs-secure-optimize'),
                 'cleanupSuccess' => __('Database cleanup completed successfully.', 'fbs-secure-optimize'),
@@ -190,7 +190,7 @@ class FBS_Secure_Optimize_Controller {
      * @return bool True if enabled, false otherwise
      */
     public static function is_feature_enabled($section, $option) {
-        $settings = get_option('fbs_opt_settings', array());
+        $settings = get_option('fbsseop_settings', array());
         $section_settings = isset($settings[$section]) ? $settings[$section] : array();
         
         return isset($section_settings[$option]) && $section_settings[$option];
@@ -206,7 +206,7 @@ class FBS_Secure_Optimize_Controller {
      * @return mixed Setting value or default
      */
     public static function get_setting($section, $option, $default = '') {
-        $settings = get_option('fbs_opt_settings', array());
+        $settings = get_option('fbsseop_settings', array());
         $section_settings = isset($settings[$section]) ? $settings[$section] : array();
         
         return isset($section_settings[$option]) ? $section_settings[$option] : $default;
@@ -222,7 +222,7 @@ class FBS_Secure_Optimize_Controller {
      * @return bool True if updated successfully
      */
     public static function update_setting($section, $option, $value) {
-        $settings = get_option('fbs_opt_settings', array());
+        $settings = get_option('fbsseop_settings', array());
         
         if (!isset($settings[$section])) {
             $settings[$section] = array();
@@ -230,7 +230,7 @@ class FBS_Secure_Optimize_Controller {
         
         $settings[$section][$option] = $value;
         
-        return update_option('fbs_opt_settings', $settings);
+        return update_option('fbsseop_settings', $settings);
     }
 
     /**
@@ -255,8 +255,8 @@ class FBS_Secure_Optimize_Controller {
      */
     public static function get_stats() {
         // Check cache first
-        $cache_key = 'fbs_opt_stats';
-        $stats = wp_cache_get($cache_key, 'fbs_optimize');
+        $cache_key = 'fbsseop_stats';
+        $stats = wp_cache_get($cache_key, 'fbsseop');
         
         if (false === $stats) {
             global $wpdb;
@@ -274,7 +274,7 @@ class FBS_Secure_Optimize_Controller {
             $stats['transients'] = $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->options} WHERE option_name LIKE '_transient_%' OR option_name LIKE '_site_transient_%'");
             
             // Login attempts stats
-            $login_attempts_table = $wpdb->prefix . 'fbs_opt_login_attempts';
+            $login_attempts_table = $wpdb->prefix . 'fbsseop_login_attempts';
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Table existence check with caching
             if ($wpdb->get_var("SHOW TABLES LIKE '" . esc_sql($login_attempts_table) . "'") == $login_attempts_table) {
                 // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Statistics gathering with caching
@@ -284,7 +284,7 @@ class FBS_Secure_Optimize_Controller {
             }
             
             // Cache the results for 5 minutes
-            wp_cache_set($cache_key, $stats, 'fbs_optimize', 300);
+            wp_cache_set($cache_key, $stats, 'fbsseop', 300);
         }
         
         return $stats;
@@ -296,7 +296,7 @@ class FBS_Secure_Optimize_Controller {
      * @author Fazle Bari <fazlebarisn@gmail.com>
      */
     public static function clear_stats_cache() {
-        wp_cache_delete('fbs_opt_stats', 'fbs_optimize');
+        wp_cache_delete('fbsseop_stats', 'fbsseop');
     }
 
     /**
