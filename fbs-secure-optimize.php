@@ -3,7 +3,7 @@
  * Plugin Name: FBS Secure Optimize
  * Plugin URI: https://github.com/fazlebarisn/fbs-optimize
  * Description: A comprehensive WordPress plugin for performance optimization and security enhancement. Features asset optimization, database cleanup, login security, and security headers.
- * Version: 1.0.0
+ * Version: 1.0.1
  * Author: Fazle Bari
  * Author URI: https://github.com/fazlebarisn
  * License: GPL v2 or later
@@ -11,7 +11,7 @@
  * Text Domain: fbs-secure-optimize
  * Domain Path: /languages
  * Requires at least: 5.0
- * Tested up to: 6.8
+ * Tested up to: 6.9
  * Requires PHP: 7.4
  *
  * @package FBS_Optimize
@@ -23,7 +23,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('FBS_SECURE_OPTIMIZE_VERSION', '1.0.0');
+define('FBS_SECURE_OPTIMIZE_VERSION', '1.0.1');
 define('FBS_SECURE_OPTIMIZE_PLUGIN_FILE', __FILE__);
 define('FBS_SECURE_OPTIMIZE_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('FBS_SECURE_OPTIMIZE_PLUGIN_URL', plugin_dir_url(__FILE__));
