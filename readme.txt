@@ -2,9 +2,9 @@
 Contributors: fazlebari
 Tags: performance, security, optimization, speed, cache
 Requires at least: 5.0
-Tested up to: 6.9
+Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 1.0.1
+Stable tag: 1.0.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -83,6 +83,11 @@ The current version is designed for single-site installations. Multisite support
 6. Statistics dashboard
 
 == Changelog ==
+= 1.0.2 =
+* New: Integrated "Our Plugins" portfolio showcase page.
+* New: Integrated "Meet The Author" profile details page.
+* Tweak: Redesigned the backend UI with modern aesthetics, clean drop shadows, and responsive grid layouts.
+
 = 1.0.1 =
 *Compatible with WordPress 6.9 version 
 

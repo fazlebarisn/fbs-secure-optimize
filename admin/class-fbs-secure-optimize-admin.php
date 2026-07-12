@@ -130,6 +130,33 @@ class FBS_Secure_Optimize_Admin {
             'dashicons-performance',
             30
         );
+
+        add_submenu_page(
+            'fbs-secure-optimize',
+            __('Dashboard', 'fbs-secure-optimize'),
+            __('Dashboard', 'fbs-secure-optimize'),
+            'manage_options',
+            'fbs-secure-optimize',
+            array($this, 'admin_page')
+        );
+
+        add_submenu_page(
+            'fbs-secure-optimize',
+            __('Our Plugins', 'fbs-secure-optimize'),
+            __('Our Plugins', 'fbs-secure-optimize'),
+            'manage_options',
+            'fbs-secure-optimize-plugins',
+            array($this, 'render_our_plugins_page')
+        );
+
+        add_submenu_page(
+            'fbs-secure-optimize',
+            __('Meet The Author', 'fbs-secure-optimize'),
+            __('Meet The Author', 'fbs-secure-optimize'),
+            'manage_options',
+            'fbs-secure-optimize-author',
+            array($this, 'render_author_page')
+        );
     }
 
     /**
@@ -1118,5 +1145,20 @@ class FBS_Secure_Optimize_Admin {
         wp_send_json_success($stats);
     }
 
+    /**
+     * Render Our Plugins Page
+     * @since 1.0.2
+     */
+    public function render_our_plugins_page() {
+        include FBS_SECURE_OPTIMIZE_PLUGIN_DIR . 'admin/templates/our-plugins.php';
+    }
+
+    /**
+     * Render Meet the Author Page
+     * @since 1.0.2
+     */
+    public function render_author_page() {
+        include FBS_SECURE_OPTIMIZE_PLUGIN_DIR . 'admin/templates/plugin-author.php';
+    }
 
 }
