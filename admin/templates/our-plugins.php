@@ -1,5 +1,5 @@
 <?php
-defined('ABSPATH') or die('Nice Try!');
+defined( 'ABSPATH' ) || exit;
 ?>
 <div class="wrap fbs-plugins-wrap">
     <style>

@@ -1,904 +1,329 @@
 /**
- * Admin JavaScript for FBS Secure Optimize plugin
- * @since 1.0.0
- * @author Fazle Bari <fazlebarisn@gmail.com>
- * @package FBS_Optimize
- * @since 1.0.0
+ * Admin Interactive Controller for FBS Secure Optimize v2.0.0
  */
+(function ($) {
+	'use strict';
 
-(function($) {
-    'use strict';
+	function showToast(message, isError) {
+		var $toast = $('#fbsseop-ajax-toast');
+		if (!$toast.length) {
+			return;
+		}
+		$toast
+			.removeClass('fbsseop-toast--error')
+			.toggleClass('fbsseop-toast--error', !!isError)
+			.html('<span>' + $('<div>').text(message).html() + '</span>')
+			.stop(true, true)
+			.fadeIn(180);
 
-    // Initialize when document is ready
-    $(document).ready(function() {
-        FBSOptimizeAdmin.init();
-    });
+		setTimeout(function () {
+			$toast.fadeOut(300);
+		}, 4500);
+	}
 
-    // Also initialize after a short delay to ensure all elements are rendered
-    $(window).on('load', function() {
-        setTimeout(function() {
-            FBSOptimizeAdmin.initDependentOptions();
-        }, 100);
-    });
+	function escHtml(str) {
+		return $('<div>').text(str == null ? '' : String(str)).html();
+	}
 
-    // Main admin object
-    window.FBSOptimizeAdmin = {
-        
-        /**
-         * Initialize admin functionality
-         * @since 1.0.0
-         * @author Fazle Bari <fazlebarisn@gmail.com>
-         */
-        init: function() {
-            this.bindEvents();
-            this.initTabs();
-            this.initTooltips();
-            this.initDependentOptions();
-        },
+	// 1. Instant Independent Module Toggle via AJAX
+	$(document).on('change', '.fbsseop-ajax-module-toggle', function () {
+		var $checkbox = $(this);
+		var moduleKey = $checkbox.data('module');
+		var isEnabled = $checkbox.is(':checked') ? 1 : 0;
+		var $card = $checkbox.closest('.fbsseop-module-card');
 
-        /**
-         * Bind event handlers
-         * @since 1.0.0
-         * @author Fazle Bari <fazlebarisn@gmail.com>
-         */
-        bindEvents: function() {
-            // Database cleanup button
-            $(document).on('click', '#fbs-opt-cleanup-btn', this.handleCleanupClick);
-            
-            // Cache clear button
-            $(document).on('click', '#fbs-opt-clear-cache-btn', this.handleCacheClearClick);
-            
-            // Form submission handlers
-            $(document).on('submit', '.fbs-opt-form', this.handleFormSubmit);
-            
-            // Window resize handler for popup positioning
-            $(window).on('resize', this.handleWindowResize);
-            
-            // Settings form submission
-            $(document).on('submit', 'form[action*="options.php"]', this.handleFormSubmit);
-            
-            // Toggle switches
-            $(document).on('change', '.fbs-opt-toggle input', this.handleToggleChange);
-            $(document).on('click', '.fbs-opt-toggle', this.handleToggleClick);
-            
-            // Export/Import buttons
-            $(document).on('click', '.fbs-opt-export-btn', this.handleExportClick);
-            $(document).on('click', '.fbs-opt-import-btn', this.handleImportClick);
-            
-        },
+		$card.toggleClass('is-enabled', !!isEnabled).toggleClass('is-disabled', !isEnabled);
+		$card.find('.fbsseop-status-text').text(isEnabled ? '● Active' : '○ Disabled');
 
-        /**
-         * Initialize tabs
-         * @since 1.0.0
-         * @author Fazle Bari <fazlebarisn@gmail.com>
-         */
-        initTabs: function() {
-            $('.nav-tab').on('click', function(e) {
-                e.preventDefault();
-                
-                var $this = $(this);
-                var tab = $this.data('tab');
-                
-                if (tab) {
-                    FBSOptimizeAdmin.switchTab(tab);
-                }
-            });
-        },
+		$.post(fbsseopAdmin.ajaxUrl, {
+			action: 'fbsseop_toggle_module',
+			nonce: fbsseopAdmin.nonce,
+			module: moduleKey,
+			enabled: isEnabled
+		}).done(function (res) {
+			if (res && res.success) {
+				$('#fbsseop-module-counter').html(
+					'<span class="fbsseop-dot"></span> ' +
+					escHtml(res.data.active_count + ' / ' + res.data.total_count + ' Modules Active')
+				);
+				showToast(res.data.message, false);
+			} else {
+				showToast((res && res.data && res.data.message) || fbsseopAdmin.strings.genericError, true);
+			}
+		});
+	});
 
-        /**
-         * Switch to a specific tab
-         * @since 1.0.0
-         * @author Fazle Bari <fazlebarisn@gmail.com>
-         */
-        switchTab: function(tab) {
-            // Update active tab
-            $('.nav-tab').removeClass('nav-tab-active');
-            $('.nav-tab[data-tab="' + tab + '"]').addClass('nav-tab-active');
-            
-            // Show/hide tab content
-            $('.fbs-opt-tab-content').removeClass('active');
-            $('.fbs-opt-tab-content[data-tab="' + tab + '"]').addClass('active');
-            
-            // Update URL without page reload
-            var url = new URL(window.location);
-            url.searchParams.set('tab', tab);
-            window.history.pushState({}, '', url);
-        },
+	// 2. Manual 1-Click Database Cleanup
+	$('#fbsseop-run-cleanup-btn').on('click', function () {
+		if (!window.confirm(fbsseopAdmin.strings.confirmCleanup)) {
+			return;
+		}
+		var $btn = $(this);
+		var origHtml = $btn.html();
+		$btn.prop('disabled', true).text(fbsseopAdmin.strings.cleaning);
 
-        /**
-         * Initialize tooltips
-         * @since 1.0.0
-         * @author Fazle Bari <fazlebarisn@gmail.com>
-         */
-        initTooltips: function() {
-            $('[data-tooltip]').each(function() {
-                var $this = $(this);
-                var tooltip = $this.data('tooltip');
-                
-                $this.attr('title', tooltip);
-            });
-        },
+		$.post(fbsseopAdmin.ajaxUrl, {
+			action: 'fbsseop_cleanup_database',
+			nonce: fbsseopAdmin.nonce
+		}).done(function (res) {
+			if (res && res.success) {
+				showToast(res.data.message, false);
+			} else {
+				showToast((res && res.data && res.data.message) || fbsseopAdmin.strings.genericError, true);
+			}
+		}).fail(function () {
+			showToast(fbsseopAdmin.strings.genericError, true);
+		}).always(function () {
+			$btn.prop('disabled', false).html(origHtml);
+		});
+	});
 
-        /**
-         * Handle cleanup button click
-         * @since 1.0.0
-         * @author Fazle Bari <fazlebarisn@gmail.com>
-         */
-        handleCleanupClick: function(e) {
-            e.preventDefault();
-            
-            if (!confirm(fbsseopAdmin.strings.confirmCleanup)) {
-                return;
-            }
-            
-            var $btn = $(this);
-            var $status = $('#fbs-opt-cleanup-status');
-            
-            // Disable button and show loading
-            $btn.prop('disabled', true);
-            $status.html('<span class="fbs-opt-loading"></span> ' + fbsseopAdmin.strings.cleaning);
-            
-            // Perform AJAX request
-            $.ajax({
-                url: fbsseopAdmin.ajaxUrl,
-                type: 'POST',
-                data: {
-                    action: 'fbsseop_cleanup_database',
-                    nonce: fbsseopAdmin.nonce
-                },
-                success: function(response) {
-                    if (response.success) {
-                        $status.html('<span class="fbs-opt-cleanup-status success">✓ ' + response.data.message + '</span>');
-                        FBSOptimizeAdmin.showSuccess(response.data.message, 4000);
-                        
-                        // Refresh statistics if on statistics tab
-                        if ($('.nav-tab-active').data('tab') === 'statistics') {
-                            FBSOptimizeAdmin.refreshStatistics();
-                        }
-                    } else {
-                        $status.html('<span class="fbs-opt-cleanup-status error">✗ ' + response.data.message + '</span>');
-                        FBSOptimizeAdmin.showError(response.data.message, 5000);
-                    }
-                },
-                error: function() {
-                    $status.html('<span class="fbs-opt-cleanup-status error">✗ ' + fbsseopAdmin.strings.cleanupError + '</span>');
-                    FBSOptimizeAdmin.showError(fbsseopAdmin.strings.cleanupError, 5000);
-                },
-                complete: function() {
-                    $btn.prop('disabled', false);
-                    
-                    // Hide status after 5 seconds
-                    setTimeout(function() {
-                        $status.fadeOut();
-                    }, 5000);
-                }
-            });
-        },
+	// 3. 1-Click Protect wp-content/uploads/
+	$('#fbsseop-protect-uploads-btn').on('click', function () {
+		var $btn = $(this);
+		$btn.prop('disabled', true);
 
-        /**
-         * Handle cache clear button click
-         * @since 1.0.0
-         * @author Fazle Bari <fazlebarisn@gmail.com>
-         */
-        handleCacheClearClick: function(e) {
-            e.preventDefault();
-            
-            if (!confirm('Are you sure you want to clear the asset cache? This will force regeneration of optimized files.')) {
-                return;
-            }
-            
-            var $btn = $(this);
-            var $status = $('#fbs-opt-cache-status');
-            
-            // Make sure status is visible
-            $status.show();
-            
-            // Disable button and show loading
-            $btn.prop('disabled', true);
-            $status.html('<span class="fbs-opt-loading"></span> Clearing cache...');
-            
-            // Perform AJAX request
-            $.ajax({
-                url: fbsseopAdmin.ajaxUrl,
-                type: 'POST',
-                data: {
-                    action: 'fbsseop_clear_cache',
-                    nonce: fbsseopAdmin.nonce
-                },
-                success: function(response) {
-                    if (response.success) {
-                        $status.html('<span class="fbs-opt-cleanup-status success">✓ ' + response.data.message + '</span>');
-                        FBSOptimizeAdmin.showSuccess(response.data.message, 4000);
-                        
-                        // Refresh statistics if on statistics tab
-                        if ($('.nav-tab-active').data('tab') === 'statistics') {
-                            FBSOptimizeAdmin.refreshStatistics();
-                        }
-                    } else {
-                        $status.html('<span class="fbs-opt-cleanup-status error">✗ ' + response.data.message + '</span>');
-                        FBSOptimizeAdmin.showError(response.data.message, 5000);
-                    }
-                },
-                error: function() {
-                    $status.html('<span class="fbs-opt-cleanup-status error">✗ Failed to clear cache</span>');
-                    FBSOptimizeAdmin.showError('Failed to clear cache. Please try again.', 5000);
-                },
-                complete: function() {
-                    $btn.prop('disabled', false);
-                    
-                    // Hide status after 5 seconds
-                    setTimeout(function() {
-                        $status.fadeOut();
-                    }, 5000);
-                }
-            });
-        },
+		$.post(fbsseopAdmin.ajaxUrl, {
+			action: 'fbsseop_protect_uploads',
+			nonce: fbsseopAdmin.nonce
+		}).done(function (res) {
+			if (res && res.success) {
+				$('#fbsseop-uploads-status-text').html('<strong style="color:#059669;">✓ ' + escHtml(res.data.message) + '</strong>');
+				$btn.remove();
+				showToast(res.data.message, false);
+			} else {
+				$btn.prop('disabled', false);
+				showToast((res && res.data && res.data.message) || fbsseopAdmin.strings.genericError, true);
+			}
+		});
+	});
 
-        /**
-         * Handle form submission
-         * @since 1.0.0
-         * @author Fazle Bari <fazlebarisn@gmail.com>
-         */
-        handleFormSubmit: function(e) {
-            var $form = $(this);
-            
-            // Show loading indicator
-            $form.find('input[type="submit"]').prop('disabled', true).val('Saving...');
-            
-            // Re-enable after a short delay
-            setTimeout(function() {
-                $form.find('input[type="submit"]').prop('disabled', false).val('Save Changes');
-            }, 2000);
-        },
+	// 4. 1-Click Deactivate High-Risk Plugin
+	$(document).on('click', '.fbsseop-deactivate-risky', function () {
+		var $btn = $(this);
+		var basename = $btn.data('plugin');
+		$btn.prop('disabled', true);
 
-        /**
-         * Handle toggle switch change
-         * @since 1.0.0
-         * @author Fazle Bari <fazlebarisn@gmail.com>
-         */
-        handleToggleChange: function() {
-            var $toggle = $(this);
-            var $container = $toggle.closest('.fbs-opt-toggle');
-            
-            // Add visual feedback
-            $container.addClass('changing');
-            setTimeout(function() {
-                $container.removeClass('changing');
-            }, 200);
-            
-            // Handle dependent options
-            FBSOptimizeAdmin.updateDependentOptions($toggle);
-        },
+		$.post(fbsseopAdmin.ajaxUrl, {
+			action: 'fbsseop_deactivate_risky_plugin',
+			nonce: fbsseopAdmin.nonce,
+			plugin: basename
+		}).done(function (res) {
+			if (res && res.success) {
+				$btn.closest('.fbsseop-risky-item').fadeOut(200, function () {
+					$(this).remove();
+				});
+				showToast(res.data.message, false);
+			} else {
+				$btn.prop('disabled', false);
+				showToast((res && res.data && res.data.message) || fbsseopAdmin.strings.genericError, true);
+			}
+		});
+	});
 
-        /**
-         * Handle toggle switch click
-         * @since 1.0.0
-         * @author Fazle Bari <fazlebarisn@gmail.com>
-         */
-        handleToggleClick: function(e) {
-            var $toggle = $(this);
-            var $input = $toggle.find('input[type="checkbox"]');
-            
-            if ($input.length > 0) {
-                $input.prop('checked', !$input.prop('checked')).trigger('change');
-            }
-        },
+	// 5. Clear Failed Login Lockouts
+	$('#fbsseop-clear-lockouts-btn').on('click', function () {
+		var $btn = $(this);
+		$btn.prop('disabled', true);
 
-        /**
-         * Handle export button click
-         * @since 1.0.0
-         * @author Fazle Bari <fazlebarisn@gmail.com>
-         */
-        handleExportClick: function(e) {
-            e.preventDefault();
-            
-            // Create and download export file
-            var settings = FBSOptimizeAdmin.getCurrentSettings();
-            var dataStr = JSON.stringify(settings, null, 2);
-            var dataBlob = new Blob([dataStr], {type: 'application/json'});
-            
-            var link = document.createElement('a');
-            link.href = URL.createObjectURL(dataBlob);
-            link.download = 'fbs-optimize-settings.json';
-            link.click();
-        },
+		$.post(fbsseopAdmin.ajaxUrl, {
+			action: 'fbsseop_clear_lockouts',
+			nonce: fbsseopAdmin.nonce
+		}).done(function (res) {
+			if (res && res.success) {
+				showToast(res.data.message, false);
+				window.location.reload();
+			} else {
+				$btn.prop('disabled', false);
+			}
+		});
+	});
 
-        /**
-         * Handle import button click
-         * @since 1.0.0
-         * @author Fazle Bari <fazlebarisn@gmail.com>
-         */
-        handleImportClick: function(e) {
-            e.preventDefault();
-            
-            var input = document.createElement('input');
-            input.type = 'file';
-            input.accept = '.json';
-            
-            input.onchange = function(event) {
-                var file = event.target.files[0];
-                if (file) {
-                    var reader = new FileReader();
-                    reader.onload = function(e) {
-                        try {
-                            var settings = JSON.parse(e.target.result);
-                            FBSOptimizeAdmin.importSettings(settings);
-                        } catch (error) {
-                            alert('Invalid settings file.');
-                        }
-                    };
-                    reader.readAsText(file);
-                }
-            };
-            
-            input.click();
-        },
+	// 6. Run 6-Layer Malware, Core Checksum & Hidden-Admin Scan
+	$('#fbsseop-run-scan-btn').on('click', function () {
+		var $btn = $(this);
+		var $results = $('#fbsseop-scan-results');
+		$btn.prop('disabled', true).find('span:last').text(fbsseopAdmin.strings.scanning);
+		$results.show().html('<p style="padding:14px;background:#f8fafc;border-radius:10px;font-weight:600;">⏳ Inspecting root PHP files, official WP.org MD5 checksums, uploads/, mu-plugins, plugin/theme heuristics, wp_options, and hidden administrator accounts...</p>');
 
+		$.post(fbsseopAdmin.ajaxUrl, {
+			action: 'fbsseop_run_scan',
+			nonce: fbsseopAdmin.nonce
+		}).done(function (res) {
+			if (!res || !res.success) {
+				$results.html('<div class="fbsseop-toast fbsseop-toast--error">' + escHtml((res && res.data && res.data.message) || fbsseopAdmin.strings.genericError) + '</div>');
+				return;
+			}
 
-        /**
-         * Get current settings
-         * @since 1.0.0
-         * @author Fazle Bari <fazlebarisn@gmail.com>
-         */
-        getCurrentSettings: function() {
-            var settings = {};
-            
-            $('form[action*="options.php"]').find('input, select, textarea').each(function() {
-                var $field = $(this);
-                var name = $field.attr('name');
-                
-                if (name && name.startsWith('fbsseop_settings')) {
-                    var value = $field.val();
-                    
-                    if ($field.attr('type') === 'checkbox') {
-                        value = $field.is(':checked') ? 1 : 0;
-                    }
-                    
-                    // Parse nested setting structure
-                    var parts = name.match(/fbsseop_settings\[([^\]]+)\]\[([^\]]+)\]/);
-                    if (parts) {
-                        var section = parts[1];
-                        var option = parts[2];
-                        
-                        if (!settings[section]) {
-                            settings[section] = {};
-                        }
-                        settings[section][option] = value;
-                    }
-                }
-            });
-            
-            return settings;
-        },
+			var d = res.data;
+			var html = '';
 
-        /**
-         * Import settings
-         * @since 1.0.0
-         * @author Fazle Bari <fazlebarisn@gmail.com>
-         */
-        importSettings: function(settings) {
-            if (!confirm('This will overwrite your current settings. Continue?')) {
-                return;
-            }
-            
-            $.ajax({
-                url: fbsseopAdmin.ajaxUrl,
-                type: 'POST',
-                data: {
-                    action: 'fbsseop_import_settings',
-                    nonce: fbsseopAdmin.nonce,
-                    settings: JSON.stringify(settings)
-                },
-                success: function(response) {
-                    if (response.success) {
-                        location.reload();
-                    } else {
-                        alert('Failed to import settings.');
-                    }
-                },
-                error: function() {
-                    alert('Failed to import settings.');
-                }
-            });
-        },
+			if (d.total_issues === 0) {
+				html += '<div class="fbsseop-toast">✓ ' + escHtml(d.message) + ' (' + escHtml(d.scanned_files) + ' PHP files verified)</div>';
+			} else {
+				html += '<div class="fbsseop-toast fbsseop-toast--error">⚠ ' + escHtml(d.message) + '</div>';
+			}
 
-        /**
-         * Refresh statistics
-         * @since 1.0.0
-         * @author Fazle Bari <fazlebarisn@gmail.com>
-         */
-        refreshStatistics: function() {
-            $.ajax({
-                url: fbsseopAdmin.ajaxUrl,
-                type: 'POST',
-                data: {
-                    action: 'fbsseop_get_stats',
-                    nonce: fbsseopAdmin.nonce
-                },
-                success: function(response) {
-                    if (response.success) {
-                        FBSOptimizeAdmin.updateStatisticsDisplay(response.data);
-                    }
-                }
-            });
-        },
+			// File Findings Table
+			if (d.findings && d.findings.length > 0) {
+				html += '<h3 style="margin:18px 0 8px;">Flagged Filesystem Findings (' + d.findings.length + ')</h3>';
+				html += '<table class="fbsseop-mini-table"><thead><tr><th>Severity</th><th>File</th><th>Reason</th><th>Actions</th></tr></thead><tbody>';
+				$.each(d.findings, function (_, item) {
+					var sevClass = item.severity === 'CRITICAL' ? 'fbsseop-sev--critical' : 'fbsseop-sev--high';
+					html += '<tr>';
+					html += '<td><span class="fbsseop-sev ' + sevClass + '">' + escHtml(item.severity) + '</span></td>';
+					html += '<td><code>' + escHtml(item.file) + '</code></td>';
+					html += '<td>' + escHtml(item.reason) + '</td>';
+					html += '<td style="display:flex;gap:6px;flex-wrap:wrap;">';
+					html += '<button type="button" class="fbsseop-btn fbsseop-btn--sm fbsseop-preview-file-btn" data-file="' + escHtml(item.file) + '">Preview</button>';
+					if (item.can_delete) {
+						if (d.is_pro) {
+							html += '<button type="button" class="fbsseop-btn fbsseop-btn--sm fbsseop-btn--danger fbsseop-pro-delete-file-btn" data-file="' + escHtml(item.file) + '">Delete (Pro)</button>';
+						} else {
+							html += '<a href="' + escHtml(fbsseopAdmin.proUrl) + '" target="_blank" rel="noopener" class="fbsseop-btn fbsseop-btn--sm">1-Click Delete (Pro)</a>';
+						}
+					}
+					html += '</td></tr>';
+				});
+				html += '</tbody></table>';
+			}
 
-        /**
-         * Update statistics display
-         * @since 1.0.0
-         * @author Fazle Bari <fazlebarisn@gmail.com>
-         */
-        updateStatisticsDisplay: function(stats) {
-            // Update database statistics
-            $('.fbs-opt-stat-item').each(function() {
-                var $item = $(this);
-                var statType = $item.data('stat');
-                
-                if (stats[statType] !== undefined) {
-                    $item.find('.fbs-opt-stat-number').text(stats[statType].toLocaleString());
-                }
-            });
-        },
+			// Database Threats
+			if (d.db_threats && d.db_threats.length > 0) {
+				html += '<h3 style="margin:20px 0 8px;">Flagged Database Options / Snippets (' + d.db_threats.length + ')</h3>';
+				html += '<table class="fbsseop-mini-table"><thead><tr><th>Severity</th><th>Option / Row</th><th>Reason</th><th>Action</th></tr></thead><tbody>';
+				$.each(d.db_threats, function (_, dbItem) {
+					html += '<tr>';
+					html += '<td><span class="fbsseop-sev fbsseop-sev--high">' + escHtml(dbItem.severity) + '</span></td>';
+					html += '<td><code>' + escHtml(dbItem.name) + '</code></td>';
+					html += '<td>' + escHtml(dbItem.reason) + '</td>';
+					html += '<td>';
+					if (d.is_pro) {
+						html += '<button type="button" class="fbsseop-btn fbsseop-btn--sm fbsseop-btn--danger fbsseop-pro-delete-db-btn" data-table="' + escHtml(dbItem.table) + '" data-rowid="' + escHtml(dbItem.row_id) + '">Delete Row (Pro)</button>';
+					} else {
+						html += '<a href="' + escHtml(fbsseopAdmin.proUrl) + '" target="_blank" rel="noopener" class="fbsseop-btn fbsseop-btn--sm">Unlock Pro Cleanup</a>';
+					}
+					html += '</td></tr>';
+				});
+				html += '</tbody></table>';
+			}
 
-        /**
-         * Show beautiful popup notification
-         * @since 1.0.0
-         * @author Fazle Bari <fazlebarisn@gmail.com>
-         */
-        showNotification: function(message, type, duration) {
-            type = type || 'info';
-            duration = duration || 4000;
-            
-            // Create popup container if it doesn't exist
-            if (!$('#fbs-opt-popup-container').length) {
-                $('body').append('<div id="fbs-opt-popup-container"></div>');
-                this.adjustPopupPosition();
-            }
-            
-            // Get icon and colors based on type
-            var iconClass, bgColor, borderColor, textColor;
-            switch(type) {
-                case 'success':
-                    iconClass = 'dashicons-yes-alt';
-                    bgColor = '#d4edda';
-                    borderColor = '#28a745';
-                    textColor = '#155724';
-                    break;
-                case 'error':
-                    iconClass = 'dashicons-warning';
-                    bgColor = '#f8d7da';
-                    borderColor = '#dc3545';
-                    textColor = '#721c24';
-                    break;
-                case 'warning':
-                    iconClass = 'dashicons-warning';
-                    bgColor = '#fff3cd';
-                    borderColor = '#ffc107';
-                    textColor = '#856404';
-                    break;
-                default: // info
-                    iconClass = 'dashicons-info';
-                    bgColor = '#d1ecf1';
-                    borderColor = '#17a2b8';
-                    textColor = '#0c5460';
-            }
-            
-            // Create popup element
-            var popupId = 'fbs-opt-popup-' + Date.now();
-            var $popup = $('<div class="fbs-opt-popup" id="' + popupId + '">' +
-                '<div class="fbs-opt-popup-content">' +
-                    '<div class="fbs-opt-popup-icon">' +
-                        '<span class="dashicons ' + iconClass + '"></span>' +
-                    '</div>' +
-                    '<div class="fbs-opt-popup-message">' + message + '</div>' +
-                    '<button class="fbs-opt-popup-close" type="button">' +
-                        '<span class="dashicons dashicons-no-alt"></span>' +
-                    '</button>' +
-                '</div>' +
-                '<div class="fbs-opt-popup-progress"></div>' +
-            '</div>');
-            
-            // Set colors
-            $popup.css({
-                'background-color': bgColor,
-                'border-left-color': borderColor,
-                'color': textColor
-            });
-            
-            // Add to container
-            $('#fbs-opt-popup-container').append($popup);
-            
-            // Set initial state (off-screen to the right)
-            $popup.css({
-                'transform': 'translateX(100%)',
-                'opacity': '0',
-                'transition': 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-            });
-            
-            // Force a reflow to ensure initial state is applied
-            $popup[0].offsetHeight;
-            
-            // Animate in (slide from right to left)
-            setTimeout(function() {
-                $popup.css({
-                    'transform': 'translateX(0)',
-                    'opacity': '1'
-                });
-            }, 10);
-            
-            // Start progress bar animation
-            $popup.find('.fbs-opt-popup-progress').animate({
-                'width': '100%'
-            }, duration, 'linear');
-            
-            // Auto-hide after duration
-            var hideTimeout = setTimeout(function() {
-                FBSOptimizeAdmin.hideNotification(popupId);
-            }, duration);
-            
-            // Close button click
-            $popup.find('.fbs-opt-popup-close').on('click', function() {
-                clearTimeout(hideTimeout);
-                FBSOptimizeAdmin.hideNotification(popupId);
-            });
-            
-            // Click to dismiss
-            $popup.on('click', function(e) {
-                if (!$(e.target).closest('.fbs-opt-popup-close').length) {
-                    clearTimeout(hideTimeout);
-                    FBSOptimizeAdmin.hideNotification(popupId);
-                }
-            });
-        },
+			// Hidden / Unauthorized Administrators
+			var hiddenUsers = (d.hidden_audit && d.hidden_audit.hidden_users) ? d.hidden_audit.hidden_users : [];
+			if (hiddenUsers.length > 0) {
+				html += '<h3 style="margin:20px 0 8px;">⚠ Hidden or Stealth-Elevated Admin Accounts (' + hiddenUsers.length + ')</h3>';
+				html += '<table class="fbsseop-mini-table"><thead><tr><th>User ID</th><th>Login & Email</th><th>Detection Type</th><th>Action</th></tr></thead><tbody>';
+				$.each(hiddenUsers, function (_, u) {
+					html += '<tr>';
+					html += '<td>#' + escHtml(u.ID) + '</td>';
+					html += '<td><strong>' + escHtml(u.user_login) + '</strong> (' + escHtml(u.user_email) + ')</td>';
+					html += '<td>' + escHtml(u.hidden_type) + '</td>';
+					html += '<td>';
+					if (d.is_pro) {
+						html += '<button type="button" class="fbsseop-btn fbsseop-btn--sm fbsseop-btn--danger fbsseop-pro-disarm-user-btn" data-userid="' + escHtml(u.ID) + '">Disarm User (Pro)</button>';
+					} else {
+						html += '<a href="' + escHtml(fbsseopAdmin.proUrl) + '" target="_blank" rel="noopener" class="fbsseop-btn fbsseop-btn--sm">Pro Auto-Disarm</a>';
+					}
+					html += '</td></tr>';
+				});
+				html += '</tbody></table>';
+			}
 
-        /**
-         * Hide notification popup
-         * @since 1.0.0
-         * @author Fazle Bari <fazlebarisn@gmail.com>
-         */
-        hideNotification: function(popupId) {
-            var $popup = $('#' + popupId);
-            if ($popup.length) {
-                // Animate out (slide to the right)
-                $popup.css({
-                    'transform': 'translateX(100%)',
-                    'opacity': '0'
-                });
-                
-                // Remove after animation completes
-                setTimeout(function() {
-                    $popup.remove();
-                }, 300);
-            }
-        },
+			$results.html(html);
+		}).fail(function () {
+			$results.html('<div class="fbsseop-toast fbsseop-toast--error">' + escHtml(fbsseopAdmin.strings.genericError) + '</div>');
+		}).always(function () {
+			$btn.prop('disabled', false).find('span:last').text(fbsseopAdmin.strings.scanBtnLabel);
+		});
+	});
 
-        /**
-         * Show success notification
-         * @since 1.0.0
-         * @author Fazle Bari <fazlebarisn@gmail.com>
-         */
-        showSuccess: function(message, duration) {
-            this.showNotification(message, 'success', duration);
-        },
+	// 7. File Snippet Preview Modal
+	$(document).on('click', '.fbsseop-preview-file-btn', function () {
+		var file = $(this).data('file');
+		$('#fbsseop-preview-title').text('Inspecting: ' + file);
+		$('#fbsseop-preview-code').text('Loading file snippet...');
+		$('#fbsseop-preview-modal').slideDown(160);
 
-        /**
-         * Show error notification
-         * @since 1.0.0
-         * @author Fazle Bari <fazlebarisn@gmail.com>
-         */
-        showError: function(message, duration) {
-            this.showNotification(message, 'error', duration);
-        },
+		$.post(fbsseopAdmin.ajaxUrl, {
+			action: 'fbsseop_preview_file',
+			nonce: fbsseopAdmin.nonce,
+			file: file
+		}).done(function (res) {
+			if (res && res.success) {
+				$('#fbsseop-preview-code').text(res.data.content);
+			} else {
+				$('#fbsseop-preview-code').text((res && res.data && res.data.message) || 'Unable to load preview.');
+			}
+		});
+	});
 
-        /**
-         * Show warning notification
-         * @since 1.0.0
-         * @author Fazle Bari <fazlebarisn@gmail.com>
-         */
-        showWarning: function(message, duration) {
-            this.showNotification(message, 'warning', duration);
-        },
+	$('#fbsseop-close-modal').on('click', function () {
+		$('#fbsseop-preview-modal').slideUp(150);
+	});
 
-        /**
-         * Show info notification
-         * @since 1.0.0
-         * @author Fazle Bari <fazlebarisn@gmail.com>
-         */
-        showInfo: function(message, duration) {
-            this.showNotification(message, 'info', duration);
-        },
+	// 8. Pro Remediation Actions (Active when FBS Secure Optimize Pro is installed)
+	$(document).on('click', '.fbsseop-pro-delete-file-btn', function () {
+		if (!window.confirm(fbsseopAdmin.strings.confirmDelete)) {
+			return;
+		}
+		var $btn = $(this);
+		var file = $btn.data('file');
+		$btn.prop('disabled', true);
 
-        /**
-         * Clear all notifications
-         * @since 1.0.0
-         * @author Fazle Bari <fazlebarisn@gmail.com>
-         */
-        clearAllNotifications: function() {
-            $('#fbs-opt-popup-container .fbs-opt-popup').each(function() {
-                var popupId = $(this).attr('id');
-                FBSOptimizeAdmin.hideNotification(popupId);
-            });
-        },
+		$.post(fbsseopAdmin.ajaxUrl, {
+			action: 'fbsseop_pro_delete_file',
+			nonce: fbsseopAdmin.nonce,
+			file: file
+		}).done(function (res) {
+			if (res && res.success) {
+				$btn.closest('tr').fadeOut(200, function () { $(this).remove(); });
+				showToast(res.data.message, false);
+			} else {
+				$btn.prop('disabled', false);
+				showToast((res && res.data && res.data.message) || fbsseopAdmin.strings.genericError, true);
+			}
+		});
+	});
 
-        /**
-         * Adjust popup position based on viewport and WordPress admin bar
-         * @since 1.0.0
-         * @author Fazle Bari <fazlebarisn@gmail.com>
-         */
-        adjustPopupPosition: function() {
-            var $container = $('#fbs-opt-popup-container');
-            if (!$container.length) return;
-            
-            var windowWidth = $(window).width();
-            var windowHeight = $(window).height();
-            var adminBarHeight = $('#wpadminbar').length ? $('#wpadminbar').outerHeight() : 0;
-            
-            // Adjust top position based on admin bar
-            var topPosition = Math.max(20, adminBarHeight + 10);
-            
-            // Reset all positioning first
-            $container.css({
-                'left': 'auto',
-                'right': 'auto',
-                'top': 'auto',
-                'max-width': 'none',
-                'width': 'auto'
-            });
-            
-            // Adjust positioning based on screen size
-            if (windowWidth < 600) {
-                // On very small screens, use full width with margins
-                $container.css({
-                    'position': 'fixed',
-                    'top': topPosition + 'px',
-                    'left': '10px',
-                    'right': '10px',
-                    'max-width': (windowWidth - 20) + 'px',
-                    'width': 'auto'
-                });
-            } else if (windowWidth < 782) {
-                // On mobile screens
-                $container.css({
-                    'position': 'fixed',
-                    'top': topPosition + 'px',
-                    'left': '10px',
-                    'right': '10px',
-                    'max-width': Math.min(400, windowWidth - 20) + 'px',
-                    'width': 'auto'
-                });
-            } else {
-                // On desktop screens - ensure it's positioned correctly
-                $container.css({
-                    'position': 'fixed',
-                    'top': topPosition + 'px',
-                    'right': '20px',
-                    'left': 'auto',
-                    'max-width': '400px',
-                    'width': 'auto'
-                });
-            }
-            
-            // Ensure container doesn't go below viewport
-            var containerHeight = $container.outerHeight();
-            if (containerHeight > windowHeight - topPosition - 20) {
-                $container.css('max-height', (windowHeight - topPosition - 20) + 'px');
-                $container.css('overflow-y', 'auto');
-            }
-        },
+	$(document).on('click', '.fbsseop-pro-delete-db-btn', function () {
+		if (!window.confirm(fbsseopAdmin.strings.confirmDelete)) {
+			return;
+		}
+		var $btn = $(this);
+		$btn.prop('disabled', true);
 
-        /**
-         * Handle window resize for popup positioning
-         * @since 1.0.0
-         * @author Fazle Bari <fazlebarisn@gmail.com>
-         */
-        handleWindowResize: function() {
-            // Debounce the resize handler
-            clearTimeout(FBSOptimizeAdmin.resizeTimeout);
-            FBSOptimizeAdmin.resizeTimeout = setTimeout(function() {
-                FBSOptimizeAdmin.adjustPopupPosition();
-            }, 250);
-        },
+		$.post(fbsseopAdmin.ajaxUrl, {
+			action: 'fbsseop_pro_delete_db_threat',
+			nonce: fbsseopAdmin.nonce,
+			table: $btn.data('table'),
+			row_id: $btn.data('rowid')
+		}).done(function (res) {
+			if (res && res.success) {
+				$btn.closest('tr').fadeOut(200, function () { $(this).remove(); });
+				showToast(res.data.message, false);
+			} else {
+				$btn.prop('disabled', false);
+				showToast((res && res.data && res.data.message) || fbsseopAdmin.strings.genericError, true);
+			}
+		});
+	});
 
-        /**
-         * Handle form submission via AJAX
-         * @since 1.0.0
-         * @author Fazle Bari <fazlebarisn@gmail.com>
-         */
-        handleFormSubmit: function(e) {
-            e.preventDefault();
-            
-            var $form = $(this);
-            var tab = $form.data('tab');
-            var $submitBtn = $form.find('button[type="submit"]');
-            var $statusSpan = $form.find('.fbs-opt-save-status');
-            
-            // Disable submit button and show loading state
-            $submitBtn.prop('disabled', true).addClass('loading');
-            
-            // Collect form data
-            var formData = $form.serializeArray();
-            var settings = {};
-            
-            // Convert form data to nested object structure
-            $.each(formData, function(i, field) {
-                var name = field.name;
-                var value = field.value;
-                
-                // Skip WordPress nonce and action fields
-                if (name === '_wpnonce' || name === '_wp_http_referer' || name === 'option_page') {
-                    return;
-                }
-                
-                // Parse nested field names like "fbsseop_settings[section][field]"
-                var matches = name.match(/^fbsseop_settings\[([^\]]+)\]\[([^\]]+)\]$/);
-                if (matches) {
-                    var section = matches[1];
-                    var field = matches[2];
-                    
-                    if (!settings[section]) {
-                        settings[section] = {};
-                    }
-                    settings[section][field] = value;
-                }
-            });
-            
-            // Check if any settings were actually provided
-            var hasSettings = false;
-            for (var section in settings) {
-                if (settings[section] && Object.keys(settings[section]).length > 0) {
-                    hasSettings = true;
-                    break;
-                }
-            }
-            
-            if (!hasSettings) {
-                // No settings to save
-                $submitBtn.prop('disabled', false).removeClass('loading');
-                FBSOptimizeAdmin.showInfo('No settings to save', 2000);
-                return;
-            }
-            
-            // Send AJAX request
-            $.ajax({
-                url: fbsseopAdmin.ajaxUrl,
-                type: 'POST',
-                data: {
-                    action: 'fbsseop_save_settings',
-                    nonce: fbsseopAdmin.nonce,
-                    settings: settings
-                },
-                success: function(response) {
-                    if (response.success) {
-                        FBSOptimizeAdmin.showSuccess(response.data.message, 3000);
-                    } else {
-                        FBSOptimizeAdmin.showError(response.data.message || 'Save failed', 5000);
-                    }
-                },
-                error: function() {
-                    FBSOptimizeAdmin.showError('Network error occurred. Please check your connection and try again.', 5000);
-                },
-                complete: function() {
-                    // Re-enable submit button
-                    $submitBtn.prop('disabled', false).removeClass('loading');
-                }
-            });
-        },
+	$(document).on('click', '.fbsseop-pro-disarm-user-btn', function () {
+		var $btn = $(this);
+		$btn.prop('disabled', true);
 
-        /**
-         * Show progress bar
-         * @since 1.0.0
-         * @author Fazle Bari <fazlebarisn@gmail.com>
-         */
-        showProgress: function(container, progress) {
-            var $container = $(container);
-            var $progressBar = $container.find('.fbs-opt-progress-bar');
-            
-            if ($progressBar.length === 0) {
-                $progressBar = $('<div class="fbs-opt-progress-bar"><div class="fbs-opt-progress-fill"></div></div>');
-                $container.append($progressBar);
-            }
-            
-            $progressBar.find('.fbs-opt-progress-fill').css('width', progress + '%');
-        },
-
-        /**
-         * Initialize dependent options
-         * @since 1.0.0
-         * @author Fazle Bari <fazlebarisn@gmail.com>
-         */
-        initDependentOptions: function() {
-            // Initialize all dependent options based on their parent toggles
-            $('.fbs-opt-dependent-option').each(function() {
-                var $dependentOption = $(this);
-                var dependsOn = $dependentOption.data('depends-on');
-                
-                if (dependsOn) {
-                    var $parentToggle = $('#' + dependsOn);
-                    if ($parentToggle.length) {
-                        FBSOptimizeAdmin.updateDependentOptions($parentToggle);
-                    }
-                }
-            });
-            
-            // Also bind change events to all toggle inputs to ensure dependent options update
-            $('.fbs-opt-toggle input[type="checkbox"]').on('change', function() {
-                FBSOptimizeAdmin.updateDependentOptions($(this));
-            });
-        },
-
-        /**
-         * Update dependent options based on toggle state
-         * @since 1.0.0
-         * @author Fazle Bari <fazlebarisn@gmail.com>
-         * @param {jQuery} $toggle The toggle element that controls dependent options
-         */
-        updateDependentOptions: function($toggle) {
-            var toggleId = $toggle.attr('id');
-            var isChecked = $toggle.is(':checked');
-            
-            // Find all dependent options that depend on this toggle
-            $('.fbs-opt-dependent-option[data-depends-on="' + toggleId + '"]').each(function() {
-                var $dependentOption = $(this);
-                
-                if (isChecked) {
-                    // Enable the dependent option
-                    $dependentOption.removeClass('disabled');
-                    $dependentOption.find('select, input, textarea').prop('disabled', false);
-                    $dependentOption.show(); // Make sure it's visible
-                } else {
-                    // Disable the dependent option
-                    $dependentOption.addClass('disabled');
-                    $dependentOption.find('select, input, textarea').prop('disabled', true);
-                    $dependentOption.hide(); // Hide when disabled
-                }
-            });
-        },
-
-        /**
-         * Validate form
-         * @since 1.0.0
-         * @author Fazle Bari <fazlebarisn@gmail.com>
-         */
-        validateForm: function($form) {
-            var isValid = true;
-            var errors = [];
-            
-            // Check required fields
-            $form.find('[required]').each(function() {
-                var $field = $(this);
-                var value = $field.val();
-                
-                if (!value || value.trim() === '') {
-                    isValid = false;
-                    errors.push($field.attr('name') + ' is required.');
-                    $field.addClass('error');
-                } else {
-                    $field.removeClass('error');
-                }
-            });
-            
-            // Check numeric fields
-            $form.find('input[type="number"]').each(function() {
-                var $field = $(this);
-                var value = parseInt($field.val());
-                var min = parseInt($field.attr('min'));
-                var max = parseInt($field.attr('max'));
-                
-                if (isNaN(value) || (min !== undefined && value < min) || (max !== undefined && value > max)) {
-                    isValid = false;
-                    errors.push($field.attr('name') + ' must be a valid number.');
-                    $field.addClass('error');
-                } else {
-                    $field.removeClass('error');
-                }
-            });
-            
-            if (!isValid) {
-                FBSOptimizeAdmin.showNotification('Please fix the following errors: ' + errors.join(', '), 'error');
-            }
-            
-            return isValid;
-        }
-    };
-
+		$.post(fbsseopAdmin.ajaxUrl, {
+			action: 'fbsseop_pro_disarm_user',
+			nonce: fbsseopAdmin.nonce,
+			user_id: $btn.data('userid')
+		}).done(function (res) {
+			if (res && res.success) {
+				$btn.closest('tr').fadeOut(200, function () { $(this).remove(); });
+				showToast(res.data.message, false);
+			} else {
+				$btn.prop('disabled', false);
+				showToast((res && res.data && res.data.message) || fbsseopAdmin.strings.genericError, true);
+			}
+		});
+	});
 })(jQuery);

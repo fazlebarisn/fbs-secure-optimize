@@ -1,131 +1,55 @@
 === FBS Secure Optimize ===
 Contributors: fazlebari
-Tags: performance, security, optimization, speed, cache
-Requires at least: 5.0
-Tested up to: 7.0
+Tags: performance, security, pagespeed, malware-scanner, security-headers
+Requires at least: 5.8
+Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 1.0.2
+Stable tag: 2.0.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-A comprehensive WordPress plugin for performance optimization and security enhancement. Features asset optimization, database cleanup, and security.
+Modular WordPress performance optimization, database cleanup, HTTP security headers, WP hardening, and 6-layer malware & hidden-admin scanner.
 
 == Description ==
 
-FBS Secure Optimize is a powerful WordPress plugin designed to improve your website's performance and security. It combines essential optimization features with robust security measures to help you create a faster, more secure website.
+**FBS Secure Optimize** (engineered by [FBS Fusion](https://fbsfusion.com/)) is a lightweight, modular performance and security suite built around **6 Independent Module Toggles**. Enable only the exact speed and security engines your site needs—disabled modules register zero frontend hooks for zero conflicts with WP Rocket, LiteSpeed Cache, or Cloudflare.
 
-= Performance Features =
+= 6 Independent Modules =
 
-* **Asset Optimization**: Minify and combine CSS and JavaScript files to reduce file size and HTTP requests
-* **Lazy Loading**: Implement lazy loading for images and iframes to improve page load times
-* **Database Cleanup**: Clean up post revisions, auto-drafts, spam comments, and expired transients
-* **Automatic Cleanup**: Schedule automatic database cleanup on a daily, weekly, or monthly basis
+1. **Asset & Bloat Optimizer**: LCP-safe native HTML5 image & iframe lazy loading (automatically prioritizes your first hero image with `fetchpriority="high"`), non-critical JS deferring, Emoji/Dashicons removal, `<head>` cleanup, and WP Heartbeat throttling.
+2. **Database & Autoload Cleaner**: Prune post revisions, old auto-drafts, spam/trashed comments, expired transients, orphaned postmeta, `OPTIMIZE TABLE`, scheduled WP-Cron maintenance, plus a built-in **Top 5 Heaviest Autoloaded `wp_options` Inspector**.
+3. **HTTP Security Headers**: Toggleable `X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN`, `Referrer-Policy`, `Permissions-Policy`, `Strict-Transport-Security (HSTS)`, and WordPress version masking.
+4. **Login Brute-Force Shield**: Automatic IP lockouts after failed login attempts, IP allowlisting, username enumeration error masking, and 1-click lockout clearing.
+5. **WP Core Hardening & Uploads Shield**: Disable XML-RPC & `X-Pingback`, lock theme/plugin PHP editors, block `?author=1` and REST `/wp/v2/users` enumeration, detect high-risk file-manager plugins, and block direct PHP script execution inside `wp-content/uploads/` in 1 click.
+6. **6-Layer Malware, Checksum & Hidden-Admin Scanner**: Verifies official WordPress.org Core MD5 checksums, detects unknown root PHP files, flags zero-tolerance PHP shells inside `wp-content/uploads/`, audits `mu-plugins`, scans plugin/theme heuristics and `wp_options`, and uncovers stealth `pre_user_query` hidden administrator accounts.
 
-= Security Features =
+= External Services =
 
-* **Login Security**: Limit login attempts to prevent brute force attacks with IP blocking
-* **Security Headers**: Add essential security headers like X-Content-Type-Options, X-Frame-Options, and more
-* **WordPress Version Hiding**: Remove WordPress version information from your site's head and RSS feeds
-* **IP Whitelisting**: Whitelist trusted IP addresses to bypass login attempt limits
-
-= Key Benefits =
-
-* **Improved Performance**: Faster page load times through asset optimization and lazy loading
-* **Enhanced Security**: Protection against common web vulnerabilities and brute force attacks
-* **Database Optimization**: Clean up unnecessary data to improve database performance
-* **Easy to Use**: Simple, intuitive interface with clear settings and real-time statistics
-* **WordPress Standards**: Built following WordPress coding standards and best practices
-
-= Perfect For =
-
-* Website owners looking to improve their site's performance
-* Developers who need a comprehensive optimization solution
-* Anyone concerned about website security
-* Sites with large databases that need regular cleanup
-* WordPress sites that want to hide their version information
+When an administrator manually triggers the **6-Layer Malware Scanner** in `wp-admin`, the plugin requests official WordPress core MD5 file hashes from the public WordPress.org Checksums API (`https://api.wordpress.org/core/checksums/1.0/`). Only your WordPress version number is sent in that request; no personal or site visitor data is transmitted.
 
 == Installation ==
 
-1. Upload the plugin files to the `/wp-content/plugins/fbs-optimize` directory, or install the plugin through the WordPress plugins screen directly.
-2. Activate the plugin through the 'Plugins' screen in WordPress
-3. Use the FBS Secure Optimize menu to configure the plugin
-4. Configure your performance and security settings according to your needs
-
-== Frequently Asked Questions ==
-
-= Does this plugin work with caching plugins? =
-
-Yes, FBS Secure Optimize is designed to work alongside popular caching plugins. However, you may need to clear your cache after making changes to asset optimization settings.
-
-= Will lazy loading affect my SEO? =
-
-No, lazy loading actually improves SEO by reducing page load times, which is a ranking factor. The plugin uses modern lazy loading techniques that are SEO-friendly.
-
-= Is it safe to clean the database? =
-
-Yes, the database cleanup features are designed to be safe and only remove unnecessary data like old revisions, auto-drafts, and spam comments. However, we recommend backing up your database before performing cleanup operations.
-
-= Can I whitelist my IP address? =
-
-Yes, you can add your IP address to the whitelist in the Login Security settings to bypass login attempt limits.
-
-= Does the plugin work with multisite? =
-
-The current version is designed for single-site installations. Multisite support may be added in future versions.
-
-== Screenshots ==
-
-1. Main settings page with performance and security tabs
-2. Asset optimization settings
-3. Database cleanup statistics
-4. Login security configuration
-5. Security headers settings
-6. Statistics dashboard
+1. Upload the `fbs-secure-optimize` folder to `/wp-content/plugins/` or install directly through **Plugins → Add New** in WordPress.
+2. Activate **FBS Secure Optimize**.
+3. Open **FBS Optimize → Control Center** to toggle modules and run your first 6-Layer Security Scan.
 
 == Changelog ==
+
+= 2.0.0 =
+* Major Release: Re-architected around 6 Independent Module Toggles (zero runtime overhead for disabled modules).
+* New: 6-Layer Malware, Official WP.org Core MD5 Checksum & Anti-Hidden-Admin (`pre_user_query`) Scanner with safe file snippet preview.
+* New: WP Core Hardening & 1-Click `wp-content/uploads/.htaccess` PHP Execution Shield + High-Risk Plugin Monitor.
+* New: Autoload Bloat Inspector showing total `wp_options` autoloaded KB and top 5 heaviest autoload rows.
+* New: LCP-safe native lazy loading (`fetchpriority="high"` on first hero image), Emoji/Dashicons bloat removal, and Heartbeat throttling.
+* Fix: Made HTTP Security Headers strictly toggle-controlled so external fonts and embeds never break out of the box.
+* Tweak: Modern SaaS Control Center UI and full WordPress Coding Standards (WPCS) & Plugin Check compliance.
+
 = 1.0.2 =
-* New: Integrated "Our Plugins" portfolio showcase page.
-* New: Integrated "Meet The Author" profile details page.
-* Tweak: Redesigned the backend UI with modern aesthetics, clean drop shadows, and responsive grid layouts.
+* New: Integrated "Our Plugins" portfolio showcase page and "Meet The Author" profile page.
+* Tweak: Redesigned backend UI.
 
 = 1.0.1 =
-*Compatible with WordPress 6.9 version 
+* Tested compatibility with WordPress 6.9.
 
 = 1.0.0 =
-* Initial release
-* Asset optimization (CSS/JS minification and combination)
-* Lazy loading for images and iframes
-* Database cleanup tools
-* Login security with attempt limiting
-* Security headers implementation
-* WordPress version hiding
-* Admin interface with tabs
-* Statistics dashboard
-
-== Upgrade Notice ==
-
-= 1.0.0 =
-Initial release of FBS Secure Optimize. Install to start optimizing your WordPress site's performance and security.
-
-== Support ==
-
-For support, feature requests, or bug reports, please visit our support forum or contact us through our website.
-
-== Privacy Policy ==
-
-This plugin does not collect, store, or transmit any personal data. All settings and data remain on your server. The plugin only processes data locally to optimize your website's performance and security.
-
-== Technical Requirements ==
-
-* WordPress 5.0 or higher
-* PHP 7.4 or higher
-* MySQL 5.6 or higher
-* Sufficient server resources for asset optimization features
-
-== Performance Impact ==
-
-FBS Secure Optimize is designed to have minimal impact on your site's performance. The plugin only loads necessary components and uses efficient caching mechanisms to ensure optimal performance.
-
-== Security Considerations ==
-
-All user inputs are properly sanitized and validated. The plugin uses WordPress nonces for form security and follows WordPress security best practices throughout the codebase.
+* Initial release.

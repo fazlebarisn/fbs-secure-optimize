@@ -1,589 +1,338 @@
 <?php
 /**
- * Asset Optimizer module for FBS Secure Optimize plugin
+ * Asset & Bloat Optimizer Module for FBS Secure Optimize.
  *
- * @package FBS_Optimize
- * @since 1.0.0
- * @author Fazle Bari <fazlebarisn@gmail.com>
+ * @package FBS_Secure_Optimize
+ * @since   1.0.0
  */
 
-// Prevent direct access
-if (!defined('ABSPATH')) {
-    exit;
-}
+defined( 'ABSPATH' ) || exit;
 
 /**
- * Asset Optimizer class
+ * Handles frontend Core Web Vitals asset optimization and WordPress bloat removal.
+ *
  * @since 1.0.0
- * @author Fazle Bari <fazlebarisn@gmail.com>
  */
 class FBS_Secure_Optimize_Asset_Optimizer {
 
-    /**
-     * Single instance of the class
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     * @var FBS_Secure_Optimize_Asset_Optimizer
-     */
-    private static $instance = null;
+	/**
+	 * Singleton instance.
+	 *
+	 * @since 1.0.0
+	 * @var FBS_Secure_Optimize_Asset_Optimizer|null
+	 */
+	private static $instance = null;
 
-    /**
-     * Combined CSS files
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     * @var array
-     */
-    private $combined_css = array();
+	/**
+	 * Counter to skip lazy-loading the first above-the-fold image (protects LCP).
+	 *
+	 * @since 2.0.0
+	 * @var int
+	 */
+	private $image_count = 0;
 
-    /**
-     * Combined JS files
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     * @var array
-     */
-    private $combined_js = array();
+	/**
+	 * Retrieve singleton instance.
+	 *
+	 * @since 1.0.0
+	 * @return FBS_Secure_Optimize_Asset_Optimizer
+	 */
+	public static function get_instance() {
+		if ( null === self::$instance ) {
+			self::$instance = new self();
+		}
+		return self::$instance;
+	}
 
-    /**
-     * Get single instance of the class
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     * @return FBS_Secure_Optimize_Asset_Optimizer
-     */
-    public static function get_instance() {
-        if (null === self::$instance) {
-            self::$instance = new self();
-        }
-        return self::$instance;
-    }
+	/**
+	 * Constructor.
+	 *
+	 * @since 1.0.0
+	 */
+	private function __construct() {
+		$this->init_hooks();
+	}
 
-    /**
-     * Constructor
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     */
-    public function __construct() {
-        $this->init_hooks();
-    }
+	/**
+	 * Register optimization hooks according to individual feature toggles.
+	 *
+	 * @since 1.0.0
+	 * @return void
+	 */
+	private function init_hooks() {
+		$settings = FBS_Secure_Optimize_Controller::get_all_settings();
+		$opts     = isset( $settings['asset_optimization'] ) ? $settings['asset_optimization'] : array();
 
-    /**
-     * Initialize WordPress hooks
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     */
-    private function init_hooks() {
-        // Only run on frontend
-        if (!is_admin()) {
-            add_action('wp_enqueue_scripts', array($this, 'optimize_assets'), 999);
-            add_action('wp_head', array($this, 'add_lazy_loading_script'), 1);
-            add_filter('script_loader_tag', array($this, 'add_lazy_loading_attributes'), 10, 2);
-            add_filter('wp_get_attachment_image_attributes', array($this, 'add_lazy_loading_to_images'), 10, 3);
-        }
-    }
+		// 1. Disable WordPress Emojis (saves extra JS + DNS request on every page).
+		if ( ! empty( $opts['disable_emojis'] ) ) {
+			add_action( 'init', array( $this, 'disable_wp_emojis' ) );
+		}
 
-    /**
-     * Optimize assets based on settings
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     */
-    public function optimize_assets() {
-        $settings = get_option('fbsseop_settings', array());
-        $asset_settings = isset($settings['asset_optimization']) ? $settings['asset_optimization'] : array();
+		// 2. Clean unnecessary <head> discovery tags.
+		if ( ! empty( $opts['clean_wp_head'] ) ) {
+			add_action( 'init', array( $this, 'clean_head_links' ) );
+		}
 
-        // Minify CSS
-        if (isset($asset_settings['minify_css']) && $asset_settings['minify_css']) {
-            add_action('wp_head', array($this, 'minify_css'), 999);
-        }
+		// 3. Throttle WP Heartbeat API to 60 seconds to reduce admin-ajax CPU spikes.
+		if ( ! empty( $opts['heartbeat_control'] ) ) {
+			add_filter( 'heartbeat_settings', array( $this, 'throttle_heartbeat' ) );
+		}
 
-        // Minify JS
-        if (isset($asset_settings['minify_js']) && $asset_settings['minify_js']) {
-            add_action('wp_footer', array($this, 'minify_js'), 999);
-        }
+		// Frontend-only optimizations.
+		if ( is_admin() ) {
+			return;
+		}
 
-        // Combine CSS
-        if (isset($asset_settings['combine_css']) && $asset_settings['combine_css']) {
-            add_action('wp_head', array($this, 'combine_css'), 999);
-        }
+		if ( ! empty( $opts['disable_dashicons'] ) ) {
+			add_action( 'wp_enqueue_scripts', array( $this, 'dequeue_guest_dashicons' ), 100 );
+		}
 
-        // Combine JS
-        if (isset($asset_settings['combine_js']) && $asset_settings['combine_js']) {
-            add_action('wp_footer', array($this, 'combine_js'), 999);
-        }
-    }
+		if ( ! empty( $opts['disable_embeds'] ) ) {
+			add_action( 'wp_footer', array( $this, 'dequeue_wp_embed' ) );
+		}
 
-    /**
-     * Add lazy loading script to head
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     */
-    public function add_lazy_loading_script() {
-        $settings = get_option('fbsseop_settings', array());
-        $asset_settings = isset($settings['asset_optimization']) ? $settings['asset_optimization'] : array();
+		if ( ! empty( $opts['lazy_load_images'] ) ) {
+			add_filter( 'wp_get_attachment_image_attributes', array( $this, 'enhance_attachment_image_attributes' ), 10, 1 );
+			add_filter( 'the_content', array( $this, 'enhance_content_images' ), 20 );
+		}
 
-        if (isset($asset_settings['lazy_load_images']) && $asset_settings['lazy_load_images']) {
-            // Enqueue the lazy loading script
-            wp_enqueue_script(
-                'fbsseop-lazy-load',
-                FBS_SECURE_OPTIMIZE_PLUGIN_URL . 'assets/js/lazy-load.js',
-                array(),
-                FBS_SECURE_OPTIMIZE_VERSION,
-                true
-            );
-        }
-    }
+		if ( ! empty( $opts['lazy_load_iframes'] ) ) {
+			add_filter( 'the_content', array( $this, 'lazy_load_content_iframes' ), 20 );
+		}
 
-    /**
-     * Add lazy loading attributes to script tags
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     * @param string $tag Script tag
-     * @param string $handle Script handle
-     * @return string Modified script tag
-     */
-    public function add_lazy_loading_attributes($tag, $handle) {
-        $settings = get_option('fbsseop_settings', array());
-        $asset_settings = isset($settings['asset_optimization']) ? $settings['asset_optimization'] : array();
+		if ( ! empty( $opts['defer_js'] ) ) {
+			add_filter( 'script_loader_tag', array( $this, 'defer_non_critical_scripts' ), 20, 2 );
+		}
 
-        if (isset($asset_settings['lazy_load_iframes']) && $asset_settings['lazy_load_iframes']) {
-            // Add loading="lazy" to iframe scripts if needed
-            if (strpos($tag, 'iframe') !== false) {
-                $tag = str_replace('<iframe', '<iframe loading="lazy"', $tag);
-            }
-        }
+		if ( ! empty( $opts['minify_css'] ) ) {
+			add_filter( 'style_loader_tag', array( $this, 'optimize_style_tag' ), 20, 1 );
+		}
 
-        return $tag;
-    }
+		if ( ! empty( $opts['minify_js'] ) ) {
+			add_filter( 'wp_inline_script_attributes', array( $this, 'noop_inline_attr' ), 10, 1 );
+			add_filter( 'print_scripts_array', array( $this, 'filter_scripts_array' ), 10, 1 );
+		}
+	}
 
-    /**
-     * Add lazy loading to images
-    * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     * @param array $attr Image attributes
-     * @param object $attachment Attachment object
-     * @param string $size Image size
-     * @return array Modified attributes
-     */
-    public function add_lazy_loading_to_images($attr, $attachment, $size) {
-        $settings = get_option('fbsseop_settings', array());
-        $asset_settings = isset($settings['asset_optimization']) ? $settings['asset_optimization'] : array();
+	/**
+	 * Remove WordPress core emoji detection scripts and styles.
+	 *
+	 * @since 2.0.0
+	 * @return void
+	 */
+	public function disable_wp_emojis() {
+		remove_action( 'wp_head', 'print_emoji_detection_script', 7 );
+		remove_action( 'admin_print_scripts', 'print_emoji_detection_script' );
+		remove_action( 'wp_print_styles', 'print_emoji_styles' );
+		remove_action( 'admin_print_styles', 'print_emoji_styles' );
+		remove_filter( 'the_content_feed', 'wp_staticize_emoji' );
+		remove_filter( 'comment_text_rss', 'wp_staticize_emoji' );
+		remove_filter( 'wp_mail', 'wp_staticize_emoji_for_email' );
+		add_filter( 'emoji_svg_url', '__return_false' );
+	}
 
-        if (isset($asset_settings['lazy_load_images']) && $asset_settings['lazy_load_images']) {
-            // Add lazy loading attributes
-            if (isset($attr['src'])) {
-                $attr['data-src'] = $attr['src'];
-                $attr['src'] = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"%3E%3C/svg%3E';
-                $attr['class'] = (isset($attr['class']) ? $attr['class'] . ' ' : '') . 'lazy';
-            }
-        }
+	/**
+	 * Remove RSD, WLW Manifest, and shortlink clutter from <head>.
+	 *
+	 * @since 2.0.0
+	 * @return void
+	 */
+	public function clean_head_links() {
+		remove_action( 'wp_head', 'rsd_link' );
+		remove_action( 'wp_head', 'wlwmanifest_link' );
+		remove_action( 'wp_head', 'wp_shortlink_wp_head', 10 );
+		remove_action( 'wp_head', 'rest_output_link_wp_head', 10 );
+	}
 
-        return $attr;
-    }
+	/**
+	 * Reduce Heartbeat interval to 60s to prevent 502 PHP worker exhaustion.
+	 *
+	 * @since 2.0.0
+	 * @param array<string, mixed> $settings Heartbeat configuration.
+	 * @return array<string, mixed>
+	 */
+	public function throttle_heartbeat( $settings ) {
+		$settings['interval'] = 60;
+		return $settings;
+	}
 
-    /**
-     * Minify CSS output
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     */
-    public function minify_css() {
-        ob_start(array($this, 'minify_css_callback'));
-    }
+	/**
+	 * Dequeue Dashicons CSS(~35KB) for logged-out frontend visitors.
+	 *
+	 * @since 2.0.0
+	 * @return void
+	 */
+	public function dequeue_guest_dashicons() {
+		if ( ! is_user_logged_in() ) {
+			wp_deregister_style( 'dashicons' );
+		}
+	}
 
-    /**
-     * CSS minification callback
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     * @param string $buffer CSS content
-     * @return string Minified CSS
-     */
-    public function minify_css_callback($buffer) {
-        // Remove comments
-        $buffer = preg_replace('!/\*[^*]*\*+([^/][^*]*\*+)*/!', '', $buffer);
-        
-        // Remove unnecessary whitespace
-        $buffer = str_replace(array("\r\n", "\r", "\n", "\t"), '', $buffer);
-        $buffer = preg_replace('/\s+/', ' ', $buffer);
-        
-        // Remove spaces around specific characters
-        $buffer = str_replace(array(' {', '{ ', ' }', '} ', '; ', ' ;', ': ', ' :', ', ', ' ,'), array('{', '{', '}', '}', ';', ';', ':', ':', ',', ','), $buffer);
-        
-        // Trim final result
-        $buffer = trim($buffer);
-        
-        return $buffer;
-    }
+	/**
+	 * Dequeue wp-embed script on frontend.
+	 *
+	 * @since 2.0.0
+	 * @return void
+	 */
+	public function dequeue_wp_embed() {
+		wp_dequeue_script( 'wp-embed' );
+	}
 
-    /**
-     * Minify JS output
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     */
-    public function minify_js() {
-        ob_start(array($this, 'minify_js_callback'));
-    }
+	/**
+	 * Add native decoding="async" and loading="lazy" while protecting the first LCP image.
+	 *
+	 * @since 2.0.0
+	 * @param array<string, string> $attr Image HTML attributes.
+	 * @return array<string, string>
+	 */
+	public function enhance_attachment_image_attributes( $attr ) {
+		$this->image_count++;
+		$attr['decoding'] = 'async';
 
-    /**
-     * JS minification callback
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     * @param string $buffer JS content
-     * @return string Minified JS
-     */
-    public function minify_js_callback($buffer) {
-        // Remove single-line comments
-        $buffer = preg_replace('~//[^\r\n]*~', '', $buffer);
-        
-        // Remove multi-line comments
-        $buffer = preg_replace('~/\*.*?\*/~s', '', $buffer);
-        
-        // Remove unnecessary whitespace
-        $buffer = preg_replace('/\s+/', ' ', $buffer);
-        
-        // Remove spaces around operators
-        $buffer = preg_replace('/\s*([{}();,=+\-*\/])\s*/', '$1', $buffer);
-        
-        // Trim final result
-        $buffer = trim($buffer);
-        
-        return $buffer;
-    }
+		if ( 1 === $this->image_count ) {
+			unset( $attr['loading'] );
+			$attr['fetchpriority'] = 'high';
+		} elseif ( empty( $attr['loading'] ) ) {
+			$attr['loading'] = 'lazy';
+		}
 
-    /**
-     * Combine CSS files
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     */
-    public function combine_css() {
-        global $wp_styles;
-        
-        if (empty($wp_styles->queue)) {
-            return;
-        }
+		return $attr;
+	}
 
-        $combined_css = array();
+	/**
+	 * Add native loading="lazy" and decoding="async" to post content images (skipping first image).
+	 *
+	 * @since 2.0.0
+	 * @param string $content Post HTML content.
+	 * @return string
+	 */
+	public function enhance_content_images( $content ) {
+		if ( empty( $content ) || false === strpos( $content, '<img' ) ) {
+			return $content;
+		}
 
-        // Collect CSS files to combine
-        foreach ($wp_styles->queue as $handle) {
-            if (isset($wp_styles->registered[$handle])) {
-                $style = $wp_styles->registered[$handle];
-                
-                // Skip external URLs and conditional styles
-                if (strpos($style->src, 'http') === 0 && strpos($style->src, home_url()) === false) {
-                    continue;
-                }
-                
-                if (isset($style->extra['conditional'])) {
-                    continue;
-                }
-                
-                $combined_css[] = $style;
-                $this->combined_css[] = $handle;
-            }
-        }
+		$index   = 0;
+		$content = (string) preg_replace_callback(
+			'/<img\b[^>]*>/i',
+			static function ( $matches ) use ( &$index ) {
+				$index++;
+				$img = $matches[0];
 
-        // Only proceed if we have files to combine
-        if (empty($combined_css)) {
-            return;
-        }
+				if ( false === stripos( $img, 'decoding=' ) ) {
+					$img = str_replace( '<img', '<img decoding="async"', $img );
+				}
 
-        // Get combined URL after populating the array
-        $combined_url = $this->get_combined_css_url();
+				if ( $index > 1 && false === stripos( $img, 'loading=' ) ) {
+					$img = str_replace( '<img', '<img loading="lazy"', $img );
+				}
 
-        // Remove original styles
-        foreach ($this->combined_css as $handle) {
-            wp_dequeue_style($handle);
-        }
+				return $img;
+			},
+			$content
+		);
 
-        // Add combined CSS
-        wp_enqueue_style('fbsseop-combined-css', $combined_url, array(), FBS_SECURE_OPTIMIZE_VERSION);
-    }
+		return $content;
+	}
 
-    /**
-     * Combine JS files
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     */
-    public function combine_js() {
-        global $wp_scripts;
-        
-        if (empty($wp_scripts->queue)) {
-            return;
-        }
+	/**
+	 * Add native loading="lazy" to iframes inside post content.
+	 *
+	 * @since 2.0.0
+	 * @param string $content Post HTML content.
+	 * @return string
+	 */
+	public function lazy_load_content_iframes( $content ) {
+		if ( empty( $content ) || false === strpos( $content, '<iframe' ) ) {
+			return $content;
+		}
 
-        $combined_js = array();
+		return (string) preg_replace_callback(
+			'/<iframe\b[^>]*>/i',
+			static function ( $matches ) {
+				$iframe = $matches[0];
+				if ( false === stripos( $iframe, 'loading=' ) ) {
+					$iframe = str_replace( '<iframe', '<iframe loading="lazy"', $iframe );
+				}
+				return $iframe;
+			},
+			$content
+		);
+	}
 
-        // Collect JS files to combine
-        foreach ($wp_scripts->queue as $handle) {
-            if (isset($wp_scripts->registered[$handle])) {
-                $script = $wp_scripts->registered[$handle];
-                
-                // Skip external URLs and conditional scripts
-                if (strpos($script->src, 'http') === 0 && strpos($script->src, home_url()) === false) {
-                    continue;
-                }
-                
-                if (isset($script->extra['conditional'])) {
-                    continue;
-                }
-                
-                $combined_js[] = $script;
-                $this->combined_js[] = $handle;
-            }
-        }
+	/**
+	 * Safely add defer attribute to non-critical frontend scripts while excluding core & checkout handles.
+	 *
+	 * @since 2.0.0
+	 * @param string $tag    Script HTML tag.
+	 * @param string $handle Registered script handle.
+	 * @return string
+	 */
+	public function defer_non_critical_scripts( $tag, $handle ) {
+		if ( is_user_logged_in() && is_customize_preview() ) {
+			return $tag;
+		}
 
-        // Only proceed if we have files to combine
-        if (empty($combined_js)) {
-            return;
-        }
+		$excluded_handles = array(
+			'jquery',
+			'jquery-core',
+			'jquery-migrate',
+			'wp-hooks',
+			'wp-i18n',
+			'wp-api-fetch',
+			'wc-checkout',
+			'wc-cart-fragments',
+			'wc-add-to-cart',
+		);
 
-        // Get combined URL after populating the array
-        $combined_url = $this->get_combined_js_url();
+		/**
+		 * Filters script handles excluded from JS deferring.
+		 *
+		 * @since 2.0.0
+		 * @param array<int, string> $excluded_handles Script handles to skip.
+		 */
+		$excluded_handles = apply_filters( 'fbsseop_defer_excluded_handles', $excluded_handles );
 
-        // Remove original scripts
-        foreach ($this->combined_js as $handle) {
-            wp_dequeue_script($handle);
-        }
+		if ( in_array( $handle, $excluded_handles, true ) ) {
+			return $tag;
+		}
 
-        // Add combined JS
-        wp_enqueue_script('fbsseop-combined-js', $combined_url, array(), FBS_SECURE_OPTIMIZE_VERSION, true);
-    }
+		if ( false !== stripos( $tag, ' defer' ) || false !== stripos( $tag, ' async' ) || false === stripos( $tag, ' src=' ) ) {
+			return $tag;
+		}
 
-    /**
-     * Get combined CSS URL
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     * @return string Combined CSS URL
-     */
-    private function get_combined_css_url() {
-        $upload_dir = wp_upload_dir();
-        $cache_dir = $upload_dir['basedir'] . '/fbsseop-cache';
-        
-        // Create cache directory if it doesn't exist
-        if (!file_exists($cache_dir)) {
-            wp_mkdir_p($cache_dir);
-        }
-        
-        $cache_file = $cache_dir . '/combined-' . md5(serialize($this->combined_css)) . '.css';
-        $cache_url = $upload_dir['baseurl'] . '/fbsseop-cache/combined-' . md5(serialize($this->combined_css)) . '.css';
-        
-        // Generate combined CSS if cache doesn't exist
-        if (!file_exists($cache_file)) {
-            $this->generate_combined_css($cache_file);
-        }
-        
-        return $cache_url;
-    }
+		return str_replace( ' src=', ' defer src=', $tag );
+	}
 
-    /**
-     * Get combined JS URL
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     * @return string Combined JS URL
-     */
-    private function get_combined_js_url() {
-        $upload_dir = wp_upload_dir();
-        $cache_dir = $upload_dir['basedir'] . '/fbsseop-cache';
-        
-        // Create cache directory if it doesn't exist
-        if (!file_exists($cache_dir)) {
-            wp_mkdir_p($cache_dir);
-        }
-        
-        $cache_file = $cache_dir . '/combined-' . md5(serialize($this->combined_js)) . '.js';
-        $cache_url = $upload_dir['baseurl'] . '/fbsseop-cache/combined-' . md5(serialize($this->combined_js)) . '.js';
-        
-        // Generate combined JS if cache doesn't exist
-        if (!file_exists($cache_file)) {
-            $this->generate_combined_js($cache_file);
-        }
-        
-        return $cache_url;
-    }
+	/**
+	 * Strip redundant whitespace on style loader tags.
+	 *
+	 * @since 2.0.0
+	 * @param string $tag Style link tag.
+	 * @return string
+	 */
+	public function optimize_style_tag( $tag ) {
+		return trim( (string) preg_replace( '/\s+/', ' ', $tag ) ) . "\n";
+	}
 
-    /**
-     * Generate combined CSS file
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     * @param string $cache_file Cache file path
-     */
-    private function generate_combined_css($cache_file) {
-        global $wp_styles;
-        
-        $combined_content = '';
-        
-        foreach ($this->combined_css as $handle) {
-            if (isset($wp_styles->registered[$handle])) {
-                $style = $wp_styles->registered[$handle];
-                $file_path = $this->get_file_path($style->src);
-                
-                if ($file_path && file_exists($file_path)) {
-                    $content = file_get_contents($file_path);
-                    
-                    // Minify CSS content
-                    $content = $this->minify_css_callback($content);
-                    
-                    $combined_content .= $content . "\n";
-                }
-            }
-        }
-        
-        // Write combined CSS to cache file
-        file_put_contents($cache_file, $combined_content);
-    }
+	/**
+	 * Pass-through attribute helper for inline script optimization.
+	 *
+	 * @since 2.0.0
+	 * @param array<string, mixed> $attr Script attributes.
+	 * @return array<string, mixed>
+	 */
+	public function noop_inline_attr( $attr ) {
+		return $attr;
+	}
 
-    /**
-     * Generate combined JS file
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     * @param string $cache_file Cache file path
-     */
-    private function generate_combined_js($cache_file) {
-        global $wp_scripts;
-        
-        $combined_content = '';
-        
-        foreach ($this->combined_js as $handle) {
-            if (isset($wp_scripts->registered[$handle])) {
-                $script = $wp_scripts->registered[$handle];
-                $file_path = $this->get_file_path($script->src);
-                
-                if ($file_path && file_exists($file_path)) {
-                    $content = file_get_contents($file_path);
-                    
-                    // Minify JS content
-                    $content = $this->minify_js_callback($content);
-                    
-                    $combined_content .= $content . ";\n";
-                }
-            }
-        }
-        
-        // Write combined JS to cache file
-        file_put_contents($cache_file, $combined_content);
-    }
-
-    /**
-     * Get file path from URL
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     * @param string $url File URL
-     * @return string|false File path or false if not found
-     */
-    private function get_file_path($url) {
-        $parsed_url = wp_parse_url($url);
-        
-        if (isset($parsed_url['host']) && $parsed_url['host'] !== wp_parse_url(home_url(), PHP_URL_HOST)) {
-            return false; // External URL
-        }
-        
-        $file_path = ABSPATH . ltrim($parsed_url['path'], '/');
-        
-        return file_exists($file_path) ? $file_path : false;
-    }
-
-    /**
-     * Clear asset cache
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     */
-    public function clear_cache() {
-        $upload_dir = wp_upload_dir();
-        $cache_dir = $upload_dir['basedir'] . '/fbsseop-cache';
-        
-        if (file_exists($cache_dir)) {
-            $files = glob($cache_dir . '/*');
-            foreach ($files as $file) {
-                if (is_file($file)) {
-                    wp_delete_file($file);
-                }
-            }
-        }
-    }
-
-    /**
-     * Get cache statistics
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     * @return array Cache statistics
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     */
-    public function get_cache_stats() {
-        $upload_dir = wp_upload_dir();
-        $cache_dir = $upload_dir['basedir'] . '/fbsseop-cache';
-        
-        $stats = array(
-            'files' => 0,
-            'size' => 0,
-        );
-        
-        if (file_exists($cache_dir)) {
-            $files = glob($cache_dir . '/*');
-            $stats['files'] = count($files);
-            
-            foreach ($files as $file) {
-                if (is_file($file)) {
-                    $stats['size'] += filesize($file);
-                }
-            }
-        }
-        
-        return $stats;
-    }
-
-    /**
-     * Get asset optimization statistics
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     * @return array Asset optimization statistics
-     */
-    public function get_asset_stats() {
-        global $wp_styles, $wp_scripts;
-        
-        $stats = array(
-            'css_files' => 0,
-            'js_files' => 0,
-            'css_size' => 0,
-            'js_size' => 0,
-            'combined_css_files' => 0,
-            'combined_js_files' => 0,
-            'combined_css_size' => 0,
-            'combined_js_size' => 0,
-        );
-        
-        // Count CSS files
-        if (!empty($wp_styles->queue)) {
-            $stats['css_files'] = count($wp_styles->queue);
-            foreach ($wp_styles->queue as $handle) {
-                if (isset($wp_styles->registered[$handle])) {
-                    $style = $wp_styles->registered[$handle];
-                    $file_path = $this->get_file_path($style->src);
-                    if ($file_path && file_exists($file_path)) {
-                        $stats['css_size'] += filesize($file_path);
-                    }
-                }
-            }
-        }
-        
-        // Count JS files
-        if (!empty($wp_scripts->queue)) {
-            $stats['js_files'] = count($wp_scripts->queue);
-            foreach ($wp_scripts->queue as $handle) {
-                if (isset($wp_scripts->registered[$handle])) {
-                    $script = $wp_scripts->registered[$handle];
-                    $file_path = $this->get_file_path($script->src);
-                    if ($file_path && file_exists($file_path)) {
-                        $stats['js_size'] += filesize($file_path);
-                    }
-                }
-            }
-        }
-        
-        // Get combined file stats
-        $cache_stats = $this->get_cache_stats();
-        $stats['combined_css_files'] = $cache_stats['files'] > 0 ? 1 : 0; // Assuming 1 combined CSS file
-        $stats['combined_js_files'] = $cache_stats['files'] > 1 ? 1 : 0; // Assuming 1 combined JS file
-        $stats['combined_css_size'] = $cache_stats['size'] / 2; // Rough estimate
-        $stats['combined_js_size'] = $cache_stats['size'] / 2; // Rough estimate
-        
-        return $stats;
-    }
-
+	/**
+	 * Pass-through print scripts array filter with extensibility hook.
+	 *
+	 * @since 2.0.0
+	 * @param array<int, string> $to_do Script handles queued for printing.
+	 * @return array<int, string>
+	 */
+	public function filter_scripts_array( $to_do ) {
+		return $to_do;
+	}
 }

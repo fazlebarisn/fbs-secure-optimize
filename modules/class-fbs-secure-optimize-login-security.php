@@ -1,577 +1,331 @@
 <?php
 /**
- * Login Security module for FBS Secure Optimize plugin
+ * Unified Login Brute-Force Shield Module for FBS Secure Optimize.
  *
- * @package FBS_Optimize
- * @since 1.0.0
- * @author Fazle Bari <fazlebarisn@gmail.com>
+ * @package FBS_Secure_Optimize
+ * @since   1.0.0
  */
 
-// Prevent direct access
-if (!defined('ABSPATH')) {
-    exit;
-}
+defined( 'ABSPATH' ) || exit;
 
 /**
- * Login Security class
+ * Protects wp-login.php & XML-RPC auth against brute-force attacks and username enumeration.
+ *
+ * @since 1.0.0
  */
 class FBS_Secure_Optimize_Login_Security {
 
-    /**
-     * Single instance of the class
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     * @var FBS_Secure_Optimize_Login_Security
-     */
-    private static $instance = null;
+	/**
+	 * Singleton instance.
+	 *
+	 * @since 1.0.0
+	 * @var FBS_Secure_Optimize_Login_Security|null
+	 */
+	private static $instance = null;
 
-    /**
-     * Get single instance of the class
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     * @return FBS_Secure_Optimize_Login_Security
-     */
-    public static function get_instance() {
-        if (null === self::$instance) {
-            self::$instance = new self();
-        }
-        return self::$instance;
-    }
+	/**
+	 * Retrieve singleton instance.
+	 *
+	 * @since 1.0.0
+	 * @return FBS_Secure_Optimize_Login_Security
+	 */
+	public static function get_instance() {
+		if ( null === self::$instance ) {
+			self::$instance = new self();
+		}
+		return self::$instance;
+	}
 
-    /**
-     * Constructor
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     */
-    public function __construct() {
-        $this->init_hooks();
-    }
+	/**
+	 * Constructor.
+	 *
+	 * @since 1.0.0
+	 */
+	private function __construct() {
+		$this->init_hooks();
+	}
 
-    /**
-     * Initialize WordPress hooks
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     */
-    private function init_hooks() {
-        // Always initialize hooks for login tracking, regardless of settings
-        // This ensures failed login statistics are always recorded
-        add_action('wp_login_failed', array($this, 'handle_failed_login'));
-        add_action('wp_login', array($this, 'handle_successful_login'));
-        
-        // Only add blocking functionality if login security is enabled
-        if (FBS_Secure_Optimize_Controller::is_feature_enabled('login_security', 'limit_login_attempts')) {
-            add_filter('authenticate', array($this, 'check_login_attempts'), 30, 3);
-            add_action('login_enqueue_scripts', array($this, 'enqueue_login_styles'));
-            add_action('login_footer', array($this, 'add_login_scripts'));
-        }
-    }
+	/**
+	 * Register login protection hooks.
+	 *
+	 * @since 1.0.0
+	 * @return void
+	 */
+	private function init_hooks() {
+		add_action( 'wp_login_failed', array( $this, 'handle_failed_login' ) );
+		add_action( 'wp_login', array( $this, 'handle_successful_login' ), 10, 1 );
 
-    /**
-     * Handle failed login attempt
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     * @param string $username Username that failed to login
-     */
-    public function handle_failed_login($username) {
-        $ip_address = $this->get_client_ip();
-        $this->log_login_attempt($ip_address, $username, false);
-        
-        // Only perform blocking actions if login security is enabled
-        if (FBS_Secure_Optimize_Controller::is_feature_enabled('login_security', 'limit_login_attempts')) {
-            // Check if IP should be blocked
-            if ($this->is_ip_blocked($ip_address)) {
-                $this->block_ip($ip_address);
-            }
-        }
-    }
+		if ( FBS_Secure_Optimize_Controller::is_feature_enabled( 'login_security', 'limit_login_attempts' ) ) {
+			add_filter( 'authenticate', array( $this, 'check_login_attempts' ), 30, 1 );
+		}
 
-    /**
-     * Handle successful login
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     * @param string $username Username that successfully logged in
-     */
-    public function handle_successful_login($username) {
-        $ip_address = $this->get_client_ip();
-        $this->log_login_attempt($ip_address, $username, true);
-        
-        // Only clear failed attempts if login security is enabled
-        if (FBS_Secure_Optimize_Controller::is_feature_enabled('login_security', 'limit_login_attempts')) {
-            // Clear failed attempts for this IP
-            $this->clear_failed_attempts($ip_address);
-        }
-    }
+		if ( FBS_Secure_Optimize_Controller::is_feature_enabled( 'login_security', 'mask_login_errors' ) ) {
+			add_filter( 'login_errors', array( $this, 'mask_login_error_message' ) );
+		}
 
-    /**
-     * Check login attempts before authentication
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     * @param WP_User|WP_Error|null $user User object or error
-     * @param string $username Username
-     * @param string $password Password
-     * @return WP_User|WP_Error User object or error
-     */
-    public function check_login_attempts($user, $username, $password) {
-        // Skip if already an error
-        if (is_wp_error($user)) {
-            return $user;
-        }
+		add_action( 'wp_ajax_fbsseop_clear_lockouts', array( $this, 'ajax_clear_lockouts' ) );
+	}
 
-        $ip_address = $this->get_client_ip();
-        
-        // Check if IP is whitelisted
-        if ($this->is_ip_whitelisted($ip_address)) {
-            return $user;
-        }
-        
-        // Check if IP is blocked
-        if ($this->is_ip_blocked($ip_address)) {
-            $lockout_duration = FBS_Secure_Optimize_Controller::get_setting('login_security', 'lockout_duration', 15);
-            
-            return new WP_Error(
-                'fbs_opt_ip_blocked',
-                sprintf(
-                    /* translators: %d is the number of minutes until the IP address is unblocked */
-                    __('Your IP address has been temporarily blocked due to too many failed login attempts. Please try again in %d minutes.', 'fbs-secure-optimize'),
-                    $lockout_duration
-                )
-            );
-        }
-        
-        return $user;
-    }
+	/**
+	 * Return generic error message on login failure to prevent username enumeration.
+	 *
+	 * @since 2.0.0
+	 * @param string $error Original error message.
+	 * @return string
+	 */
+	public function mask_login_error_message( $error ) {
+		if ( false !== strpos( $error, 'fbsseop_ip_blocked' ) || false !== strpos( $error, 'temporarily blocked' ) ) {
+			return $error;
+		}
+		return '<strong>' . esc_html__( 'Login Failed:', 'fbs-secure-optimize' ) . '</strong> ' . esc_html__( 'Invalid credentials provided. Please verify your username and password.', 'fbs-secure-optimize' );
+	}
 
-    /**
-     * Log login attempt
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     * @param string $ip_address IP address
-     * @param string $username Username
-     * @param bool $success Whether login was successful
-     */
-    private function log_login_attempt($ip_address, $username, $success) {
-        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Login security logging operation
-        global $wpdb;
-        
-        $table_name = $wpdb->prefix . 'fbsseop_login_attempts';
-        
-        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Login security logging operation
-        $wpdb->insert(
-            $table_name,
-            array(
-                'ip_address' => $ip_address,
-                'username' => sanitize_text_field($username),
-                'success' => $success ? 1 : 0,
-                'attempt_time' => current_time('mysql'),
-            ),
-            array('%s', '%s', '%d', '%s')
-        );
-        
-        // Clean old records (older than 30 days)
-        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Login security cleanup operation
-        $wpdb->query(
-            $wpdb->prepare(
-                "DELETE FROM " . esc_sql($table_name) . " WHERE attempt_time < %s",
-                gmdate('Y-m-d H:i:s', strtotime('-30 days'))
-            )
-        );
-    }
+	/**
+	 * Record failed login attempt.
+	 *
+	 * @since 1.0.0
+	 * @param string $username Submitted username.
+	 * @return void
+	 */
+	public function handle_failed_login( $username ) {
+		$ip = self::get_client_ip();
+		$this->log_login_attempt( $ip, $username, false );
+		FBS_Secure_Optimize_Controller::clear_stats_cache();
+	}
 
-    /**
-     * Check if IP address is blocked
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     * @param string $ip_address IP address
-     * @return bool True if blocked
-     */
-    private function is_ip_blocked($ip_address) {
-        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Login security check operation
-        global $wpdb;
-        
-        $table_name = $wpdb->prefix . 'fbsseop_login_attempts';
-        $max_attempts = FBS_Secure_Optimize_Controller::get_setting('login_security', 'max_attempts', 5);
-        $lockout_duration = FBS_Secure_Optimize_Controller::get_setting('login_security', 'lockout_duration', 15);
-        
-        // Count failed attempts in the last lockout period
-        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Login security check operation
-        $failed_attempts = $wpdb->get_var(
-            $wpdb->prepare(
-                "SELECT COUNT(*) FROM " . esc_sql($table_name) . " 
-                 WHERE ip_address = %s 
-                 AND success = 0 
-                 AND attempt_time > %s",
-                $ip_address,
-                gmdate('Y-m-d H:i:s', strtotime("-{$lockout_duration} minutes"))
-            )
-        );
-        
-        return $failed_attempts >= $max_attempts;
-    }
+	/**
+	 * Record successful login and reset failed attempt counter for the IP.
+	 *
+	 * @since 1.0.0
+	 * @param string $username Authenticated username.
+	 * @return void
+	 */
+	public function handle_successful_login( $username ) {
+		$ip = self::get_client_ip();
+		$this->log_login_attempt( $ip, $username, true );
+		$this->clear_failed_attempts_for_ip( $ip );
+		FBS_Secure_Optimize_Controller::clear_stats_cache();
+	}
 
-    /**
-     * Block IP address
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     * @param string $ip_address IP address
-     */
-    private function block_ip($ip_address) {
-        // Log the blocking
-        FBS_Secure_Optimize_Controller::log(
-            sprintf('IP address %s blocked due to too many failed login attempts', $ip_address),
-            'warning'
-        );
-        
-        // You could implement additional blocking mechanisms here
-        // such as adding to .htaccess or using a firewall
-    }
+	/**
+	 * Block authentication early when IP has exceeded maximum allowed failed attempts.
+	 *
+	 * @since 1.0.0
+	 * @param WP_User|WP_Error|null $user User or error from prior filter.
+	 * @return WP_User|WP_Error|null
+	 */
+	public function check_login_attempts( $user ) {
+		$ip = self::get_client_ip();
 
-    /**
-     * Clear failed attempts for IP
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     * @param string $ip_address IP address
-     */
-    private function clear_failed_attempts($ip_address) {
-        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Login security cleanup operation
-        global $wpdb;
-        
-        $table_name = $wpdb->prefix . 'fbsseop_login_attempts';
-        
-        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Login security cleanup operation
-        $wpdb->delete(
-            $table_name,
-            array('ip_address' => $ip_address, 'success' => 0),
-            array('%s', '%d')
-        );
-    }
+		if ( $this->is_ip_whitelisted( $ip ) ) {
+			return $user;
+		}
 
-    /**
-     * Check if IP is whitelisted
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     * @param string $ip_address IP address
-     * @return bool True if whitelisted
-     */
-    private function is_ip_whitelisted($ip_address) {
-        $whitelist_ips = FBS_Secure_Optimize_Controller::get_setting('login_security', 'whitelist_ips', '');
-        
-        if (empty($whitelist_ips)) {
-            return false;
-        }
-        
-        $whitelist = array_map('trim', explode("\n", $whitelist_ips));
-        
-        foreach ($whitelist as $whitelist_ip) {
-            if ($this->ip_in_range($ip_address, $whitelist_ip)) {
-                return true;
-            }
-        }
-        
-        return false;
-    }
+		if ( $this->is_ip_blocked( $ip ) ) {
+			$duration = max( 1, (int) FBS_Secure_Optimize_Controller::get_setting( 'login_security', 'lockout_duration', 15 ) );
+			return new WP_Error(
+				'fbsseop_ip_blocked',
+				sprintf(
+					/* translators: %d: Lockout duration in minutes. */
+					esc_html__( 'Too many failed login attempts from your IP address. Access is temporarily locked for %d minutes.', 'fbs-secure-optimize' ),
+					$duration
+				)
+			);
+		}
 
-    /**
-     * Check if IP is in range
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     * @param string $ip IP address
-     * @param string $range IP range (supports CIDR notation)
-     * @return bool True if IP is in range
-     */
-    private function ip_in_range($ip, $range) {
-        // Handle CIDR notation
-        if (strpos($range, '/') !== false) {
-            list($subnet, $bits) = explode('/', $range);
-            
-            if ($bits === null) {
-                $bits = 32;
-            }
-            
-            $ip = ip2long($ip);
-            $subnet = ip2long($subnet);
-            $mask = -1 << (32 - $bits);
-            $subnet &= $mask;
-            
-            return ($ip & $mask) === $subnet;
-        }
-        
-        // Handle single IP
-        return $ip === $range;
-    }
+		return $user;
+	}
 
-    /**
-     * Get client IP address
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     * @return string IP address
-     */
-    private function get_client_ip() {
-        $ip_keys = array(
-            'HTTP_CF_CONNECTING_IP',     // Cloudflare
-            'HTTP_CLIENT_IP',
-            'HTTP_X_FORWARDED_FOR',
-            'HTTP_X_FORWARDED',
-            'HTTP_X_CLUSTER_CLIENT_IP',
-            'HTTP_FORWARDED_FOR',
-            'HTTP_FORWARDED',
-            'REMOTE_ADDR'
-        );
-        
-        foreach ($ip_keys as $key) {
-            if (array_key_exists($key, $_SERVER) === true) {
-                // Sanitize the server variable before using it
-                $server_value = sanitize_text_field(wp_unslash($_SERVER[$key]));
-                foreach (explode(',', $server_value) as $ip) {
-                    $ip = trim($ip);
-                    
-                    if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) !== false) {
-                        return $ip;
-                    }
-                }
-            }
-        }
-        
-        // Sanitize REMOTE_ADDR before using it
-        $remote_addr = isset($_SERVER['REMOTE_ADDR']) ? sanitize_text_field(wp_unslash($_SERVER['REMOTE_ADDR'])) : '0.0.0.0';
-        return $remote_addr;
-    }
+	/**
+	 * Insert login attempt row and prune entries older than 30 days.
+	 *
+	 * @since 1.0.0
+	 * @param string $ip_address Client IP.
+	 * @param string $username   Username attempted.
+	 * @param bool   $success    Whether login succeeded.
+	 * @return void
+	 */
+	private function log_login_attempt( $ip_address, $username, $success ) {
+		global $wpdb;
 
-    /**
-     * Enqueue login page styles
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     */
-    public function enqueue_login_styles() {
-        wp_enqueue_style(
-            'fbsseop-login',
-            FBS_SECURE_OPTIMIZE_PLUGIN_URL . 'assets/css/admin.css',
-            array(),
-            FBS_SECURE_OPTIMIZE_VERSION
-        );
-    }
+		$table_name = $wpdb->prefix . 'fbsseop_login_attempts';
 
-    /**
-     * Add login page scripts
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     */
-    public function add_login_scripts() {
-        // Enqueue the login security script
-        wp_enqueue_script(
-            'fbsseop-login-security',
-            FBS_SECURE_OPTIMIZE_PLUGIN_URL . 'assets/js/login-security.js',
-            array(),
-            FBS_SECURE_OPTIMIZE_VERSION,
-            true
-        );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery -- Custom security telemetry table insert.
+		$wpdb->insert(
+			$table_name,
+			array(
+				'ip_address'   => substr( $ip_address, 0, 45 ),
+				'username'     => substr( sanitize_text_field( (string) $username ), 0, 190 ),
+				'attempt_time' => gmdate( 'Y-m-d H:i:s' ),
+				'success'      => $success ? 1 : 0,
+			),
+			array( '%s', '%s', '%s', '%d' )
+		);
 
-        // Localize script with translated strings
-        wp_localize_script('fbsseop-login-security', 'fbsseopLoginSecurity', array(
-            'loginWarning' => __('For security purposes, login attempts are limited. Multiple failed attempts will result in temporary IP blocking.', 'fbs-secure-optimize'),
-        ));
-    }
+		$cutoff = gmdate( 'Y-m-d H:i:s', time() - ( 30 * DAY_IN_SECONDS ) );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Custom table retention cleanup.
+		$wpdb->query(
+			$wpdb->prepare(
+				// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				"DELETE FROM {$table_name} WHERE attempt_time < %s",
+				$cutoff
+			)
+		);
+	}
 
-    /**
-     * Get login attempt statistics
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     * @param int $hours Number of hours to look back
-     * @return array Statistics
-     */
-    public function get_login_stats($hours = 24) {
-        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Login security statistics operation
-        global $wpdb;
-        
-        $table_name = $wpdb->prefix . 'fbsseop_login_attempts';
-        
-        $stats = array(
-            'total_attempts' => 0,
-            'failed_attempts' => 0,
-            'successful_attempts' => 0,
-            'unique_ips' => 0,
-            'blocked_ips' => array(),
-        );
-        
-        // Get total attempts in the specified time period
-        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Login security statistics operation
-        $stats['total_attempts'] = $wpdb->get_var(
-            $wpdb->prepare(
-                "SELECT COUNT(*) FROM " . esc_sql($table_name) . " 
-                 WHERE attempt_time > %s",
-                gmdate('Y-m-d H:i:s', strtotime("-{$hours} hours"))
-            )
-        );
-        
-        // Get failed attempts
-        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Login security statistics operation
-        $stats['failed_attempts'] = $wpdb->get_var(
-            $wpdb->prepare(
-                "SELECT COUNT(*) FROM " . esc_sql($table_name) . " 
-                 WHERE success = 0 
-                 AND attempt_time > %s",
-                gmdate('Y-m-d H:i:s', strtotime("-{$hours} hours"))
-            )
-        );
-        
-        // Get successful attempts
-        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Login security statistics operation
-        $stats['successful_attempts'] = $wpdb->get_var(
-            $wpdb->prepare(
-                "SELECT COUNT(*) FROM " . esc_sql($table_name) . " 
-                 WHERE success = 1 
-                 AND attempt_time > %s",
-                gmdate('Y-m-d H:i:s', strtotime("-{$hours} hours"))
-            )
-        );
-        
-        // Get unique IPs
-        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Login security statistics operation
-        $stats['unique_ips'] = $wpdb->get_var(
-            $wpdb->prepare(
-                "SELECT COUNT(DISTINCT ip_address) FROM " . esc_sql($table_name) . " 
-                 WHERE attempt_time > %s",
-                gmdate('Y-m-d H:i:s', strtotime("-{$hours} hours"))
-            )
-        );
-        
-        // Get currently blocked IPs
-        $max_attempts = FBS_Secure_Optimize_Controller::get_setting('login_security', 'max_attempts', 5);
-        $lockout_duration = FBS_Secure_Optimize_Controller::get_setting('login_security', 'lockout_duration', 15);
-        
-        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Login security statistics operation
-        $blocked_ips = $wpdb->get_results(
-            $wpdb->prepare(
-                "SELECT ip_address, COUNT(*) as attempts 
-                 FROM " . esc_sql($table_name) . " 
-                 WHERE success = 0 
-                 AND attempt_time > %s 
-                 GROUP BY ip_address 
-                 HAVING attempts >= %d",
-                gmdate('Y-m-d H:i:s', strtotime("-{$lockout_duration} minutes")),
-                $max_attempts
-            )
-        );
-        
-        $stats['blocked_ips'] = $blocked_ips;
-        
-        return $stats;
-    }
+	/**
+	 * Determine whether an IP is currently locked out.
+	 *
+	 * @since 1.0.0
+	 * @param string $ip_address Client IP.
+	 * @return bool
+	 */
+	public function is_ip_blocked( $ip_address ) {
+		global $wpdb;
 
-    /**
-     * Get recent login attempts
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     * @param int $limit Number of attempts to retrieve
-     * @return array Recent attempts
-     */
-    public function get_recent_attempts($limit = 50) {
-        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Login security statistics operation
-        global $wpdb;
-        
-        $table_name = $wpdb->prefix . 'fbsseop_login_attempts';
-        
-        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Login security statistics operation
-        return $wpdb->get_results(
-            $wpdb->prepare(
-                "SELECT * FROM " . esc_sql($table_name) . " 
-                 ORDER BY attempt_time DESC 
-                 LIMIT %d",
-                $limit
-            )
-        );
-    }
+		$table_name       = $wpdb->prefix . 'fbsseop_login_attempts';
+		$max_attempts     = max( 2, (int) FBS_Secure_Optimize_Controller::get_setting( 'login_security', 'max_attempts', 5 ) );
+		$lockout_duration = max( 1, (int) FBS_Secure_Optimize_Controller::get_setting( 'login_security', 'lockout_duration', 15 ) );
+		$window_start     = gmdate( 'Y-m-d H:i:s', time() - ( $lockout_duration * MINUTE_IN_SECONDS ) );
 
-    /**
-     * Clear all login attempts
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     * @return bool True if successful
-     */
-    public function clear_all_attempts() {
-        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Login security cleanup operation
-        global $wpdb;
-        
-        $table_name = $wpdb->prefix . 'fbsseop_login_attempts';
-        
-        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Login security cleanup operation
-        $result = $wpdb->query("TRUNCATE TABLE " . esc_sql($table_name));
-        
-        if ($result !== false) {
-            FBS_Secure_Optimize_Controller::log('All login attempts cleared', 'info');
-            return true;
-        }
-        
-        return false;
-    }
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Real-time lockout check.
+		$failed_count = (int) $wpdb->get_var(
+			$wpdb->prepare(
+				// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				"SELECT COUNT(*) FROM {$table_name} WHERE ip_address = %s AND success = 0 AND attempt_time > %s",
+				$ip_address,
+				$window_start
+			)
+		);
 
-    /**
-     * Unblock IP address
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     * @param string $ip_address IP address to unblock
-     * @return bool True if successful
-     */
-    public function unblock_ip($ip_address) {
-        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Login security management operation
-        global $wpdb;
-        
-        $table_name = $wpdb->prefix . 'fbsseop_login_attempts';
-        
-        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery -- Login security management operation
-        $result = $wpdb->delete(
-            $table_name,
-            array('ip_address' => $ip_address, 'success' => 0),
-            array('%s', '%d')
-        );
-        
-        if ($result !== false) {
-            FBS_Secure_Optimize_Controller::log("IP address $ip_address unblocked", 'info');
-            return true;
-        }
-        
-        return false;
-    }
+		return $failed_count >= $max_attempts;
+	}
 
-    /**
-     * Add IP to whitelist
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     * @param string $ip_address IP address to whitelist
-     * @return bool True if successful
-     */
-    public function add_to_whitelist($ip_address) {
-        $whitelist_ips = FBS_Secure_Optimize_Controller::get_setting('login_security', 'whitelist_ips', '');
-        $whitelist = array_map('trim', explode("\n", $whitelist_ips));
-        
-        if (!in_array($ip_address, $whitelist)) {
-            $whitelist[] = $ip_address;
-            $new_whitelist = implode("\n", array_filter($whitelist));
-            
-            return FBS_Secure_Optimize_Controller::update_setting('login_security', 'whitelist_ips', $new_whitelist);
-        }
-        
-        return true;
-    }
+	/**
+	 * Clear failed attempts for a single IP after successful authentication.
+	 *
+	 * @since 1.0.0
+	 * @param string $ip_address Client IP.
+	 * @return void
+	 */
+	private function clear_failed_attempts_for_ip( $ip_address ) {
+		global $wpdb;
+		$table_name = $wpdb->prefix . 'fbsseop_login_attempts';
 
-    /**
-     * Remove IP from whitelist
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     * @param string $ip_address IP address to remove
-     * @return bool True if successful
-     */
-    public function remove_from_whitelist($ip_address) {
-        $whitelist_ips = FBS_Secure_Optimize_Controller::get_setting('login_security', 'whitelist_ips', '');
-        $whitelist = array_map('trim', explode("\n", $whitelist_ips));
-        
-        $key = array_search($ip_address, $whitelist);
-        if ($key !== false) {
-            unset($whitelist[$key]);
-            $new_whitelist = implode("\n", array_filter($whitelist));
-            
-            return FBS_Secure_Optimize_Controller::update_setting('login_security', 'whitelist_ips', $new_whitelist);
-        }
-        
-        return true;
-    }
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Resetting failed attempts after valid login.
+		$wpdb->delete(
+			$table_name,
+			array(
+				'ip_address' => $ip_address,
+				'success'    => 0,
+			),
+			array( '%s', '%d' )
+		);
+	}
+
+	/**
+	 * Check whether an IP matches the administrator allowlist (supports exact IP and CIDR).
+	 *
+	 * @since 1.0.0
+	 * @param string $ip_address Client IP.
+	 * @return bool
+	 */
+	public function is_ip_whitelisted( $ip_address ) {
+		$raw_list = (string) FBS_Secure_Optimize_Controller::get_setting( 'login_security', 'whitelist_ips', '' );
+		if ( '' === trim( $raw_list ) ) {
+			return false;
+		}
+
+		$entries = array_filter( array_map( 'trim', explode( "\n", $raw_list ) ) );
+		foreach ( $entries as $entry ) {
+			if ( $entry === $ip_address ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Retrieve recent failed login attempts for admin telemetry display.
+	 *
+	 * @since 2.0.0
+	 * @param int $limit Max rows to fetch.
+	 * @return array<int, array<string, mixed>>
+	 */
+	public static function get_recent_failed_attempts( $limit = 10 ) {
+		global $wpdb;
+		$table_name = $wpdb->prefix . 'fbsseop_login_attempts';
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Admin telemetry view.
+		$exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table_name ) );
+		if ( $exists !== $table_name ) {
+			return array();
+		}
+
+		$limit = max( 1, min( 50, absint( $limit ) ) );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Admin telemetry view.
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				"SELECT ip_address, username, attempt_time FROM {$table_name} WHERE success = 0 ORDER BY id DESC LIMIT %d",
+				$limit
+			),
+			ARRAY_A
+		);
+
+		return is_array( $rows ) ? $rows : array();
+	}
+
+	/**
+	 * AJAX handler: Clear all active failed login lockouts.
+	 *
+	 * @since 2.0.0
+	 * @return void
+	 */
+	public function ajax_clear_lockouts() {
+		check_ajax_referer( 'fbsseop_admin_nonce', 'nonce' );
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( array( 'message' => __( 'Permission denied.', 'fbs-secure-optimize' ) ) );
+		}
+
+		global $wpdb;
+		$table_name = $wpdb->prefix . 'fbsseop_login_attempts';
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Admin clear action.
+		$wpdb->query( "DELETE FROM {$table_name} WHERE success = 0" );
+		FBS_Secure_Optimize_Controller::clear_stats_cache();
+
+		wp_send_json_success(
+			array(
+				'message' => __( 'All failed login lockouts have been cleared.', 'fbs-secure-optimize' ),
+			)
+		);
+	}
+
+	/**
+	 * Safely determine client IP address using validated REMOTE_ADDR or Cloudflare header.
+	 *
+	 * @since 2.0.0
+	 * @return string
+	 */
+	public static function get_client_ip() {
+		if ( ! empty( $_SERVER['HTTP_CF_CONNECTING_IP'] ) ) {
+			$cf_ip = sanitize_text_field( wp_unslash( $_SERVER['HTTP_CF_CONNECTING_IP'] ) );
+			if ( filter_var( $cf_ip, FILTER_VALIDATE_IP ) ) {
+				return $cf_ip;
+			}
+		}
+
+		if ( ! empty( $_SERVER['REMOTE_ADDR'] ) ) {
+			$remote_ip = sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) );
+			if ( filter_var( $remote_ip, FILTER_VALIDATE_IP ) ) {
+				return $remote_ip;
+			}
+		}
+
+		return '0.0.0.0';
+	}
 }

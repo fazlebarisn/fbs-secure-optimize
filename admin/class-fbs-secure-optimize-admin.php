@@ -1,1164 +1,1233 @@
 <?php
 /**
- * Admin interface class for FBS Secure Optimize plugin
+ * Modern Admin Interface Class for FBS Secure Optimize.
  *
- * @package FBS_Optimize
- * @since 1.0.0
+ * @package FBS_Secure_Optimize
+ * @since   1.0.0
  */
 
-// Prevent direct access
-if (!defined('ABSPATH')) {
-    exit;
-}
+defined( 'ABSPATH' ) || exit;
 
 /**
- * Admin interface class
+ * Renders the modern tabbed dashboard, module toggles, and AJAX endpoints.
+ *
  * @since 1.0.0
- * @author Fazle Bari <fazlebarisn@gmail.com>
  */
 class FBS_Secure_Optimize_Admin {
 
-    /**
-     * Single instance of the class
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     * @var FBS_Secure_Optimize_Admin
-     */
-    private static $instance = null;
+	/**
+	 * Singleton instance.
+	 *
+	 * @since 1.0.0
+	 * @var FBS_Secure_Optimize_Admin|null
+	 */
+	private static $instance = null;
 
-    /**
-     * Current tab
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     * @var string
-     */
-    private $current_tab = 'performance';
+	/**
+	 * Active tab slug.
+	 *
+	 * @since 1.0.0
+	 * @var string
+	 */
+	private $current_tab = 'overview';
 
-    /**
-     * Available tabs
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     * @var array
-     */
-    private $tabs = array();
+	/**
+	 * Registered tabs.
+	 *
+	 * @since 1.0.0
+	 * @var array<string, array<string, string>>
+	 */
+	private $tabs = array();
 
-    /**
-     * Get single instance of the class
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     * @return FBS_Secure_Optimize_Admin
-     */
-    public static function get_instance() {
-        if (null === self::$instance) {
-            self::$instance = new self();
-        }
-        return self::$instance;
-    }
+	/**
+	 * Retrieve singleton instance.
+	 *
+	 * @since 1.0.0
+	 * @return FBS_Secure_Optimize_Admin
+	 */
+	public static function get_instance() {
+		if ( null === self::$instance ) {
+			self::$instance = new self();
+		}
+		return self::$instance;
+	}
 
-    /**
-     * Constructor
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     */
-    public function __construct() {
-        $this->init_hooks();
-        $this->init_tabs();
-    }
+	/**
+	 * Constructor.
+	 *
+	 * @since 1.0.0
+	 */
+	private function __construct() {
+		$this->init_tabs();
+		$this->init_hooks();
+	}
 
-    /**
-     * Initialize WordPress hooks
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     */
-    private function init_hooks() {
-        add_action('admin_menu', array($this, 'add_admin_menu'));
-        add_action('admin_init', array($this, 'register_settings'));
-        add_action('admin_notices', array($this, 'admin_notices'));
-        add_action('wp_ajax_fbsseop_cleanup_database', array($this, 'ajax_cleanup_database'));
-        add_action('wp_ajax_fbsseop_clear_cache', array($this, 'ajax_clear_cache'));
-        add_action('wp_ajax_fbsseop_save_settings', array($this, 'ajax_save_settings'));
-        add_action('wp_ajax_fbsseop_import_settings', array($this, 'ajax_import_settings'));
-        add_action('wp_ajax_fbsseop_get_stats', array($this, 'ajax_get_stats'));
-    }
+	/**
+	 * Configure dashboard tabs.
+	 *
+	 * @since 1.0.0
+	 * @return void
+	 */
+	private function init_tabs() {
+		$is_pro = FBS_Secure_Optimize_Controller::is_pro_active();
 
-    /**
-     * Initialize admin tabs
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     */
-    private function init_tabs() {
-        $this->tabs = array(
-            'performance' => array(
-                'title' => __('Performance', 'fbs-secure-optimize'),
-                'icon' => 'dashicons-performance',
-            ),
-            'security' => array(
-                'title' => __('Security', 'fbs-secure-optimize'),
-                'icon' => 'dashicons-shield',
-            ),
-            'statistics' => array(
-                'title' => __('Statistics', 'fbs-secure-optimize'),
-                'icon' => 'dashicons-chart-bar',
-            ),
-        );
+		$this->tabs = array(
+			'overview'    => array(
+				'title' => __( 'Module Control Center', 'fbs-secure-optimize' ),
+				'icon'  => 'dashicons-screenoptions',
+			),
+			'performance' => array(
+				'title' => __( 'Speed & Database', 'fbs-secure-optimize' ),
+				'icon'  => 'dashicons-performance',
+			),
+			'security'    => array(
+				'title' => __( 'Headers & Hardening', 'fbs-secure-optimize' ),
+				'icon'  => 'dashicons-lock',
+			),
+			'scanner'     => array(
+				'title' => __( '6-Layer Malware Scanner', 'fbs-secure-optimize' ),
+				'icon'  => 'dashicons-shield-alt',
+			),
+			'firewall'    => array(
+				'title' => $is_pro ? __( 'WAF & User Guard (Pro)', 'fbs-secure-optimize' ) : __( 'WAF & User Guard (Pro)', 'fbs-secure-optimize' ),
+				'icon'  => 'dashicons-superhero-alt',
+			),
+		);
 
-        // Get current tab from URL (safe for display purposes only)
-        // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-        if ( isset( $_GET['tab'] ) ) {
-            // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-            $tab = sanitize_text_field( wp_unslash( $_GET['tab'] ) );
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only tab routing parameter.
+		if ( isset( $_GET['tab'] ) ) {
+			// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			$requested_tab = sanitize_key( wp_unslash( $_GET['tab'] ) );
+			if ( isset( $this->tabs[ $requested_tab ] ) ) {
+				$this->current_tab = $requested_tab;
+			}
+		}
+	}
 
-            if ( array_key_exists( $tab, $this->tabs ) ) {
-                $this->current_tab = $tab;
-            }
-        }
+	/**
+	 * Register admin menus, settings handlers, and AJAX endpoints.
+	 *
+	 * @since 1.0.0
+	 * @return void
+	 */
+	private function init_hooks() {
+		add_action( 'admin_menu', array( $this, 'add_admin_menu' ) );
+		add_action( 'admin_post_fbsseop_save_settings', array( $this, 'handle_save_settings_post' ) );
+		add_action( 'wp_ajax_fbsseop_toggle_module', array( $this, 'ajax_toggle_module' ) );
+		add_action( 'wp_ajax_fbsseop_cleanup_database', array( $this, 'ajax_cleanup_database' ) );
+	}
 
-    }
+	/**
+	 * Register top-level admin menu and submenus.
+	 *
+	 * @since 1.0.0
+	 * @return void
+	 */
+	public function add_admin_menu() {
+		add_menu_page(
+			__( 'FBS Secure Optimize', 'fbs-secure-optimize' ),
+			__( 'FBS Optimize', 'fbs-secure-optimize' ),
+			'manage_options',
+			'fbs-secure-optimize',
+			array( $this, 'render_admin_page' ),
+			'dashicons-shield',
+			30
+		);
 
-    /**
-     * Add admin menu
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     */
-    public function add_admin_menu() {
-        add_menu_page(
-            __('FBS Secure Optimize', 'fbs-secure-optimize'),
-            __('FBS Optimize', 'fbs-secure-optimize'),
-            'manage_options',
-            'fbs-secure-optimize',
-            array($this, 'admin_page'),
-            'dashicons-performance',
-            30
-        );
+		add_submenu_page(
+			'fbs-secure-optimize',
+			__( 'Control Center', 'fbs-secure-optimize' ),
+			__( 'Control Center', 'fbs-secure-optimize' ),
+			'manage_options',
+			'fbs-secure-optimize',
+			array( $this, 'render_admin_page' )
+		);
 
-        add_submenu_page(
-            'fbs-secure-optimize',
-            __('Dashboard', 'fbs-secure-optimize'),
-            __('Dashboard', 'fbs-secure-optimize'),
-            'manage_options',
-            'fbs-secure-optimize',
-            array($this, 'admin_page')
-        );
+		add_submenu_page(
+			'fbs-secure-optimize',
+			__( '6-Layer Scanner', 'fbs-secure-optimize' ),
+			__( 'Malware Scanner', 'fbs-secure-optimize' ),
+			'manage_options',
+			'fbs-secure-optimize-scanner-shortcut',
+			array( $this, 'redirect_to_scanner_tab' )
+		);
 
-        add_submenu_page(
-            'fbs-secure-optimize',
-            __('Our Plugins', 'fbs-secure-optimize'),
-            __('Our Plugins', 'fbs-secure-optimize'),
-            'manage_options',
-            'fbs-secure-optimize-plugins',
-            array($this, 'render_our_plugins_page')
-        );
+		add_submenu_page(
+			'fbs-secure-optimize',
+			__( 'Our Plugins', 'fbs-secure-optimize' ),
+			__( 'Our Plugins', 'fbs-secure-optimize' ),
+			'manage_options',
+			'fbs-secure-optimize-plugins',
+			array( $this, 'render_our_plugins_page' )
+		);
 
-        add_submenu_page(
-            'fbs-secure-optimize',
-            __('Meet The Author', 'fbs-secure-optimize'),
-            __('Meet The Author', 'fbs-secure-optimize'),
-            'manage_options',
-            'fbs-secure-optimize-author',
-            array($this, 'render_author_page')
-        );
-    }
+		add_submenu_page(
+			'fbs-secure-optimize',
+			__( 'Meet The Author', 'fbs-secure-optimize' ),
+			__( 'Meet The Author', 'fbs-secure-optimize' ),
+			'manage_options',
+			'fbs-secure-optimize-author',
+			array( $this, 'render_author_page' )
+		);
+	}
 
-    /**
-     * Register plugin settings
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     */
-    public function register_settings() {
-        // Register main settings group
-        register_setting(
-            'fbsseop_settings',
-            'fbsseop_settings',
-            array($this, 'sanitize_settings')
-        );
-    }
+	/**
+	 * Redirect shortcut submenu item to the Malware Scanner tab.
+	 *
+	 * @since 2.0.0
+	 * @return void
+	 */
+	public function redirect_to_scanner_tab() {
+		wp_safe_redirect( admin_url( 'admin.php?page=fbs-secure-optimize&tab=scanner' ) );
+		exit;
+	}
 
+	/**
+	 * Handle settings form submission safely with per-tab preservation.
+	 *
+	 * @since 2.0.0
+	 * @return void
+	 */
+	public function handle_save_settings_post() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Permission denied.', 'fbs-secure-optimize' ) );
+		}
 
+		check_admin_referer( 'fbsseop_save_settings_action', 'fbsseop_nonce' );
 
-    /**
-     * Sanitize settings
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     * @param array $input Raw input data
-     * @return array Sanitized data
-     */
-    public function sanitize_settings($input) {
-        // Get current settings to preserve existing data
-        $current_settings = get_option('fbsseop_settings', array());
-        $sanitized = $current_settings;
+		$section_tab = isset( $_POST['settings_tab'] ) ? sanitize_key( wp_unslash( $_POST['settings_tab'] ) ) : 'overview';
+		$raw_input   = isset( $_POST['fbsseop'] ) && is_array( $_POST['fbsseop'] ) ? wp_unslash( $_POST['fbsseop'] ) : array(); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Sanitized field-by-field below.
 
-        // Sanitize asset optimization settings (Performance tab)
-        if (isset($input['asset_optimization'])) {
-            $sanitized['asset_optimization'] = array(
-                'minify_css' => isset($input['asset_optimization']['minify_css']) ? (int)$input['asset_optimization']['minify_css'] : 0,
-                'minify_js' => isset($input['asset_optimization']['minify_js']) ? (int)$input['asset_optimization']['minify_js'] : 0,
-                'combine_css' => isset($input['asset_optimization']['combine_css']) ? (int)$input['asset_optimization']['combine_css'] : 0,
-                'combine_js' => isset($input['asset_optimization']['combine_js']) ? (int)$input['asset_optimization']['combine_js'] : 0,
-                'lazy_load_images' => isset($input['asset_optimization']['lazy_load_images']) ? (int)$input['asset_optimization']['lazy_load_images'] : 0,
-                'lazy_load_iframes' => isset($input['asset_optimization']['lazy_load_iframes']) ? (int)$input['asset_optimization']['lazy_load_iframes'] : 0,
-            );
-        }
+		$current = FBS_Secure_Optimize_Controller::get_all_settings();
 
-        // Sanitize database cleanup settings (Performance tab)
-        if (isset($input['database_cleanup'])) {
-            $frequency = isset($input['database_cleanup']['cleanup_frequency']) ? sanitize_text_field($input['database_cleanup']['cleanup_frequency']) : 'weekly';
-            $allowed_frequencies = array('daily', 'weekly', 'monthly');
-            
-            $sanitized['database_cleanup'] = array(
-                'cleanup_revisions' => isset($input['database_cleanup']['cleanup_revisions']) ? (int)$input['database_cleanup']['cleanup_revisions'] : 0,
-                'cleanup_autodrafts' => isset($input['database_cleanup']['cleanup_autodrafts']) ? (int)$input['database_cleanup']['cleanup_autodrafts'] : 0,
-                'cleanup_spam_comments' => isset($input['database_cleanup']['cleanup_spam_comments']) ? (int)$input['database_cleanup']['cleanup_spam_comments'] : 0,
-                'cleanup_transients' => isset($input['database_cleanup']['cleanup_transients']) ? (int)$input['database_cleanup']['cleanup_transients'] : 0,
-                'auto_cleanup' => isset($input['database_cleanup']['auto_cleanup']) ? (int)$input['database_cleanup']['auto_cleanup'] : 0,
-                'cleanup_frequency' => in_array($frequency, $allowed_frequencies) ? $frequency : 'weekly',
-            );
-        }
+		if ( 'overview' === $section_tab ) {
+			$module_keys = array_keys( $current['modules'] );
+			foreach ( $module_keys as $mkey ) {
+				$current['modules'][ $mkey ] = ! empty( $raw_input['modules'][ $mkey ] ) ? 1 : 0;
+			}
+		} elseif ( 'performance' === $section_tab ) {
+			$asset_bools = array(
+				'minify_css',
+				'minify_js',
+				'defer_js',
+				'lazy_load_images',
+				'lazy_load_iframes',
+				'disable_emojis',
+				'disable_dashicons',
+				'disable_embeds',
+				'clean_wp_head',
+				'heartbeat_control',
+			);
+			foreach ( $asset_bools as $ab ) {
+				$current['asset_optimization'][ $ab ] = ! empty( $raw_input['asset_optimization'][ $ab ] ) ? 1 : 0;
+			}
 
-        // Sanitize login security settings (Security tab)
-        if (isset($input['login_security'])) {
-            $sanitized['login_security'] = array(
-                'limit_login_attempts' => isset($input['login_security']['limit_login_attempts']) ? (int)$input['login_security']['limit_login_attempts'] : 0,
-                'max_attempts' => isset($input['login_security']['max_attempts']) ? max(3, min(20, absint($input['login_security']['max_attempts']))) : 5,
-                'lockout_duration' => isset($input['login_security']['lockout_duration']) ? max(5, min(1440, absint($input['login_security']['lockout_duration']))) : 15,
-                'whitelist_ips' => isset($input['login_security']['whitelist_ips']) ? sanitize_textarea_field($input['login_security']['whitelist_ips']) : '',
-            );
-        }
+			$db_bools = array(
+				'cleanup_revisions',
+				'cleanup_autodrafts',
+				'cleanup_spam_comments',
+				'cleanup_transients',
+				'cleanup_orphaned_meta',
+				'optimize_tables',
+				'auto_cleanup',
+			);
+			foreach ( $db_bools as $dbb ) {
+				$current['database_cleanup'][ $dbb ] = ! empty( $raw_input['database_cleanup'][ $dbb ] ) ? 1 : 0;
+			}
 
-        // Sanitize security headers settings (Security tab)
-        if (isset($input['security_headers'])) {
-            $sanitized['security_headers'] = array(
-                'x_content_type_options' => isset($input['security_headers']['x_content_type_options']) ? (int)$input['security_headers']['x_content_type_options'] : 0,
-                'x_frame_options' => isset($input['security_headers']['x_frame_options']) ? (int)$input['security_headers']['x_frame_options'] : 0,
-                'x_xss_protection' => isset($input['security_headers']['x_xss_protection']) ? (int)$input['security_headers']['x_xss_protection'] : 0,
-                'strict_transport_security' => isset($input['security_headers']['strict_transport_security']) ? (int)$input['security_headers']['strict_transport_security'] : 0,
-                'hide_wp_version' => isset($input['security_headers']['hide_wp_version']) ? (int)$input['security_headers']['hide_wp_version'] : 0,
-            );
-        }
+			$freq    = isset( $raw_input['database_cleanup']['cleanup_frequency'] ) ? sanitize_key( $raw_input['database_cleanup']['cleanup_frequency'] ) : 'weekly';
+			$allowed = array( 'daily', 'weekly', 'monthly' );
+			$current['database_cleanup']['cleanup_frequency'] = in_array( $freq, $allowed, true ) ? $freq : 'weekly';
 
-        return $sanitized;
-    }
+			wp_clear_scheduled_hook( 'fbsseop_cleanup_database' );
+		} elseif ( 'security' === $section_tab ) {
+			$header_bools = array(
+				'x_content_type_options',
+				'x_frame_options',
+				'x_xss_protection',
+				'referrer_policy',
+				'permissions_policy',
+				'strict_transport_security',
+				'hide_wp_version',
+			);
+			foreach ( $header_bools as $hb ) {
+				$current['security_headers'][ $hb ] = ! empty( $raw_input['security_headers'][ $hb ] ) ? 1 : 0;
+			}
 
+			$current['login_security']['limit_login_attempts'] = ! empty( $raw_input['login_security']['limit_login_attempts'] ) ? 1 : 0;
+			$current['login_security']['mask_login_errors']    = ! empty( $raw_input['login_security']['mask_login_errors'] ) ? 1 : 0;
+			$current['login_security']['max_attempts']         = isset( $raw_input['login_security']['max_attempts'] ) ? max( 2, min( 25, absint( $raw_input['login_security']['max_attempts'] ) ) ) : 5;
+			$current['login_security']['lockout_duration']     = isset( $raw_input['login_security']['lockout_duration'] ) ? max( 1, min( 1440, absint( $raw_input['login_security']['lockout_duration'] ) ) ) : 15;
+			$current['login_security']['whitelist_ips']        = isset( $raw_input['login_security']['whitelist_ips'] ) ? sanitize_textarea_field( $raw_input['login_security']['whitelist_ips'] ) : '';
 
-    /**
-     * Get setting value
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     * @param string $section Section name
-     * @param string $key Setting key
-     * @return mixed Setting value
-     */
-    private function get_setting_value($section, $key) {
-        $settings = get_option('fbsseop_settings', array());
-        return isset($settings[$section][$key]) ? $settings[$section][$key] : 0;
-    }
+			$harden_bools = array(
+				'disable_xmlrpc',
+				'disable_file_edit',
+				'block_author_enum',
+				'disable_rest_users',
+			);
+			foreach ( $harden_bools as $hdb ) {
+				$current['wp_hardening'][ $hdb ] = ! empty( $raw_input['wp_hardening'][ $hdb ] ) ? 1 : 0;
+			}
+		}
 
-    /**
-     * Display admin page
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     */
-    public function admin_page() {
-        ?>
-        <div class="wrap fbs-opt-admin-wrap">
-            <div class="fbs-opt-header">
-                <h1 class="fbs-opt-title">
-                    <span class="dashicons dashicons-performance"></span>
-                    <?php echo esc_html(get_admin_page_title()); ?>
-                </h1>
-                <p class="fbs-opt-subtitle"><?php esc_html_e('Secure and optimize your WordPress site for better performance and enhanced security', 'fbs-secure-optimize'); ?></p>
-            </div>
-            
-            <?php $this->display_tabs(); ?>
-            
-            <div class="fbs-opt-admin-content">
-                <div class="fbs-opt-tab-content <?php echo $this->current_tab === 'performance' ? 'active' : ''; ?>" data-tab="performance">
-                    <?php $this->display_performance_tab(); ?>
-                </div>
-                
-                <div class="fbs-opt-tab-content <?php echo $this->current_tab === 'security' ? 'active' : ''; ?>" data-tab="security">
-                    <?php $this->display_security_tab(); ?>
-                </div>
-                
-                <div class="fbs-opt-tab-content <?php echo $this->current_tab === 'statistics' ? 'active' : ''; ?>" data-tab="statistics">
-                    <?php $this->display_statistics_tab(); ?>
-                </div>
-            </div>
-        </div>
-        <?php
-    }
+		update_option( 'fbsseop_settings', $current );
 
-    /**
-     * Display admin tabs
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     */
-    private function display_tabs() {
-        echo '<div class="fbs-opt-tabs">';
-        echo '<h2 class="nav-tab-wrapper">';
-        
-        foreach ($this->tabs as $tab_key => $tab_data) {
-            $class = ($tab_key === $this->current_tab) ? 'nav-tab nav-tab-active' : 'nav-tab';
-            $url = add_query_arg('tab', $tab_key, admin_url('admin.php?page=fbs-optimize'));
-            
-            printf(
-                '<a href="%1$s" class="%2$s" data-tab="%3$s"><span class="dashicons %4$s"></span> %5$s</a>',
-                esc_url($url),
-                esc_attr($class),
-                esc_attr($tab_key),
-                esc_attr($tab_data['icon']),
-                esc_html($tab_data['title'])
-            );
-        }
-        
-        echo '</h2>';
-        echo '</div>';
-    }
+		wp_safe_redirect(
+			add_query_arg(
+				array(
+					'page'  => 'fbs-secure-optimize',
+					'tab'   => isset( $this->tabs[ $section_tab ] ) ? $section_tab : 'overview',
+					'saved' => '1',
+				),
+				admin_url( 'admin.php' )
+			)
+		);
+		exit;
+	}
 
-    /**
-     * Display performance tab
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     */
-    private function display_performance_tab() {
-        ?>
-        <div class="fbs-opt-performance-tab">
-            <form class="fbs-opt-form" data-tab="performance">
-                <?php
-                settings_fields('fbsseop_settings');
-                ?>
-                
-                <div class="fbs-opt-section">
-                    <div class="fbs-opt-section-header">
-                        <h3 class="fbs-opt-section-title">
-                            <span class="dashicons dashicons-admin-tools"></span>
-                            <?php esc_html_e('Asset Optimization', 'fbs-secure-optimize'); ?>
-                        </h3>
-                        <p class="fbs-opt-section-description"><?php esc_html_e('Optimize your CSS and JavaScript files for better loading speed', 'fbs-secure-optimize'); ?></p>
-                    </div>
-                    
-                    <div class="fbs-opt-options-grid">
-                        <div class="fbs-opt-option-card">
-                            <div class="fbs-opt-option-header">
-                                <h4><?php esc_html_e('Minify CSS', 'fbs-secure-optimize'); ?></h4>
-                                <div class="fbs-opt-toggle">
-                                    <input type="hidden" name="fbsseop_settings[asset_optimization][minify_css]" value="0" />
-                                    <input type="checkbox" name="fbsseop_settings[asset_optimization][minify_css]" value="1" <?php checked(1, $this->get_setting_value('asset_optimization', 'minify_css')); ?> />
-                                    <span class="fbs-opt-slider"></span>
-                                </div>
-                            </div>
-                            <p class="fbs-opt-option-description"><?php esc_html_e('Remove unnecessary characters from CSS files to reduce file size', 'fbs-secure-optimize'); ?></p>
-                        </div>
-                        
-                        <div class="fbs-opt-option-card">
-                            <div class="fbs-opt-option-header">
-                                <h4><?php esc_html_e('Minify JavaScript', 'fbs-secure-optimize'); ?></h4>
-                                <div class="fbs-opt-toggle">
-                                    <input type="hidden" name="fbsseop_settings[asset_optimization][minify_js]" value="0" />
-                                    <input type="checkbox" name="fbsseop_settings[asset_optimization][minify_js]" value="1" <?php checked(1, $this->get_setting_value('asset_optimization', 'minify_js')); ?> />
-                                    <span class="fbs-opt-slider"></span>
-                                </div>
-                            </div>
-                            <p class="fbs-opt-option-description"><?php esc_html_e('Remove unnecessary characters from JavaScript files to reduce file size', 'fbs-secure-optimize'); ?></p>
-                        </div>
-                        
-                        <div class="fbs-opt-option-card">
-                            <div class="fbs-opt-option-header">
-                                <h4><?php esc_html_e('Combine CSS Files', 'fbs-secure-optimize'); ?></h4>
-                                <div class="fbs-opt-toggle">
-                                    <input type="hidden" name="fbsseop_settings[asset_optimization][combine_css]" value="0" />
-                                    <input type="checkbox" name="fbsseop_settings[asset_optimization][combine_css]" value="1" <?php checked(1, $this->get_setting_value('asset_optimization', 'combine_css')); ?> />
-                                    <span class="fbs-opt-slider"></span>
-                                </div>
-                            </div>
-                            <p class="fbs-opt-option-description"><?php esc_html_e('Combine multiple CSS files into one to reduce HTTP requests', 'fbs-secure-optimize'); ?></p>
-                        </div>
-                        
-                        <div class="fbs-opt-option-card">
-                            <div class="fbs-opt-option-header">
-                                <h4><?php esc_html_e('Combine JavaScript Files', 'fbs-secure-optimize'); ?></h4>
-                                <div class="fbs-opt-toggle">
-                                    <input type="hidden" name="fbsseop_settings[asset_optimization][combine_js]" value="0" />
-                                    <input type="checkbox" name="fbsseop_settings[asset_optimization][combine_js]" value="1" <?php checked(1, $this->get_setting_value('asset_optimization', 'combine_js')); ?> />
-                                    <span class="fbs-opt-slider"></span>
-                                </div>
-                            </div>
-                            <p class="fbs-opt-option-description"><?php esc_html_e('Combine multiple JavaScript files into one to reduce HTTP requests', 'fbs-secure-optimize'); ?></p>
-                        </div>
-                        
-                        <div class="fbs-opt-option-card">
-                            <div class="fbs-opt-option-header">
-                                <h4><?php esc_html_e('Lazy Load Images', 'fbs-secure-optimize'); ?></h4>
-                                <div class="fbs-opt-toggle">
-                                    <input type="hidden" name="fbsseop_settings[asset_optimization][lazy_load_images]" value="0" />
-                                    <input type="checkbox" name="fbsseop_settings[asset_optimization][lazy_load_images]" value="1" <?php checked(1, $this->get_setting_value('asset_optimization', 'lazy_load_images')); ?> />
-                                    <span class="fbs-opt-slider"></span>
-                                </div>
-                            </div>
-                            <p class="fbs-opt-option-description"><?php esc_html_e('Load images only when they are about to enter the viewport', 'fbs-secure-optimize'); ?></p>
-                        </div>
-                        
-                        <div class="fbs-opt-option-card">
-                            <div class="fbs-opt-option-header">
-                                <h4><?php esc_html_e('Lazy Load Iframes', 'fbs-secure-optimize'); ?></h4>
-                                <div class="fbs-opt-toggle">
-                                    <input type="hidden" name="fbsseop_settings[asset_optimization][lazy_load_iframes]" value="0" />
-                                    <input type="checkbox" name="fbsseop_settings[asset_optimization][lazy_load_iframes]" value="1" <?php checked(1, $this->get_setting_value('asset_optimization', 'lazy_load_iframes')); ?> />
-                                    <span class="fbs-opt-slider"></span>
-                                </div>
-                            </div>
-                            <p class="fbs-opt-option-description"><?php esc_html_e('Load iframes only when they are about to enter the viewport', 'fbs-secure-optimize'); ?></p>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="fbs-opt-section">
-                    <div class="fbs-opt-section-header">
-                        <h3 class="fbs-opt-section-title">
-                            <span class="dashicons dashicons-database"></span>
-                            <?php esc_html_e('Database Cleanup', 'fbs-secure-optimize'); ?>
-                        </h3>
-                        <p class="fbs-opt-section-description"><?php esc_html_e('Clean up your database to improve performance and reduce storage usage', 'fbs-secure-optimize'); ?></p>
-                    </div>
-                    
-                    <div class="fbs-opt-options-grid">
-                        <div class="fbs-opt-option-card">
-                            <div class="fbs-opt-option-header">
-                                <h4><?php esc_html_e('Clean Post Revisions', 'fbs-secure-optimize'); ?></h4>
-                                <div class="fbs-opt-toggle">
-                                    <input type="hidden" name="fbsseop_settings[database_cleanup][cleanup_revisions]" value="0" />
-                                    <input type="checkbox" name="fbsseop_settings[database_cleanup][cleanup_revisions]" value="1" <?php checked(1, $this->get_setting_value('database_cleanup', 'cleanup_revisions')); ?> />
-                                    <span class="fbs-opt-slider"></span>
-                                </div>
-                            </div>
-                            <p class="fbs-opt-option-description"><?php esc_html_e('Remove old post revisions to reduce database size', 'fbs-secure-optimize'); ?></p>
-                        </div>
-                        
-                        <div class="fbs-opt-option-card">
-                            <div class="fbs-opt-option-header">
-                                <h4><?php esc_html_e('Clean Auto-drafts', 'fbs-secure-optimize'); ?></h4>
-                                <div class="fbs-opt-toggle">
-                                    <input type="hidden" name="fbsseop_settings[database_cleanup][cleanup_autodrafts]" value="0" />
-                                    <input type="checkbox" name="fbsseop_settings[database_cleanup][cleanup_autodrafts]" value="1" <?php checked(1, $this->get_setting_value('database_cleanup', 'cleanup_autodrafts')); ?> />
-                                    <span class="fbs-opt-slider"></span>
-                                </div>
-                            </div>
-                            <p class="fbs-opt-option-description"><?php esc_html_e('Remove auto-draft posts to reduce database size', 'fbs-secure-optimize'); ?></p>
-                        </div>
-                        
-                        <div class="fbs-opt-option-card">
-                            <div class="fbs-opt-option-header">
-                                <h4><?php esc_html_e('Clean Spam Comments', 'fbs-secure-optimize'); ?></h4>
-                                <div class="fbs-opt-toggle">
-                                    <input type="hidden" name="fbsseop_settings[database_cleanup][cleanup_spam_comments]" value="0" />
-                                    <input type="checkbox" name="fbsseop_settings[database_cleanup][cleanup_spam_comments]" value="1" <?php checked(1, $this->get_setting_value('database_cleanup', 'cleanup_spam_comments')); ?> />
-                                    <span class="fbs-opt-slider"></span>
-                                </div>
-                            </div>
-                            <p class="fbs-opt-option-description"><?php esc_html_e('Remove spam comments to reduce database size', 'fbs-secure-optimize'); ?></p>
-                        </div>
-                        
-                        <div class="fbs-opt-option-card">
-                            <div class="fbs-opt-option-header">
-                                <h4><?php esc_html_e('Clean Transients', 'fbs-secure-optimize'); ?></h4>
-                                <div class="fbs-opt-toggle">
-                                    <input type="hidden" name="fbsseop_settings[database_cleanup][cleanup_transients]" value="0" />
-                                    <input type="checkbox" name="fbsseop_settings[database_cleanup][cleanup_transients]" value="1" <?php checked(1, $this->get_setting_value('database_cleanup', 'cleanup_transients')); ?> />
-                                    <span class="fbs-opt-slider"></span>
-                                </div>
-                            </div>
-                            <p class="fbs-opt-option-description"><?php esc_html_e('Remove expired transients to reduce database size', 'fbs-secure-optimize'); ?></p>
-                        </div>
-                        
-                        <div class="fbs-opt-option-card">
-                            <div class="fbs-opt-option-header">
-                                <h4><?php esc_html_e('Automatic Cleanup', 'fbs-secure-optimize'); ?></h4>
-                                <div class="fbs-opt-toggle">
-                                    <input type="hidden" name="fbsseop_settings[database_cleanup][auto_cleanup]" value="0" />
-                                    <input type="checkbox" name="fbsseop_settings[database_cleanup][auto_cleanup]" value="1" id="auto_cleanup_toggle" <?php checked(1, $this->get_setting_value('database_cleanup', 'auto_cleanup')); ?> />
-                                    <span class="fbs-opt-slider"></span>
-                                </div>
-                            </div>
-                            <p class="fbs-opt-option-description"><?php esc_html_e('Automatically perform database cleanup on a schedule', 'fbs-secure-optimize'); ?></p>
-                        </div>
-                        
-                        <div class="fbs-opt-option-card fbs-opt-dependent-option" data-depends-on="auto_cleanup_toggle">
-                            <div class="fbs-opt-option-header">
-                                <h4><?php esc_html_e('Cleanup Frequency', 'fbs-secure-optimize'); ?></h4>
-                                <select name="fbsseop_settings[database_cleanup][cleanup_frequency]" class="fbs-opt-select" id="cleanup_frequency_select">
-                                    <option value="daily" <?php selected($this->get_setting_value('database_cleanup', 'cleanup_frequency'), 'daily'); ?>><?php esc_html_e('Daily', 'fbs-secure-optimize'); ?></option>
-                                    <option value="weekly" <?php selected($this->get_setting_value('database_cleanup', 'cleanup_frequency'), 'weekly'); ?>><?php esc_html_e('Weekly', 'fbs-secure-optimize'); ?></option>
-                                    <option value="monthly" <?php selected($this->get_setting_value('database_cleanup', 'cleanup_frequency'), 'monthly'); ?>><?php esc_html_e('Monthly', 'fbs-secure-optimize'); ?></option>
-                                </select>
-                            </div>
-                            <p class="fbs-opt-option-description"><?php esc_html_e('How often to perform automatic cleanup', 'fbs-secure-optimize'); ?></p>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="fbs-opt-cleanup-actions">
-                    <div class="fbs-opt-action-card">
-                        <h3><?php esc_html_e('Manual Cleanup', 'fbs-secure-optimize'); ?></h3>
-                        <p><?php esc_html_e('Perform database cleanup manually. This action cannot be undone.', 'fbs-secure-optimize'); ?></p>
-                        <button type="button" id="fbs-opt-cleanup-btn" class="fbs-opt-button fbs-opt-button-secondary">
-                            <span class="dashicons dashicons-trash"></span>
-                            <?php esc_html_e('Clean Database Now', 'fbs-secure-optimize'); ?>
-                        </button>
-                        <span id="fbs-opt-cleanup-status"></span>
-                    </div>
-                    
-                    <div class="fbs-opt-action-card">
-                        <h3><?php esc_html_e('Cache Management', 'fbs-secure-optimize'); ?></h3>
-                        <p><?php esc_html_e('Clear optimized asset cache to force regeneration of combined and minified files.', 'fbs-secure-optimize'); ?></p>
-                        <button type="button" id="fbs-opt-clear-cache-btn" class="fbs-opt-button fbs-opt-button-secondary">
-                            <span class="dashicons dashicons-update"></span>
-                            <?php esc_html_e('Clear Asset Cache', 'fbs-secure-optimize'); ?>
-                        </button>
-                        <span id="fbs-opt-cache-status"></span>
-                    </div>
-                </div>
-                
-                <div class="fbs-opt-form-actions">
-                    <button type="submit" class="button button-primary fbs-opt-button-primary" id="save-performance-settings">
-                        <span class="dashicons dashicons-yes-alt"></span>
-                        <?php esc_html_e('Save Performance Settings', 'fbs-secure-optimize'); ?>
-                    </button>
-                </div>
-            </form>
-        </div>
-        <?php
-    }
+	/**
+	 * AJAX handler: Instant 1-click toggle for an independent module card.
+	 *
+	 * @since 2.0.0
+	 * @return void
+	 */
+	public function ajax_toggle_module() {
+		check_ajax_referer( 'fbsseop_admin_nonce', 'nonce' );
 
-    /**
-     * Display security tab
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     */
-    private function display_security_tab() {
-        ?>
-        <div class="fbs-opt-security-tab">
-            <form class="fbs-opt-form" data-tab="security">
-                <?php
-                settings_fields('fbsseop_settings');
-                ?>
-                
-                <div class="fbs-opt-section">
-                    <div class="fbs-opt-section-header">
-                        <h3 class="fbs-opt-section-title">
-                            <span class="dashicons dashicons-lock"></span>
-                            <?php esc_html_e('Login Security', 'fbs-secure-optimize'); ?>
-                        </h3>
-                        <p class="fbs-opt-section-description"><?php esc_html_e('Protect your site from brute force attacks and unauthorized access', 'fbs-secure-optimize'); ?></p>
-                    </div>
-                    
-                    <div class="fbs-opt-options-grid">
-                        <div class="fbs-opt-option-card">
-                            <div class="fbs-opt-option-header">
-                                <h4><?php esc_html_e('Limit Login Attempts', 'fbs-secure-optimize'); ?></h4>
-                                <div class="fbs-opt-toggle">
-                                    <input type="hidden" name="fbsseop_settings[login_security][limit_login_attempts]" value="0" />
-                                    <input type="checkbox" name="fbsseop_settings[login_security][limit_login_attempts]" value="1" id="limit_login_attempts_toggle" <?php checked(1, $this->get_setting_value('login_security', 'limit_login_attempts')); ?> />
-                                    <span class="fbs-opt-slider"></span>
-                                </div>
-                            </div>
-                            <p class="fbs-opt-option-description"><?php esc_html_e('Limit the number of login attempts to prevent brute force attacks', 'fbs-secure-optimize'); ?></p>
-                        </div>
-                        
-                        <div class="fbs-opt-option-card fbs-opt-dependent-option" data-depends-on="limit_login_attempts_toggle">
-                            <div class="fbs-opt-option-header">
-                                <h4><?php esc_html_e('Maximum Attempts', 'fbs-secure-optimize'); ?></h4>
-                                <input type="number" name="fbsseop_settings[login_security][max_attempts]" value="<?php echo esc_attr($this->get_setting_value('login_security', 'max_attempts')); ?>" min="3" max="20" class="fbs-opt-input" id="max_attempts_input" />
-                            </div>
-                            <p class="fbs-opt-option-description"><?php esc_html_e('Maximum number of login attempts before lockout', 'fbs-secure-optimize'); ?></p>
-                        </div>
-                        
-                        <div class="fbs-opt-option-card fbs-opt-dependent-option" data-depends-on="limit_login_attempts_toggle">
-                            <div class="fbs-opt-option-header">
-                                <h4><?php esc_html_e('Lockout Duration (minutes)', 'fbs-secure-optimize'); ?></h4>
-                                <input type="number" name="fbsseop_settings[login_security][lockout_duration]" value="<?php echo esc_attr($this->get_setting_value('login_security', 'lockout_duration')); ?>" min="5" max="1440" class="fbs-opt-input" id="lockout_duration_input" />
-                            </div>
-                            <p class="fbs-opt-option-description"><?php esc_html_e('How long to lock out users after exceeding maximum attempts', 'fbs-secure-optimize'); ?></p>
-                        </div>
-                        
-                        <div class="fbs-opt-option-card fbs-opt-option-card-wide">
-                            <div class="fbs-opt-option-header">
-                                <h4><?php esc_html_e('Whitelist IP Addresses', 'fbs-secure-optimize'); ?></h4>
-                            </div>
-                            <textarea name="fbsseop_settings[login_security][whitelist_ips]" rows="3" class="fbs-opt-textarea" placeholder="<?php esc_attr_e('Enter IP addresses, one per line', 'fbs-secure-optimize'); ?>"><?php echo esc_textarea($this->get_setting_value('login_security', 'whitelist_ips')); ?></textarea>
-                            <p class="fbs-opt-option-description"><?php esc_html_e('IP addresses that are exempt from login attempt limits', 'fbs-secure-optimize'); ?></p>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="fbs-opt-section">
-                    <div class="fbs-opt-section-header">
-                        <h3 class="fbs-opt-section-title">
-                            <span class="dashicons dashicons-shield"></span>
-                            <?php esc_html_e('Security Headers', 'fbs-secure-optimize'); ?>
-                        </h3>
-                        <p class="fbs-opt-section-description"><?php esc_html_e('Add security headers to protect against common web vulnerabilities', 'fbs-secure-optimize'); ?></p>
-                    </div>
-                    
-                    <div class="fbs-opt-options-grid">
-                        <div class="fbs-opt-option-card">
-                            <div class="fbs-opt-option-header">
-                                <h4><?php esc_html_e('X-Content-Type-Options', 'fbs-secure-optimize'); ?></h4>
-                                <div class="fbs-opt-toggle">
-                                    <input type="hidden" name="fbsseop_settings[security_headers][x_content_type_options]" value="0" />
-                                    <input type="checkbox" name="fbsseop_settings[security_headers][x_content_type_options]" value="1" <?php checked(1, $this->get_setting_value('security_headers', 'x_content_type_options')); ?> />
-                                    <span class="fbs-opt-slider"></span>
-                                </div>
-                            </div>
-                            <p class="fbs-opt-option-description"><?php esc_html_e('Prevent MIME type sniffing attacks', 'fbs-secure-optimize'); ?></p>
-                        </div>
-                        
-                        <div class="fbs-opt-option-card">
-                            <div class="fbs-opt-option-header">
-                                <h4><?php esc_html_e('X-Frame-Options', 'fbs-secure-optimize'); ?></h4>
-                                <div class="fbs-opt-toggle">
-                                    <input type="hidden" name="fbsseop_settings[security_headers][x_frame_options]" value="0" />
-                                    <input type="checkbox" name="fbsseop_settings[security_headers][x_frame_options]" value="1" <?php checked(1, $this->get_setting_value('security_headers', 'x_frame_options')); ?> />
-                                    <span class="fbs-opt-slider"></span>
-                                </div>
-                            </div>
-                            <p class="fbs-opt-option-description"><?php esc_html_e('Prevent clickjacking attacks', 'fbs-secure-optimize'); ?></p>
-                        </div>
-                        
-                        <div class="fbs-opt-option-card">
-                            <div class="fbs-opt-option-header">
-                                <h4><?php esc_html_e('X-XSS-Protection', 'fbs-secure-optimize'); ?></h4>
-                                <div class="fbs-opt-toggle">
-                                    <input type="hidden" name="fbsseop_settings[security_headers][x_xss_protection]" value="0" />
-                                    <input type="checkbox" name="fbsseop_settings[security_headers][x_xss_protection]" value="1" <?php checked(1, $this->get_setting_value('security_headers', 'x_xss_protection')); ?> />
-                                    <span class="fbs-opt-slider"></span>
-                                </div>
-                            </div>
-                            <p class="fbs-opt-option-description"><?php esc_html_e('Enable XSS filtering in browsers', 'fbs-secure-optimize'); ?></p>
-                        </div>
-                        
-                        <div class="fbs-opt-option-card">
-                            <div class="fbs-opt-option-header">
-                                <h4><?php esc_html_e('Strict-Transport-Security', 'fbs-secure-optimize'); ?></h4>
-                                <div class="fbs-opt-toggle">
-                                    <input type="hidden" name="fbsseop_settings[security_headers][strict_transport_security]" value="0" />
-                                    <input type="checkbox" name="fbsseop_settings[security_headers][strict_transport_security]" value="1" <?php checked(1, $this->get_setting_value('security_headers', 'strict_transport_security')); ?> />
-                                    <span class="fbs-opt-slider"></span>
-                                </div>
-                            </div>
-                            <p class="fbs-opt-option-description"><?php esc_html_e('Force HTTPS connections (requires SSL certificate)', 'fbs-secure-optimize'); ?></p>
-                        </div>
-                        
-                        <div class="fbs-opt-option-card">
-                            <div class="fbs-opt-option-header">
-                                <h4><?php esc_html_e('Hide WordPress Version', 'fbs-secure-optimize'); ?></h4>
-                                <div class="fbs-opt-toggle">
-                                    <input type="hidden" name="fbsseop_settings[security_headers][hide_wp_version]" value="0" />
-                                    <input type="checkbox" name="fbsseop_settings[security_headers][hide_wp_version]" value="1" <?php checked(1, $this->get_setting_value('security_headers', 'hide_wp_version')); ?> />
-                                    <span class="fbs-opt-slider"></span>
-                                </div>
-                            </div>
-                            <p class="fbs-opt-option-description"><?php esc_html_e('Remove WordPress version from head and RSS feeds', 'fbs-secure-optimize'); ?></p>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="fbs-opt-form-actions">
-                    <button type="submit" class="button button-primary fbs-opt-button-primary" id="save-security-settings">
-                        <span class="dashicons dashicons-yes-alt"></span>
-                        <?php esc_html_e('Save Security Settings', 'fbs-secure-optimize'); ?>
-                    </button>
-                </div>
-            </form>
-        </div>
-        <?php
-    }
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( array( 'message' => __( 'Permission denied.', 'fbs-secure-optimize' ) ) );
+		}
 
-    /**
-     * Display statistics tab
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     */
-    private function display_statistics_tab() {
-        $stats = FBS_Secure_Optimize_Controller::get_stats();
-        $asset_optimizer = FBS_Secure_Optimize_Asset_Optimizer::get_instance();
-        $asset_stats = $asset_optimizer->get_asset_stats();
-        $cache_stats = $asset_optimizer->get_cache_stats();
-        
-        // Format file sizes
-        $format_size = function($bytes) {
-            if ($bytes >= 1048576) {
-                return round($bytes / 1048576, 2) . ' MB';
-            } elseif ($bytes >= 1024) {
-                return round($bytes / 1024, 2) . ' KB';
-            } else {
-                return $bytes . ' bytes';
-            }
-        };
-        ?>
-        <div class="fbs-opt-statistics-tab">
-            <div class="fbs-opt-stats-overview">
-                <div class="fbs-opt-overview-card">
-                    <div class="fbs-opt-overview-icon">
-                        <span class="dashicons dashicons-database"></span>
-                    </div>
-                    <div class="fbs-opt-overview-content">
-                        <h3><?php esc_html_e('Database Health', 'fbs-secure-optimize'); ?></h3>
-                        <p><?php esc_html_e('Monitor your database size and cleanup opportunities', 'fbs-secure-optimize'); ?></p>
-                    </div>
-                </div>
-                
-                <div class="fbs-opt-overview-card">
-                    <div class="fbs-opt-overview-icon">
-                        <span class="dashicons dashicons-shield"></span>
-                    </div>
-                    <div class="fbs-opt-overview-content">
-                        <h3><?php esc_html_e('Security Status', 'fbs-secure-optimize'); ?></h3>
-                        <p><?php esc_html_e('Track security events and login attempts', 'fbs-secure-optimize'); ?></p>
-                    </div>
-                </div>
-                
-                <div class="fbs-opt-overview-card">
-                    <div class="fbs-opt-overview-icon">
-                        <span class="dashicons dashicons-performance"></span>
-                    </div>
-                    <div class="fbs-opt-overview-content">
-                        <h3><?php esc_html_e('Performance Metrics', 'fbs-secure-optimize'); ?></h3>
-                        <p><?php esc_html_e('View optimization impact and improvements', 'fbs-secure-optimize'); ?></p>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="fbs-opt-section">
-                <div class="fbs-opt-section-header">
-                    <h3 class="fbs-opt-section-title">
-                        <span class="dashicons dashicons-chart-bar"></span>
-                        <?php esc_html_e('Database Statistics', 'fbs-secure-optimize'); ?>
-                    </h3>
-                    <p class="fbs-opt-section-description"><?php esc_html_e('Current database usage and cleanup opportunities', 'fbs-secure-optimize'); ?></p>
-                </div>
-                
-                <div class="fbs-opt-stats-grid">
-                    <div class="fbs-opt-stat-card">
-                        <div class="fbs-opt-stat-icon">
-                            <span class="dashicons dashicons-backup"></span>
-                        </div>
-                        <div class="fbs-opt-stat-content">
-                            <h4><?php esc_html_e('Post Revisions', 'fbs-secure-optimize'); ?></h4>
-                            <span class="fbs-opt-stat-number"><?php echo esc_html(number_format($stats['post_revisions'])); ?></span>
-                            <p class="fbs-opt-stat-description"><?php esc_html_e('Old post revisions that can be cleaned up', 'fbs-secure-optimize'); ?></p>
-                        </div>
-                    </div>
-                    
-                    <div class="fbs-opt-stat-card">
-                        <div class="fbs-opt-stat-icon">
-                            <span class="dashicons dashicons-edit-page"></span>
-                        </div>
-                        <div class="fbs-opt-stat-content">
-                            <h4><?php esc_html_e('Auto-drafts', 'fbs-secure-optimize'); ?></h4>
-                            <span class="fbs-opt-stat-number"><?php echo esc_html(number_format($stats['auto_drafts'])); ?></span>
-                            <p class="fbs-opt-stat-description"><?php esc_html_e('Unused auto-draft posts', 'fbs-secure-optimize'); ?></p>
-                        </div>
-                    </div>
-                    
-                    <div class="fbs-opt-stat-card">
-                        <div class="fbs-opt-stat-icon">
-                            <span class="dashicons dashicons-admin-comments"></span>
-                        </div>
-                        <div class="fbs-opt-stat-content">
-                            <h4><?php esc_html_e('Spam Comments', 'fbs-secure-optimize'); ?></h4>
-                            <span class="fbs-opt-stat-number"><?php echo esc_html(number_format($stats['spam_comments'])); ?></span>
-                            <p class="fbs-opt-stat-description"><?php esc_html_e('Spam comments that can be removed', 'fbs-secure-optimize'); ?></p>
-                        </div>
-                    </div>
-                    
-                    <div class="fbs-opt-stat-card">
-                        <div class="fbs-opt-stat-icon">
-                            <span class="dashicons dashicons-clock"></span>
-                        </div>
-                        <div class="fbs-opt-stat-content">
-                            <h4><?php esc_html_e('Transients', 'fbs-secure-optimize'); ?></h4>
-                            <span class="fbs-opt-stat-number"><?php echo esc_html(number_format($stats['transients'])); ?></span>
-                            <p class="fbs-opt-stat-description"><?php esc_html_e('Expired transients in the database', 'fbs-secure-optimize'); ?></p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="fbs-opt-section">
-                <div class="fbs-opt-section-header">
-                    <h3 class="fbs-opt-section-title">
-                        <span class="dashicons dashicons-lock"></span>
-                        <?php esc_html_e('Security Statistics', 'fbs-secure-optimize'); ?>
-                    </h3>
-                    <p class="fbs-opt-section-description"><?php esc_html_e('Security events and login attempt monitoring', 'fbs-secure-optimize'); ?></p>
-                </div>
-                
-                <div class="fbs-opt-stats-grid">
-                    <div class="fbs-opt-stat-card">
-                        <div class="fbs-opt-stat-icon">
-                            <span class="dashicons dashicons-warning"></span>
-                        </div>
-                        <div class="fbs-opt-stat-content">
-                            <h4><?php esc_html_e('Failed Logins (24h)', 'fbs-secure-optimize'); ?></h4>
-                            <span class="fbs-opt-stat-number"><?php echo esc_html(number_format($stats['failed_logins'])); ?></span>
-                            <p class="fbs-opt-stat-description"><?php esc_html_e('Failed login attempts in the last 24 hours', 'fbs-secure-optimize'); ?></p>
-                        </div>
-                    </div>
-                    
-                    <div class="fbs-opt-stat-card">
-                        <div class="fbs-opt-stat-icon">
-                            <span class="dashicons dashicons-yes-alt"></span>
-                        </div>
-                        <div class="fbs-opt-stat-content">
-                            <h4><?php esc_html_e('Security Score', 'fbs-secure-optimize'); ?></h4>
-                            <span class="fbs-opt-stat-number fbs-opt-score">85%</span>
-                            <p class="fbs-opt-stat-description"><?php esc_html_e('Overall security configuration score', 'fbs-secure-optimize'); ?></p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="fbs-opt-section">
-                <div class="fbs-opt-section-header">
-                    <h3 class="fbs-opt-section-title">
-                        <span class="dashicons dashicons-chart-line"></span>
-                        <?php esc_html_e('Performance Impact', 'fbs-secure-optimize'); ?>
-                    </h3>
-                    <p class="fbs-opt-section-description"><?php esc_html_e('Estimated performance improvements from optimizations', 'fbs-secure-optimize'); ?></p>
-                </div>
-                
-                <div class="fbs-opt-performance-metrics">
-                    <div class="fbs-opt-metric-card">
-                        <h4><?php esc_html_e('Page Load Time', 'fbs-secure-optimize'); ?></h4>
-                        <div class="fbs-opt-metric-bar">
-                            <div class="fbs-opt-metric-fill" style="width: 75%;"></div>
-                        </div>
-                        <p class="fbs-opt-metric-value"><?php esc_html_e('25% faster', 'fbs-secure-optimize'); ?></p>
-                    </div>
-                    
-                    <div class="fbs-opt-metric-card">
-                        <h4><?php esc_html_e('Database Size', 'fbs-secure-optimize'); ?></h4>
-                        <div class="fbs-opt-metric-bar">
-                            <div class="fbs-opt-metric-fill" style="width: 60%;"></div>
-                        </div>
-                        <p class="fbs-opt-metric-value"><?php esc_html_e('40% reduction', 'fbs-secure-optimize'); ?></p>
-                    </div>
-                    
-                    <div class="fbs-opt-metric-card">
-                        <h4><?php esc_html_e('HTTP Requests', 'fbs-secure-optimize'); ?></h4>
-                        <div class="fbs-opt-metric-bar">
-                            <div class="fbs-opt-metric-fill" style="width: 80%;"></div>
-                        </div>
-                        <p class="fbs-opt-metric-value"><?php esc_html_e('20% fewer requests', 'fbs-secure-optimize'); ?></p>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Asset Optimization Statistics -->
-            <div class="fbs-opt-section">
-                <div class="fbs-opt-section-header">
-                    <h3 class="fbs-opt-section-title">
-                        <span class="dashicons dashicons-performance"></span>
-                        <?php esc_html_e('Asset Optimization Statistics', 'fbs-secure-optimize'); ?>
-                    </h3>
-                    <p class="fbs-opt-section-description"><?php esc_html_e('Monitor file optimization and performance improvements', 'fbs-secure-optimize'); ?></p>
-                </div>
-                
-                <div class="fbs-opt-stats-grid">
-                    <div class="fbs-opt-stat-card">
-                        <div class="fbs-opt-stat-icon">
-                            <span class="dashicons dashicons-media-code"></span>
-                        </div>
-                        <div class="fbs-opt-stat-content">
-                            <h4><?php esc_html_e('CSS Files', 'fbs-secure-optimize'); ?></h4>
-                            <span class="fbs-opt-stat-number"><?php echo esc_html($asset_stats['css_files']); ?></span>
-                            <p class="fbs-opt-stat-description"><?php esc_html_e('Total CSS files loaded', 'fbs-secure-optimize'); ?></p>
-                        </div>
-                    </div>
-                    
-                    <div class="fbs-opt-stat-card">
-                        <div class="fbs-opt-stat-icon">
-                            <span class="dashicons dashicons-media-code"></span>
-                        </div>
-                        <div class="fbs-opt-stat-content">
-                            <h4><?php esc_html_e('JavaScript Files', 'fbs-secure-optimize'); ?></h4>
-                            <span class="fbs-opt-stat-number"><?php echo esc_html($asset_stats['js_files']); ?></span>
-                            <p class="fbs-opt-stat-description"><?php esc_html_e('Total JS files loaded', 'fbs-secure-optimize'); ?></p>
-                        </div>
-                    </div>
-                    
-                    <div class="fbs-opt-stat-card">
-                        <div class="fbs-opt-stat-icon">
-                            <span class="dashicons dashicons-admin-tools"></span>
-                        </div>
-                        <div class="fbs-opt-stat-content">
-                            <h4><?php esc_html_e('Combined Files', 'fbs-secure-optimize'); ?></h4>
-                            <span class="fbs-opt-stat-number"><?php echo esc_html($cache_stats['files']); ?></span>
-                            <p class="fbs-opt-stat-description"><?php esc_html_e('Optimized combined files', 'fbs-secure-optimize'); ?></p>
-                        </div>
-                    </div>
-                    
-                    <div class="fbs-opt-stat-card">
-                        <div class="fbs-opt-stat-icon">
-                            <span class="dashicons dashicons-chart-line"></span>
-                        </div>
-                        <div class="fbs-opt-stat-content">
-                            <h4><?php esc_html_e('HTTP Requests Saved', 'fbs-secure-optimize'); ?></h4>
-                            <span class="fbs-opt-stat-number"><?php echo esc_html(($asset_stats['css_files'] + $asset_stats['js_files']) - $cache_stats['files']); ?></span>
-                            <p class="fbs-opt-stat-description"><?php esc_html_e('Reduced HTTP requests', 'fbs-secure-optimize'); ?></p>
-                        </div>
-                    </div>
-                    
-                    <div class="fbs-opt-stat-card">
-                        <div class="fbs-opt-stat-icon">
-                            <span class="dashicons dashicons-download"></span>
-                        </div>
-                        <div class="fbs-opt-stat-content">
-                            <h4><?php esc_html_e('Cache Size', 'fbs-secure-optimize'); ?></h4>
-                            <span class="fbs-opt-stat-number"><?php echo esc_html($format_size($cache_stats['size'])); ?></span>
-                            <p class="fbs-opt-stat-description"><?php esc_html_e('Total cached file size', 'fbs-secure-optimize'); ?></p>
-                        </div>
-                    </div>
-                    
-                    <div class="fbs-opt-stat-card">
-                        <div class="fbs-opt-stat-icon">
-                            <span class="dashicons dashicons-chart-pie"></span>
-                        </div>
-                        <div class="fbs-opt-stat-content">
-                            <h4><?php esc_html_e('Optimization Ratio', 'fbs-secure-optimize'); ?></h4>
-                            <span class="fbs-opt-stat-number"><?php 
-                                $total_files = $asset_stats['css_files'] + $asset_stats['js_files'];
-                                $combined_files = $cache_stats['files'];
-                                if ($total_files > 0) {
-                                    $ratio = round((($total_files - $combined_files) / $total_files) * 100, 1);
-                                    echo esc_html($ratio . '%');
-                                } else {
-                                    echo esc_html('0%');
-                                }
-                            ?></span>
-                            <p class="fbs-opt-stat-description"><?php esc_html_e('Files optimized', 'fbs-secure-optimize'); ?></p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <?php
-    }
+		$module  = isset( $_POST['module'] ) ? sanitize_key( wp_unslash( $_POST['module'] ) ) : '';
+		$enabled = ! empty( $_POST['enabled'] ) ? 1 : 0;
 
+		$current = FBS_Secure_Optimize_Controller::get_all_settings();
+		if ( ! array_key_exists( $module, $current['modules'] ) ) {
+			wp_send_json_error( array( 'message' => __( 'Invalid module key.', 'fbs-secure-optimize' ) ) );
+		}
 
-    /**
-     * Display admin notices
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     */
-    public function admin_notices() {
-        // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-        if ( isset( $_GET['settings-updated'] ) ) {
-            // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-            $settings_updated = ! empty( sanitize_text_field( wp_unslash( $_GET['settings-updated'] ) ) );
-    
-            if ( $settings_updated ) {
-                echo '<div class="notice notice-success is-dismissible"><p>' .
-                    esc_html__( 'Settings saved successfully.', 'fbs-secure-optimize' ) .
-                    '</p></div>';
-            }
-        }
-    }    
+		$current['modules'][ $module ] = $enabled;
+		update_option( 'fbsseop_settings', $current );
 
-    /**
-     * AJAX handler for database cleanup
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     */
-    public function ajax_cleanup_database() {
-        // Verify nonce
-        $nonce = isset($_POST['nonce']) ? sanitize_text_field(wp_unslash($_POST['nonce'])) : '';
-        if (!$nonce || !wp_verify_nonce($nonce, 'fbsseop_admin_nonce')) {
-            wp_die(esc_html__('Security check failed.', 'fbs-secure-optimize'));
-        }
-        
-        // Check user capabilities
-        if (!current_user_can('manage_options')) {
-            wp_die(esc_html__('You do not have sufficient permissions.', 'fbs-secure-optimize'));
-        }
-        
-        // Get database cleanup module
-        $controller = FBS_Secure_Optimize_Controller::get_instance();
-        $cleanup_module = $controller->get_module('database_cleanup');
-        
-        if ($cleanup_module) {
-            $result = $cleanup_module->perform_cleanup();
-            
-            if ($result) {
-                wp_send_json_success(array('message' => __('Database cleanup completed successfully.', 'fbs-secure-optimize')));
-            } else {
-                wp_send_json_error(array('message' => __('An error occurred during database cleanup.', 'fbs-secure-optimize')));
-            }
-        } else {
-            wp_send_json_error(array('message' => __('Database cleanup module not found.', 'fbs-secure-optimize')));
-        }
-    }
+		$active_count = array_sum( array_map( 'intval', $current['modules'] ) );
 
-    /**
-     * AJAX handler for clearing cache
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     */
-    public function ajax_clear_cache() {
-        // Verify nonce
-        $nonce = isset($_POST['nonce']) ? sanitize_text_field(wp_unslash($_POST['nonce'])) : '';
-        if (!$nonce || !wp_verify_nonce($nonce, 'fbsseop_admin_nonce')) {
-            wp_die(esc_html__('Security check failed.', 'fbs-secure-optimize'));
-        }
-        
-        // Check user capabilities
-        if (!current_user_can('manage_options')) {
-            wp_die(esc_html__('You do not have sufficient permissions.', 'fbs-secure-optimize'));
-        }
-        
-        // Get asset optimizer module
-        $controller = FBS_Secure_Optimize_Controller::get_instance();
-        $asset_optimizer = $controller->get_module('asset_optimizer');
-        
-        if ($asset_optimizer) {
-            $asset_optimizer->clear_cache();
-            
-            // Clear statistics cache
-            FBS_Secure_Optimize_Controller::clear_stats_cache();
-            
-            wp_send_json_success(array('message' => __('Asset cache cleared successfully.', 'fbs-secure-optimize')));
-        } else {
-            wp_send_json_error(array('message' => __('Asset optimizer module not found.', 'fbs-secure-optimize')));
-        }
-    }
+		wp_send_json_success(
+			array(
+				'module'       => $module,
+				'enabled'      => $enabled,
+				'active_count' => $active_count,
+				'total_count'  => count( $current['modules'] ),
+				'message'      => $enabled
+					? __( 'Module activated.', 'fbs-secure-optimize' )
+					: __( 'Module deactivated (zero runtime overhead).', 'fbs-secure-optimize' ),
+			)
+		);
+	}
 
-    /**
-     * AJAX handler for saving settings
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     */
-    public function ajax_save_settings() {
-        // Verify nonce
-        $nonce = isset($_POST['nonce']) ? sanitize_text_field(wp_unslash($_POST['nonce'])) : '';
-        if (!$nonce || !wp_verify_nonce($nonce, 'fbsseop_admin_nonce')) {
-            wp_die(esc_html__('Security check failed.', 'fbs-secure-optimize'));
-        }
-        
-        // Check user capabilities
-        if (!current_user_can('manage_options')) {
-            wp_die(esc_html__('You do not have sufficient permissions.', 'fbs-secure-optimize'));
-        }
-        
-        $settings_data = array();
+	/**
+	 * AJAX handler: Run manual database cleanup.
+	 *
+	 * @since 1.0.0
+	 * @return void
+	 */
+	public function ajax_cleanup_database() {
+		check_ajax_referer( 'fbsseop_admin_nonce', 'nonce' );
 
-        if ( isset( $_POST['settings'] ) && is_array( $_POST['settings'] ) ) {
-            // phpcs:ignore WordPress.Security.NonceVerification.Missing, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized, WordPress.Security.ValidatedSanitizedInput.MissingUnslash
-            $posted_settings = $_POST['settings'];
-        
-            $posted_settings = wp_unslash( $posted_settings );
-            $settings_data   = map_deep( $posted_settings, 'sanitize_text_field' );
-        }
-               
-        // Sanitize the settings
-        $sanitized_settings = $this->sanitize_settings($settings_data);
-        
-        // Get current settings to compare
-        $current_settings = get_option('fbsseop_settings', array());
-        
-        // Save the settings
-        $result = update_option('fbsseop_settings', $sanitized_settings);
-        
-        // Check if settings were actually changed
-        $settings_changed = ($current_settings !== $sanitized_settings);
-        
-        if ($result || !$settings_changed) {
-            // Success if update_option returned true OR if no changes were made
-            $message = $settings_changed ? 
-                __('Settings saved successfully.', 'fbs-secure-optimize') : 
-                __('No changes detected. Settings are already up to date.', 'fbs-secure-optimize');
-            wp_send_json_success(array('message' => $message));
-        } else {
-            wp_send_json_error(array('message' => __('Failed to save settings.', 'fbs-secure-optimize')));
-        }
-    }
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( array( 'message' => __( 'Permission denied.', 'fbs-secure-optimize' ) ) );
+		}
 
-    /**
-     * AJAX handler for importing settings
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     */
-    public function ajax_import_settings() {
-        // Verify nonce
-        $nonce = isset($_POST['nonce']) ? sanitize_text_field(wp_unslash($_POST['nonce'])) : '';
-        if (!$nonce || !wp_verify_nonce($nonce, 'fbsseop_admin_nonce')) {
-            wp_die(esc_html__('Security check failed.', 'fbs-secure-optimize'));
-        }
-        
-        // Check user capabilities
-        if (!current_user_can('manage_options')) {
-            wp_die(esc_html__('You do not have sufficient permissions.', 'fbs-secure-optimize'));
-        }
-        
-        $settings_json = isset($_POST['settings']) ? sanitize_text_field(wp_unslash($_POST['settings'])) : '';
-        
-        if (empty($settings_json)) {
-            wp_send_json_error(array('message' => __('No settings data provided.', 'fbs-secure-optimize')));
-        }
-        
-        $settings = json_decode($settings_json, true);
-        
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            wp_send_json_error(array('message' => __('Invalid settings format.', 'fbs-secure-optimize')));
-        }
-        
-        // Sanitize the settings
-        $sanitized_settings = $this->sanitize_settings($settings);
-        
-        // Save the settings
-        $result = update_option('fbsseop_settings', $sanitized_settings);
-        
-        if ($result) {
-            wp_send_json_success(array('message' => __('Settings imported successfully.', 'fbs-secure-optimize')));
-        } else {
-            wp_send_json_error(array('message' => __('Failed to import settings.', 'fbs-secure-optimize')));
-        }
-    }
+		$cleaner = FBS_Secure_Optimize_Database_Cleanup::get_instance();
+		$results = $cleaner->perform_cleanup();
+		$stats   = FBS_Secure_Optimize_Controller::get_stats();
 
-    /**
-     * AJAX handler for getting statistics
-     * @since 1.0.0
-     * @author Fazle Bari <fazlebarisn@gmail.com>
-     */
-    public function ajax_get_stats() {
-        // Verify nonce
-        $nonce = isset($_POST['nonce']) ? sanitize_text_field(wp_unslash($_POST['nonce'])) : '';
-        if (!$nonce || !wp_verify_nonce($nonce, 'fbsseop_admin_nonce')) {
-            wp_die(esc_html__('Security check failed.', 'fbs-secure-optimize'));
-        }
-        
-        // Check user capabilities
-        if (!current_user_can('manage_options')) {
-            wp_die(esc_html__('You do not have sufficient permissions.', 'fbs-secure-optimize'));
-        }
-        
-        $stats = FBS_Secure_Optimize_Controller::get_stats();
-        
-        wp_send_json_success($stats);
-    }
+		wp_send_json_success(
+			array(
+				'results' => $results,
+				'stats'   => $stats,
+				'message' => sprintf(
+					/* translators: 1: Revisions deleted, 2: Transients deleted, 3: Orphaned meta deleted, 4: Tables optimized. */
+					__( 'Cleanup complete! Removed %1$d revisions, %2$d expired transients, %3$d orphaned meta rows, and optimized %4$d tables.', 'fbs-secure-optimize' ),
+					(int) $results['post_revisions'],
+					(int) $results['transients'],
+					(int) $results['orphaned_meta'],
+					(int) $results['optimized_tables']
+				),
+			)
+		);
+	}
 
-    /**
-     * Render Our Plugins Page
-     * @since 1.0.2
-     */
-    public function render_our_plugins_page() {
-        include FBS_SECURE_OPTIMIZE_PLUGIN_DIR . 'admin/templates/our-plugins.php';
-    }
+	/**
+	 * Render main dashboard wrapper and active tab view.
+	 *
+	 * @since 2.0.0
+	 * @return void
+	 */
+	public function render_admin_page() {
+		$settings     = FBS_Secure_Optimize_Controller::get_all_settings();
+		$stats        = FBS_Secure_Optimize_Controller::get_stats();
+		$is_pro       = FBS_Secure_Optimize_Controller::is_pro_active();
+		$active_mods  = array_sum( array_map( 'intval', $settings['modules'] ) );
+		$total_mods   = count( $settings['modules'] );
+		$uploads_safe = FBS_Secure_Optimize_Hardening::is_uploads_protected();
+		$last_scan    = get_option( 'fbsseop_last_scan_summary', array() );
+		?>
+		<div class="wrap fbsseop-wrap">
+			<!-- Top SaaS Hero Banner -->
+			<div class="fbsseop-hero">
+				<div class="fbsseop-hero__brand">
+					<div class="fbsseop-hero__logo" aria-hidden="true">
+						<span class="dashicons dashicons-shield-alt"></span>
+					</div>
+					<div>
+						<div class="fbsseop-hero__title-row">
+							<h1><?php esc_html_e( 'FBS Secure Optimize', 'fbs-secure-optimize' ); ?></h1>
+							<span class="fbsseop-badge fbsseop-badge--ver"><?php echo esc_html( 'v' . FBS_SECURE_OPTIMIZE_VERSION ); ?></span>
+							<?php if ( $is_pro ) : ?>
+								<span class="fbsseop-badge fbsseop-badge--pro"><?php esc_html_e( 'PRO ACTIVE', 'fbs-secure-optimize' ); ?></span>
+							<?php else : ?>
+								<span class="fbsseop-badge fbsseop-badge--free"><?php esc_html_e( 'FREE EDITION', 'fbs-secure-optimize' ); ?></span>
+							<?php endif; ?>
+						</div>
+						<p class="fbsseop-hero__subtitle">
+							<?php esc_html_e( 'Modular PageSpeed, Database, HTTP Security Headers & Deep Malware Forensics Engine by FBS Fusion.', 'fbs-secure-optimize' ); ?>
+						</p>
+					</div>
+				</div>
 
-    /**
-     * Render Meet the Author Page
-     * @since 1.0.2
-     */
-    public function render_author_page() {
-        include FBS_SECURE_OPTIMIZE_PLUGIN_DIR . 'admin/templates/plugin-author.php';
-    }
+				<div class="fbsseop-hero__actions">
+					<span class="fbsseop-health-pill" id="fbsseop-module-counter">
+						<span class="fbsseop-dot"></span>
+						<?php
+						printf(
+							/* translators: 1: Active module count, 2: Total module count. */
+							esc_html__( '%1$d / %2$d Modules Active', 'fbs-secure-optimize' ),
+							(int) $active_mods,
+							(int) $total_mods
+						);
+						?>
+					</span>
+					<a href="<?php echo esc_url( admin_url( 'admin.php?page=fbs-secure-optimize&tab=scanner' ) ); ?>" class="fbsseop-btn fbsseop-btn--glass">
+						<span class="dashicons dashicons-search"></span>
+						<?php esc_html_e( 'Run 6-Layer Scan', 'fbs-secure-optimize' ); ?>
+					</a>
+					<?php if ( ! $is_pro ) : ?>
+						<a href="<?php echo esc_url( admin_url( 'admin.php?page=fbs-secure-optimize&tab=firewall' ) ); ?>" class="fbsseop-btn fbsseop-btn--emerald">
+							<span class="dashicons dashicons-superhero-alt"></span>
+							<?php esc_html_e( 'Unlock Pro WAF & Guard', 'fbs-secure-optimize' ); ?>
+						</a>
+					<?php endif; ?>
+				</div>
+			</div>
 
+			<?php
+			// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Display-only saved toast flag.
+			if ( isset( $_GET['saved'] ) && '1' === $_GET['saved'] ) :
+				?>
+				<div class="fbsseop-toast fbsseop-toast--success">
+					<span class="dashicons dashicons-yes-alt"></span>
+					<span><?php esc_html_e( 'Settings saved and synchronized successfully.', 'fbs-secure-optimize' ); ?></span>
+				</div>
+			<?php endif; ?>
+
+			<div id="fbsseop-ajax-toast" class="fbsseop-toast" style="display:none;"></div>
+
+			<!-- Navigation Tabs -->
+			<nav class="fbsseop-tabs" aria-label="<?php esc_attr_e( 'Plugin Sections', 'fbs-secure-optimize' ); ?>">
+				<?php foreach ( $this->tabs as $tab_key => $tab_meta ) : ?>
+					<?php
+					$is_active = ( $this->current_tab === $tab_key );
+					$tab_url   = add_query_arg(
+						array(
+							'page' => 'fbs-secure-optimize',
+							'tab'  => $tab_key,
+						),
+						admin_url( 'admin.php' )
+					);
+					?>
+					<a href="<?php echo esc_url( $tab_url ); ?>" class="fbsseop-tab <?php echo $is_active ? 'is-active' : ''; ?>">
+						<span class="dashicons <?php echo esc_attr( $tab_meta['icon'] ); ?>"></span>
+						<span><?php echo esc_html( $tab_meta['title'] ); ?></span>
+						<?php if ( 'firewall' === $tab_key && ! $is_pro ) : ?>
+							<span class="fbsseop-pro-chip">PRO</span>
+						<?php endif; ?>
+					</a>
+				<?php endforeach; ?>
+			</nav>
+
+			<!-- Tab Body -->
+			<div class="fbsseop-body">
+				<?php
+				switch ( $this->current_tab ) {
+					case 'performance':
+						$this->render_performance_tab( $settings, $stats );
+						break;
+					case 'security':
+						$this->render_security_tab( $settings, $uploads_safe );
+						break;
+					case 'scanner':
+						$this->render_scanner_tab( $settings, $last_scan, $is_pro );
+						break;
+					case 'firewall':
+						$this->render_firewall_tab( $is_pro );
+						break;
+					case 'overview':
+					default:
+						$this->render_overview_tab( $settings, $stats, $uploads_safe, $last_scan );
+						break;
+				}
+				?>
+			</div>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Tab 1: Overview & Independent Module Control Center.
+	 *
+	 * @since 2.0.0
+	 * @param array<string, mixed> $settings     Plugin settings.
+	 * @param array<string, mixed> $stats        Telemetry stats.
+	 * @param bool                 $uploads_safe Uploads .htaccess status.
+	 * @param array<string, mixed> $last_scan    Last scan summary.
+	 * @return void
+	 */
+	private function render_overview_tab( $settings, $stats, $uploads_safe, $last_scan ) {
+		$cleanable_total = (int) $stats['post_revisions'] + (int) $stats['auto_drafts'] + (int) $stats['spam_comments'] + (int) $stats['transients'];
+
+		$module_cards = array(
+			'asset_optimizer'  => array(
+				'title'   => __( 'Asset & Bloat Optimizer', 'fbs-secure-optimize' ),
+				'badge'   => __( 'Speed', 'fbs-secure-optimize' ),
+				'icon'    => 'dashicons-performance',
+				'desc'    => __( 'LCP-safe native lazy loading, JS deferring, Emoji/Dashicons removal, and Heartbeat API throttling.', 'fbs-secure-optimize' ),
+				'cfg_tab' => 'performance',
+			),
+			'database_cleanup' => array(
+				'title'   => __( 'Database & Autoload Cleaner', 'fbs-secure-optimize' ),
+				'badge'   => __( 'Speed', 'fbs-secure-optimize' ),
+				'icon'    => 'dashicons-database',
+				'desc'    => __( 'Prune revisions, auto-drafts, expired transients, orphaned postmeta, and monitor heavy autoload rows.', 'fbs-secure-optimize' ),
+				'cfg_tab' => 'performance',
+			),
+			'security_headers' => array(
+				'title'   => __( 'HTTP Security Headers', 'fbs-secure-optimize' ),
+				'badge'   => __( 'Security', 'fbs-secure-optimize' ),
+				'icon'    => 'dashicons-admin-site-alt3',
+				'desc'    => __( 'Enforce Nosniff, X-Frame-Options, Referrer-Policy, Permissions-Policy, HSTS, and hide WP version leaks.', 'fbs-secure-optimize' ),
+				'cfg_tab' => 'security',
+			),
+			'login_security'   => array(
+				'title'   => __( 'Login Brute-Force Shield', 'fbs-secure-optimize' ),
+				'badge'   => __( 'Security', 'fbs-secure-optimize' ),
+				'icon'    => 'dashicons-lock',
+				'desc'    => __( 'Automatic IP lockouts after failed login attempts, IP allowlisting, and username enumeration masking.', 'fbs-secure-optimize' ),
+				'cfg_tab' => 'security',
+			),
+			'wp_hardening'     => array(
+				'title'   => __( 'WP Hardening & Uploads Shield', 'fbs-secure-optimize' ),
+				'badge'   => __( 'Security', 'fbs-secure-optimize' ),
+				'icon'    => 'dashicons-Cue',
+				'desc'    => __( 'Disable XML-RPC, lock theme/plugin editors, block ?author=1 scans, and block PHP execution in uploads/.', 'fbs-secure-optimize' ),
+				'cfg_tab' => 'security',
+			),
+			'malware_scanner'  => array(
+				'title'   => __( '6-Layer Malware & Admin Scanner', 'fbs-secure-optimize' ),
+				'badge'   => __( 'Forensics', 'fbs-secure-optimize' ),
+				'icon'    => 'dashicons-shield-alt',
+				'desc'    => __( 'Verify official WP.org MD5 checksums, detect root/uploads PHP shells, DB backdoors, and hidden admins.', 'fbs-secure-optimize' ),
+				'cfg_tab' => 'scanner',
+			),
+		);
+		?>
+		<!-- Live Telemetry Strip -->
+		<div class="fbsseop-kpi-grid">
+			<div class="fbsseop-kpi-card">
+				<span class="fbsseop-kpi-card__label"><?php esc_html_e( 'Cleanable DB Bloat', 'fbs-secure-optimize' ); ?></span>
+				<strong class="fbsseop-kpi-card__value" id="fbsseop-kpi-cleanable"><?php echo esc_html( number_format_i18n( $cleanable_total ) ); ?></strong>
+				<span class="fbsseop-kpi-card__meta"><?php esc_html_e( 'Revisions, drafts, spam & transients', 'fbs-secure-optimize' ); ?></span>
+			</div>
+
+			<div class="fbsseop-kpi-card">
+				<span class="fbsseop-kpi-card__label"><?php esc_html_e( 'Autoloaded wp_options', 'fbs-secure-optimize' ); ?></span>
+				<strong class="fbsseop-kpi-card__value <?php echo ( (float) $stats['autoload_kb'] > 800 ) ? 'is-warn' : 'is-good'; ?>">
+					<?php echo esc_html( $stats['autoload_kb'] . ' KB' ); ?>
+				</strong>
+				<span class="fbsseop-kpi-card__meta"><?php esc_html_e( 'Recommended target: < 800 KB', 'fbs-secure-optimize' ); ?></span>
+			</div>
+
+			<div class="fbsseop-kpi-card">
+				<span class="fbsseop-kpi-card__label"><?php esc_html_e( 'Failed Logins (24h)', 'fbs-secure-optimize' ); ?></span>
+				<strong class="fbsseop-kpi-card__value"><?php echo esc_html( number_format_i18n( (int) $stats['failed_logins'] ) ); ?></strong>
+				<span class="fbsseop-kpi-card__meta"><?php esc_html_e( 'Tracked by Brute-Force Shield', 'fbs-secure-optimize' ); ?></span>
+			</div>
+
+			<div class="fbsseop-kpi-card">
+				<span class="fbsseop-kpi-card__label"><?php esc_html_e( 'Uploads PHP Shield & Scan', 'fbs-secure-optimize' ); ?></span>
+				<strong class="fbsseop-kpi-card__value <?php echo $uploads_safe ? 'is-good' : 'is-warn'; ?>">
+					<?php echo $uploads_safe ? esc_html__( 'Protected', 'fbs-secure-optimize' ) : esc_html__( 'Unshielded', 'fbs-secure-optimize' ); ?>
+				</strong>
+				<span class="fbsseop-kpi-card__meta">
+					<?php
+					if ( ! empty( $last_scan['scanned_at'] ) ) {
+						printf(
+							/* translators: %d: Issue count from last scan. */
+							esc_html__( 'Last scan: %d issue(s)', 'fbs-secure-optimize' ),
+							(int) $last_scan['total_issues']
+						);
+					} else {
+						esc_html_e( 'No deep scan run yet', 'fbs-secure-optimize' );
+					}
+					?>
+				</span>
+			</div>
+		</div>
+
+		<!-- Independent Module Toggles Grid -->
+		<div class="fbsseop-section-head">
+			<div>
+				<h2><?php esc_html_e( 'Independent Module Toggles', 'fbs-secure-optimize' ); ?></h2>
+				<p><?php esc_html_e( 'Enable only the engines your site needs. Disabled modules are completely bypassed at boot—zero conflicts with WP Rocket, LiteSpeed Cache, or Cloudflare.', 'fbs-secure-optimize' ); ?></p>
+			</div>
+		</div>
+
+		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+			<input type="hidden" name="action" value="fbsseop_save_settings">
+			<input type="hidden" name="settings_tab" value="overview">
+			<?php wp_nonce_field( 'fbsseop_save_settings_action', 'fbsseop_nonce' ); ?>
+
+			<div class="fbsseop-modules-grid">
+				<?php foreach ( $module_cards as $mkey => $meta ) : ?>
+					<?php
+					$enabled = ! empty( $settings['modules'][ $mkey ] );
+					$cfg_url = add_query_arg(
+						array(
+							'page' => 'fbs-secure-optimize',
+							'tab'  => $meta['cfg_tab'],
+						),
+						admin_url( 'admin.php' )
+					);
+					$icon_cls = ( 'dashicons-Cue' === $meta['icon'] ) ? 'dashicons-Lock' : $meta['icon'];
+					if ( 'wp_hardening' === $mkey ) {
+						$icon_cls = 'dashicons-admin-tools';
+					}
+					?>
+					<div class="fbsseop-module-card <?php echo $enabled ? 'is-enabled' : 'is-disabled'; ?>">
+						<div class="fbsseop-module-card__top">
+							<div class="fbsseop-module-card__icon">
+								<span class="dashicons <?php echo esc_attr( $icon_cls ); ?>"></span>
+							</div>
+							<span class="fbsseop-tag"><?php echo esc_html( $meta['badge'] ); ?></span>
+							<label class="fbsseop-switch" aria-label="<?php echo esc_attr( $meta['title'] ); ?>">
+								<input
+									type="checkbox"
+									class="fbsseop-ajax-module-toggle"
+									data-module="<?php echo esc_attr( $mkey ); ?>"
+									name="fbsseop[modules][<?php echo esc_attr( $mkey ); ?>]"
+									value="1"
+									<?php checked( $enabled ); ?>
+								>
+								<span class="fbsseop-switch__slider"></span>
+							</label>
+						</div>
+
+						<h3><?php echo esc_html( $meta['title'] ); ?></h3>
+						<p><?php echo esc_html( $meta['desc'] ); ?></p>
+
+						<div class="fbsseop-module-card__footer">
+							<span class="fbsseop-status-text">
+								<?php echo $enabled ? esc_html__( '● Active', 'fbs-secure-optimize' ) : esc_html__( '○ Disabled', 'fbs-secure-optimize' ); ?>
+							</span>
+							<a href="<?php echo esc_url( $cfg_url ); ?>" class="fbsseop-link">
+								<?php esc_html_e( 'Configure →', 'fbs-secure-optimize' ); ?>
+							</a>
+						</div>
+					</div>
+				<?php endforeach; ?>
+			</div>
+
+			<div class="fbsseop-save-bar">
+				<button type="submit" class="fbsseop-btn fbsseop-btn--primary">
+					<span class="dashicons dashicons-saved"></span>
+					<?php esc_html_e( 'Save Module Toggles', 'fbs-secure-optimize' ); ?>
+				</button>
+			</div>
+		</form>
+		<?php
+	}
+
+	/**
+	 * Tab 2: Speed, Bloat Removal & Database Optimization.
+	 *
+	 * @since 2.0.0
+	 * @param array<string, mixed> $settings Plugin settings.
+	 * @param array<string, mixed> $stats    Database statistics.
+	 * @return void
+	 */
+	private function render_performance_tab( $settings, $stats ) {
+		$asset_on = ! empty( $settings['modules']['asset_optimizer'] );
+		$db_on    = ! empty( $settings['modules']['database_cleanup'] );
+		$asset    = $settings['asset_optimization'];
+		$db       = $settings['database_cleanup'];
+		?>
+		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+			<input type="hidden" name="action" value="fbsseop_save_settings">
+			<input type="hidden" name="settings_tab" value="performance">
+			<?php wp_nonce_field( 'fbsseop_save_settings_action', 'fbsseop_nonce' ); ?>
+
+			<div class="fbsseop-two-col">
+				<!-- Left Column: Asset & Bloat Optimizer -->
+				<div class="fbsseop-panel">
+					<div class="fbsseop-panel__header">
+						<div>
+							<h2><?php esc_html_e( '1. Asset & Core Web Vitals Optimizer', 'fbs-secure-optimize' ); ?></h2>
+							<p><?php esc_html_e( 'Zero-jQuery frontend speed enhancements designed for 95–100/100 Lighthouse.', 'fbs-secure-optimize' ); ?></p>
+						</div>
+						<?php if ( ! $asset_on ) : ?>
+							<span class="fbsseop-pill-warn"><?php esc_html_e( 'Module Off in Control Center', 'fbs-secure-optimize' ); ?></span>
+						<?php endif; ?>
+					</div>
+
+					<?php
+					$asset_fields = array(
+						'lazy_load_images'  => array(
+							__( 'LCP-Safe Native Image Lazy Loading', 'fbs-secure-optimize' ),
+							__( 'Adds native loading="lazy" & decoding="async" while automatically giving fetchpriority="high" to your first hero image.', 'fbs-secure-optimize' ),
+						),
+						'lazy_load_iframes' => array(
+							__( 'Native Iframe & Video Lazy Loading', 'fbs-secure-optimize' ),
+							__( 'Defers offscreen YouTube, Google Maps, and embedded iframes until scrolled near.', 'fbs-secure-optimize' ),
+						),
+						'disable_emojis'    => array(
+							__( 'Remove WP Emoji JS & CSS Bloat', 'fbs-secure-optimize' ),
+							__( 'Eliminates wp-emoji-release.min.js and s.w.org DNS lookup on every page.', 'fbs-secure-optimize' ),
+						),
+						'disable_dashicons' => array(
+							__( 'Disable Frontend Dashicons for Guests', 'fbs-secure-optimize' ),
+							__( 'Saves ~35 KB of render-blocking CSS for logged-out visitors.', 'fbs-secure-optimize' ),
+						),
+						'clean_wp_head'     => array(
+							__( 'Clean <head> RSD, WLW & Shortlinks', 'fbs-secure-optimize' ),
+							__( 'Strips legacy XML-RPC discovery, Windows Live Writer, and redundant meta links.', 'fbs-secure-optimize' ),
+						),
+						'heartbeat_control' => array(
+							__( 'Throttle WP Heartbeat API (60s)', 'fbs-secure-optimize' ),
+							__( 'Prevents admin-ajax.php CPU spikes and 502 timeouts on shared/VPS servers.', 'fbs-secure-optimize' ),
+						),
+						'disable_embeds'    => array(
+							__( 'Disable WP oEmbed Script', 'fbs-secure-optimize' ),
+							__( 'Dequeues wp-embed.min.js if your site does not embed third-party WordPress posts.', 'fbs-secure-optimize' ),
+						),
+						'defer_js'          => array(
+							__( 'Defer Non-Critical JavaScript', 'fbs-secure-optimize' ),
+							__( 'Adds defer attribute to frontend scripts while automatically excluding jQuery & WooCommerce checkout.', 'fbs-secure-optimize' ),
+						),
+						'minify_css'        => array(
+							__( 'Optimize Stylesheet Tags', 'fbs-secure-optimize' ),
+							__( 'Cleans redundant whitespace in enqueued stylesheet tags.', 'fbs-secure-optimize' ),
+						),
+					);
+					foreach ( $asset_fields as $fkey => $fmeta ) :
+						?>
+						<div class="fbsseop-setting-row">
+							<div>
+								<strong><?php echo esc_html( $fmeta[0] ); ?></strong>
+								<span><?php echo esc_html( $fmeta[1] ); ?></span>
+							</div>
+							<label class="fbsseop-switch">
+								<input type="checkbox" name="fbsseop[asset_optimization][<?php echo esc_attr( $fkey ); ?>]" value="1" <?php checked( ! empty( $asset[ $fkey ] ) ); ?>>
+								<span class="fbsseop-switch__slider"></span>
+							</label>
+						</div>
+					<?php endforeach; ?>
+				</div>
+
+				<!-- Right Column: Database & Autoload Cleaner -->
+				<div class="fbsseop-panel">
+					<div class="fbsseop-panel__header">
+						<div>
+							<h2><?php esc_html_e( '2. Database & Autoload Cleaner', 'fbs-secure-optimize' ); ?></h2>
+							<p><?php esc_html_e( 'Keep MySQL lean for sub-200ms Server TTFB.', 'fbs-secure-optimize' ); ?></p>
+						</div>
+						<?php if ( ! $db_on ) : ?>
+							<span class="fbsseop-pill-warn"><?php esc_html_e( 'Module Off in Control Center', 'fbs-secure-optimize' ); ?></span>
+						<?php endif; ?>
+					</div>
+
+					<?php
+					$db_fields = array(
+						'cleanup_revisions'     => sprintf(
+							/* translators: %d: Count of post revisions. */
+							__( 'Post Revisions (%d found)', 'fbs-secure-optimize' ),
+							(int) $stats['post_revisions']
+						),
+						'cleanup_autodrafts'    => sprintf(
+							/* translators: %d: Count of auto-drafts. */
+							__( 'Old Auto-Drafts > 7 Days (%d found)', 'fbs-secure-optimize' ),
+							(int) $stats['auto_drafts']
+						),
+						'cleanup_spam_comments' => sprintf(
+							/* translators: %d: Count of spam/trash comments. */
+							__( 'Spam & Trashed Comments (%d found)', 'fbs-secure-optimize' ),
+							(int) $stats['spam_comments']
+						),
+						'cleanup_transients'    => sprintf(
+							/* translators: %d: Count of transients. */
+							__( 'Expired Transients (%d total in DB)', 'fbs-secure-optimize' ),
+							(int) $stats['transients']
+						),
+						'cleanup_orphaned_meta' => __( 'Orphaned Postmeta Rows', 'fbs-secure-optimize' ),
+						'optimize_tables'       => __( 'Run MySQL OPTIMIZE TABLE on Core Tables', 'fbs-secure-optimize' ),
+						'auto_cleanup'          => __( 'Enable Scheduled Automatic Cleanup (WP-Cron)', 'fbs-secure-optimize' ),
+					);
+					foreach ( $db_fields as $dkey => $dlabel ) :
+						?>
+						<div class="fbsseop-setting-row">
+							<div><strong><?php echo esc_html( $dlabel ); ?></strong></div>
+							<label class="fbsseop-switch">
+								<input type="checkbox" name="fbsseop[database_cleanup][<?php echo esc_attr( $dkey ); ?>]" value="1" <?php checked( ! empty( $db[ $dkey ] ) ); ?>>
+								<span class="fbsseop-switch__slider"></span>
+							</label>
+						</div>
+					<?php endforeach; ?>
+
+					<div class="fbsseop-setting-row">
+						<div><strong><?php esc_html_e( 'Automatic Cleanup Schedule', 'fbs-secure-optimize' ); ?></strong></div>
+						<select name="fbsseop[database_cleanup][cleanup_frequency]" class="fbsseop-select">
+							<option value="daily" <?php selected( $db['cleanup_frequency'], 'daily' ); ?>><?php esc_html_e( 'Daily', 'fbs-secure-optimize' ); ?></option>
+							<option value="weekly" <?php selected( $db['cleanup_frequency'], 'weekly' ); ?>><?php esc_html_e( 'Weekly (Recommended)', 'fbs-secure-optimize' ); ?></option>
+							<option value="monthly" <?php selected( $db['cleanup_frequency'], 'monthly' ); ?>><?php esc_html_e( 'Monthly', 'fbs-secure-optimize' ); ?></option>
+						</select>
+					</div>
+
+					<div class="fbsseop-inline-action">
+						<button type="button" id="fbsseop-run-cleanup-btn" class="fbsseop-btn fbsseop-btn--emerald">
+							<span class="dashicons dashicons-Trash"></span>
+							<?php esc_html_e( 'Clean & Optimize Database Now', 'fbs-secure-optimize' ); ?>
+						</button>
+					</div>
+
+					<!-- Autoload Bloat Inspector -->
+					<div class="fbsseop-subbox">
+						<h4>
+							<?php
+							printf(
+								/* translators: %s: Autoload size in KB. */
+								esc_html__( 'Top 5 Heaviest Autoloaded Options (Total: %s KB)', 'fbs-secure-optimize' ),
+								esc_html( (string) $stats['autoload_kb'] )
+							);
+							?>
+						</h4>
+						<?php if ( ! empty( $stats['heavy_autoloads'] ) ) : ?>
+							<table class="fbsseop-mini-table">
+								<thead>
+									<tr>
+										<th><?php esc_html_e( 'Option Name', 'fbs-secure-optimize' ); ?></th>
+										<th><?php esc_html_e( 'Size', 'fbs-secure-optimize' ); ?></th>
+									</tr>
+								</thead>
+								<tbody>
+									<?php foreach ( $stats['heavy_autoloads'] as $row ) : ?>
+										<tr>
+											<td><code><?php echo esc_html( $row['option_name'] ); ?></code></td>
+											<td><strong><?php echo esc_html( $row['size_kb'] . ' KB' ); ?></strong></td>
+										</tr>
+									<?php endforeach; ?>
+								</tbody>
+							</table>
+						<?php endif; ?>
+					</div>
+				</div>
+			</div>
+
+			<div class="fbsseop-save-bar">
+				<button type="submit" class="fbsseop-btn fbsseop-btn--primary">
+					<span class="dashicons dashicons-saved"></span>
+					<?php esc_html_e( 'Save Speed & Database Settings', 'fbs-secure-optimize' ); ?>
+				</button>
+			</div>
+		</form>
+		<?php
+	}
+
+	/**
+	 * Tab 3: HTTP Security Headers, Login Shield & WP Core Hardening.
+	 *
+	 * @since 2.0.0
+	 * @param array<string, mixed> $settings     Plugin settings.
+	 * @param bool                 $uploads_safe Whether uploads/.htaccess is protected.
+	 * @return void
+	 */
+	private function render_security_tab( $settings, $uploads_safe ) {
+		$headers       = $settings['security_headers'];
+		$login         = $settings['login_security'];
+		$harden        = $settings['wp_hardening'];
+		$risky_plugins = FBS_Secure_Optimize_Hardening::get_active_high_risk_plugins();
+		$recent_fails  = FBS_Secure_Optimize_Login_Security::get_recent_failed_attempts( 8 );
+		?>
+		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+			<input type="hidden" name="action" value="fbsseop_save_settings">
+			<input type="hidden" name="settings_tab" value="security">
+			<?php wp_nonce_field( 'fbsseop_save_settings_action', 'fbsseop_nonce' ); ?>
+
+			<div class="fbsseop-two-col">
+				<!-- Left: HTTP Security Headers & WP Core Hardening -->
+				<div class="fbsseop-panel">
+					<div class="fbsseop-panel__header">
+						<div>
+							<h2><?php esc_html_e( '1. HTTP Security Headers', 'fbs-secure-optimize' ); ?></h2>
+							<p><?php esc_html_e( 'Safe, non-breaking browser defense headers for Grade A security posture.', 'fbs-secure-optimize' ); ?></p>
+						</div>
+					</div>
+
+					<?php
+					$header_fields = array(
+						'x_content_type_options'    => array( 'X-Content-Type-Options: nosniff', __( 'Prevents MIME-type sniffing attacks on uploaded assets.', 'fbs-secure-optimize' ) ),
+						'x_frame_options'           => array( 'X-Frame-Options: SAMEORIGIN', __( 'Blocks clickjacking iframes from external domains.', 'fbs-secure-optimize' ) ),
+						'referrer_policy'           => array( 'Referrer-Policy: strict-origin-when-cross-origin', __( 'Protects private admin/checkout URLs from referrer leaks.', 'fbs-secure-optimize' ) ),
+						'permissions_policy'        => array( 'Permissions-Policy (Camera/Mic/Geo Off)', __( 'Restricts unauthorized browser sensor APIs.', 'fbs-secure-optimize' ) ),
+						'strict_transport_security' => array( 'Strict-Transport-Security (HSTS — HTTPS Only)', __( 'Forces browsers onto HTTPS for 1 year (enable only on valid SSL sites).', 'fbs-secure-optimize' ) ),
+						'hide_wp_version'           => array( __( 'Hide WordPress Core Version', 'fbs-secure-optimize' ), __( 'Strips generator tags and core ?ver=6.x query fingerprinting.', 'fbs-secure-optimize' ) ),
+					);
+					foreach ( $header_fields as $hkey => $hmeta ) :
+						?>
+						<div class="fbsseop-setting-row">
+							<div>
+								<strong><?php echo esc_html( $hmeta[0] ); ?></strong>
+								<span><?php echo esc_html( $hmeta[1] ); ?></span>
+							</div>
+							<label class="fbsseop-switch">
+								<input type="checkbox" name="fbsseop[security_headers][<?php echo esc_attr( $hkey ); ?>]" value="1" <?php checked( ! empty( $headers[ $hkey ] ) ); ?>>
+								<span class="fbsseop-switch__slider"></span>
+							</label>
+						</div>
+					<?php endforeach; ?>
+
+					<hr class="fbsseop-divider">
+
+					<div class="fbsseop-panel__header">
+						<div>
+							<h2><?php esc_html_e( '2. WP Core Hardening & Uploads Shield', 'fbs-secure-optimize' ); ?></h2>
+							<p><?php esc_html_e( 'Eliminate common hacker entry vectors before exploitation.', 'fbs-secure-optimize' ); ?></p>
+						</div>
+					</div>
+
+					<?php
+					$harden_fields = array(
+						'disable_xmlrpc'     => array( __( 'Disable XML-RPC & X-Pingback', 'fbs-secure-optimize' ), __( 'Blocks amplified brute-force and pingback DDoS attacks.', 'fbs-secure-optimize' ) ),
+						'block_author_enum'  => array( __( 'Block ?author=1 Username Enumeration', 'fbs-secure-optimize' ), __( 'Redirects bot author-archive probes to the homepage.', 'fbs-secure-optimize' ) ),
+						'disable_rest_users' => array( __( 'Restrict Unauthenticated REST /wp/v2/users', 'fbs-secure-optimize' ), __( 'Stops bots from harvesting admin usernames via the public REST API.', 'fbs-secure-optimize' ) ),
+						'disable_file_edit'  => array( __( 'Lock Theme & Plugin File Editors', 'fbs-secure-optimize' ), __( 'Blocks PHP code editing inside wp-admin via map_meta_cap.', 'fbs-secure-optimize' ) ),
+					);
+					foreach ( $harden_fields as $hdkey => $hdmeta ) :
+						?>
+						<div class="fbsseop-setting-row">
+							<div>
+								<strong><?php echo esc_html( $hdmeta[0] ); ?></strong>
+								<span><?php echo esc_html( $hdmeta[1] ); ?></span>
+							</div>
+							<label class="fbsseop-switch">
+								<input type="checkbox" name="fbsseop[wp_hardening][<?php echo esc_attr( $hdkey ); ?>]" value="1" <?php checked( ! empty( $harden[ $hdkey ] ) ); ?>>
+								<span class="fbsseop-switch__slider"></span>
+							</label>
+						</div>
+					<?php endforeach; ?>
+
+					<!-- 1-Click Uploads .htaccess PHP Blocker -->
+					<div class="fbsseop-subbox">
+						<h4><?php esc_html_e( 'wp-content/uploads/ PHP Execution Shield', 'fbs-secure-optimize' ); ?></h4>
+						<p id="fbsseop-uploads-status-text">
+							<?php if ( $uploads_safe ) : ?>
+								<strong style="color:#059669;"><?php esc_html_e( '✓ Protected: Direct PHP script execution inside wp-content/uploads/ is blocked.', 'fbs-secure-optimize' ); ?></strong>
+							<?php else : ?>
+								<strong style="color:#d97706;"><?php esc_html_e( '⚠ Unprotected: Click below to generate .htaccess rules blocking backdoor PHP execution in uploads/.', 'fbs-secure-optimize' ); ?></strong>
+							<?php endif; ?>
+						</p>
+						<?php if ( ! $uploads_safe ) : ?>
+							<button type="button" id="fbsseop-protect-uploads-btn" class="fbsseop-btn fbsseop-btn--emerald">
+								<?php esc_html_e( '1-Click Shield wp-content/uploads/', 'fbs-secure-optimize' ); ?>
+							</button>
+						<?php endif; ?>
+					</div>
+
+					<?php if ( ! empty( $risky_plugins ) ) : ?>
+						<div class="fbsseop-subbox fbsseop-subbox--danger">
+							<h4><?php esc_html_e( '⚠ High-Risk Active Plugins Detected', 'fbs-secure-optimize' ); ?></h4>
+							<?php foreach ( $risky_plugins as $rp ) : ?>
+								<div class="fbsseop-risky-item">
+									<div>
+										<strong><?php echo esc_html( $rp['name'] ); ?></strong>
+										<p><?php echo esc_html( $rp['risk'] ); ?></p>
+									</div>
+									<button type="button" class="fbsseop-btn fbsseop-btn--danger fbsseop-deactivate-risky" data-plugin="<?php echo esc_attr( $rp['basename'] ); ?>">
+										<?php esc_html_e( 'Deactivate', 'fbs-secure-optimize' ); ?>
+									</button>
+								</div>
+							<?php endforeach; ?>
+						</div>
+					<?php endif; ?>
+				</div>
+
+				<!-- Right: Login Brute-Force Shield -->
+				<div class="fbsseop-panel">
+					<div class="fbsseop-panel__header">
+						<div>
+							<h2><?php esc_html_e( '3. Unified Login Brute-Force Shield', 'fbs-secure-optimize' ); ?></h2>
+							<p><?php esc_html_e( 'Automatic IP lockouts and credential-stuffing protection.', 'fbs-secure-optimize' ); ?></p>
+						</div>
+					</div>
+
+					<div class="fbsseop-setting-row">
+						<div>
+							<strong><?php esc_html_e( 'Limit Failed Login Attempts', 'fbs-secure-optimize' ); ?></strong>
+							<span><?php esc_html_e( 'Automatically lock out attacking IPs after repeated failures.', 'fbs-secure-optimize' ); ?></span>
+						</div>
+						<label class="fbsseop-switch">
+							<input type="checkbox" name="fbsseop[login_security][limit_login_attempts]" value="1" <?php checked( ! empty( $login['limit_login_attempts'] ) ); ?>>
+							<span class="fbsseop-switch__slider"></span>
+						</label>
+					</div>
+
+					<div class="fbsseop-setting-row">
+						<div>
+							<strong><?php esc_html_e( 'Mask Login Error Hints', 'fbs-secure-optimize' ); ?></strong>
+							<span><?php esc_html_e( 'Hides whether an entered username exists on login failure.', 'fbs-secure-optimize' ); ?></span>
+						</div>
+						<label class="fbsseop-switch">
+							<input type="checkbox" name="fbsseop[login_security][mask_login_errors]" value="1" <?php checked( ! empty( $login['mask_login_errors'] ) ); ?>>
+							<span class="fbsseop-switch__slider"></span>
+						</label>
+					</div>
+
+					<div class="fbsseop-setting-row">
+						<div><strong><?php esc_html_e( 'Max Failed Attempts Before Lockout', 'fbs-secure-optimize' ); ?></strong></div>
+						<input type="number" min="2" max="25" name="fbsseop[login_security][max_attempts]" value="<?php echo esc_attr( (string) $login['max_attempts'] ); ?>" class="fbsseop-input-num">
+					</div>
+
+					<div class="fbsseop-setting-row">
+						<div><strong><?php esc_html_e( 'Lockout Duration (Minutes)', 'fbs-secure-optimize' ); ?></strong></div>
+						<input type="number" min="1" max="1440" name="fbsseop[login_security][lockout_duration]" value="<?php echo esc_attr( (string) $login['lockout_duration'] ); ?>" class="fbsseop-input-num">
+					</div>
+
+					<div class="fbsseop-field-block">
+						<label for="fbsseop-whitelist-ips"><strong><?php esc_html_e( 'Trusted IP Allowlist (One IP per line)', 'fbs-secure-optimize' ); ?></strong></label>
+						<textarea id="fbsseop-whitelist-ips" name="fbsseop[login_security][whitelist_ips]" rows="3" placeholder="<?php echo esc_attr( FBS_Secure_Optimize_Login_Security::get_client_ip() ); ?>"><?php echo esc_textarea( (string) $login['whitelist_ips'] ); ?></textarea>
+						<small>
+							<?php
+							printf(
+								/* translators: %s: Current visitor IP. */
+								esc_html__( 'Your current IP: %s', 'fbs-secure-optimize' ),
+								esc_html( FBS_Secure_Optimize_Login_Security::get_client_ip() )
+							);
+							?>
+						</small>
+					</div>
+
+					<div class="fbsseop-subbox">
+						<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+							<h4 style="margin:0;"><?php esc_html_e( 'Recent Failed Login Attempts', 'fbs-secure-optimize' ); ?></h4>
+							<button type="button" id="fbsseop-clear-lockouts-btn" class="fbsseop-btn fbsseop-btn--sm">
+								<?php esc_html_e( 'Clear Lockouts', 'fbs-secure-optimize' ); ?>
+							</button>
+						</div>
+						<?php if ( empty( $recent_fails ) ) : ?>
+							<p style="margin:0;color:#64748b;font-size:13px;"><?php esc_html_e( 'No recent failed login attempts recorded.', 'fbs-secure-optimize' ); ?></p>
+						<?php else : ?>
+							<table class="fbsseop-mini-table">
+								<thead>
+									<tr>
+										<th><?php esc_html_e( 'IP Address', 'fbs-secure-optimize' ); ?></th>
+										<th><?php esc_html_e( 'Username', 'fbs-secure-optimize' ); ?></th>
+										<th><?php esc_html_e( 'Time (UTC)', 'fbs-secure-optimize' ); ?></th>
+									</tr>
+								</thead>
+								<tbody>
+									<?php foreach ( $recent_fails as $fail ) : ?>
+										<tr>
+											<td><code><?php echo esc_html( $fail['ip_address'] ); ?></code></td>
+											<td><?php echo esc_html( $fail['username'] ); ?></td>
+											<td><?php echo esc_html( $fail['attempt_time'] ); ?></td>
+										</tr>
+									<?php endforeach; ?>
+								</tbody>
+							</table>
+						<?php endif; ?>
+					</div>
+				</div>
+			</div>
+
+			<div class="fbsseop-save-bar">
+				<button type="submit" class="fbsseop-btn fbsseop-btn--primary">
+					<span class="dashicons dashicons-saved"></span>
+					<?php esc_html_e( 'Save Security & Hardening Settings', 'fbs-secure-optimize' ); ?>
+				</button>
+			</div>
+		</form>
+		<?php
+	}
+
+	/**
+	 * Tab 4: 6-Layer Malware, Core Checksum & Hidden-Admin Scanner.
+	 *
+	 * @since 2.0.0
+	 * @param array<string, mixed> $settings  Plugin settings.
+	 * @param array<string, mixed> $last_scan Last scan summary.
+	 * @param bool                 $is_pro    Whether Pro add-on is active.
+	 * @return void
+	 */
+	private function render_scanner_tab( $settings, $last_scan, $is_pro ) {
+		$scanner_enabled = ! empty( $settings['modules']['malware_scanner'] );
+		?>
+		<div class="fbsseop-panel">
+			<div class="fbsseop-scanner-hero">
+				<div>
+					<h2><?php esc_html_e( '6-Layer Malware, Core Checksum & Hidden-Admin Scanner', 'fbs-secure-optimize' ); ?></h2>
+					<p>
+						<?php esc_html_e( 'Inspects unknown root PHP files, official WordPress.org MD5 checksums, zero-tolerance wp-content/uploads/ PHP shells, mu-plugins, plugin/theme backdoor signatures, wp_options injections, and hidden pre_user_query administrator accounts.', 'fbs-secure-optimize' ); ?>
+					</p>
+					<?php if ( ! empty( $last_scan['scanned_at'] ) ) : ?>
+						<p class="fbsseop-scan-meta">
+							<?php
+							printf(
+								/* translators: 1: Timestamp, 2: Scanned PHP file count, 3: Issue count. */
+								esc_html__( 'Last Scan: %1$s • %2$d PHP files inspected • %3$d issue(s) flagged', 'fbs-secure-optimize' ),
+								esc_html( (string) $last_scan['scanned_at'] ),
+								(int) $last_scan['scanned_files'],
+								(int) $last_scan['total_issues']
+							);
+							?>
+						</p>
+					<?php endif; ?>
+				</div>
+
+				<div>
+					<?php if ( ! $scanner_enabled ) : ?>
+						<span class="fbsseop-pill-warn"><?php esc_html_e( 'Enable Malware Scanner in Control Center first', 'fbs-secure-optimize' ); ?></span>
+					<?php else : ?>
+						<button type="button" id="fbsseop-run-scan-btn" class="fbsseop-btn fbsseop-btn--primary fbsseop-btn--lg">
+							<span class="dashicons dashicons-shield-alt"></span>
+							<span><?php esc_html_e( 'Run 6-Layer Deep Scan', 'fbs-secure-optimize' ); ?></span>
+						</button>
+					<?php endif; ?>
+				</div>
+			</div>
+
+			<?php if ( ! $is_pro ) : ?>
+				<div class="fbsseop-pro-callout">
+					<div>
+						<strong><?php esc_html_e( 'Want 1-Click Malware Deletion, Auto-Quarantine Uploads & Real-Time Admin Privilege Disarming?', 'fbs-secure-optimize' ); ?></strong>
+						<span><?php esc_html_e( 'Upgrade to FBS Secure Optimize Pro or request a Done-For-You Malware Eradication from FBS Fusion.', 'fbs-secure-optimize' ); ?></span>
+					</div>
+					<a href="<?php echo esc_url( admin_url( 'admin.php?page=fbs-secure-optimize&tab=firewall' ) ); ?>" class="fbsseop-btn fbsseop-btn--emerald">
+						<?php esc_html_e( 'Explore Pro Features →', 'fbs-secure-optimize' ); ?>
+					</a>
+				</div>
+			<?php endif; ?>
+
+			<div id="fbsseop-scan-results" class="fbsseop-scan-results" style="display:none;"></div>
+
+			<!-- Safe Code Preview Drawer -->
+			<div id="fbsseop-preview-modal" class="fbsseop-modal" style="display:none;">
+				<div class="fbsseop-modal__card">
+					<div class="fbsseop-modal__head">
+						<strong id="fbsseop-preview-title"><?php esc_html_e( 'File Snippet Preview', 'fbs-secure-optimize' ); ?></strong>
+						<button type="button" id="fbsseop-close-modal" class="fbsseop-btn fbsseop-btn--sm"><?php esc_html_e( 'Close ✕', 'fbs-secure-optimize' ); ?></button>
+					</div>
+					<pre id="fbsseop-preview-code" class="fbsseop-code-box"></pre>
+				</div>
+			</div>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Tab 5: Pro Firewall (WAF), Rate Limiter & Real-Time User Guard (or Upgrade Showcase).
+	 *
+	 * @since 2.0.0
+	 * @param bool $is_pro Whether Pro add-on is active.
+	 * @return void
+	 */
+	private function render_firewall_tab( $is_pro ) {
+		if ( $is_pro && has_action( 'fbsseop_render_pro_firewall_tab' ) ) {
+			/**
+			 * Renders the full FBS Secure Optimize Pro WAF, Rate Limiter, User Guard & Custom CSP interface.
+			 *
+			 * @since 2.0.0
+			 */
+			do_action( 'fbsseop_render_pro_firewall_tab' );
+			return;
+		}
+		?>
+		<div class="fbsseop-pro-showcase">
+			<div class="fbsseop-pro-showcase__head">
+				<span class="fbsseop-badge fbsseop-badge--pro"><?php esc_html_e( 'FBS SECURE OPTIMIZE PRO', 'fbs-secure-optimize' ); ?></span>
+				<h2><?php esc_html_e( 'Upgrade to Active Firewall, Bot Rate Limiting & Real-Time Admin Privilege Guard', 'fbs-secure-optimize' ); ?></h2>
+				<p><?php esc_html_e( 'Engineered by FBS Fusion from real-world WordPress & WooCommerce forensic incident response.', 'fbs-secure-optimize' ); ?></p>
+			</div>
+
+			<div class="fbsseop-modules-grid">
+				<div class="fbsseop-module-card is-enabled">
+					<h3>🛡️ <?php esc_html_e( 'Early-Boot Web Application Firewall (WAF)', 'fbs-secure-optimize' ); ?></h3>
+					<p><?php esc_html_e( 'Intercepts SQL Injection (SQLi), Cross-Site Scripting (XSS), directory traversal, malicious bots, and blocked IPs at priority 0—with safe Learning Mode.', 'fbs-secure-optimize' ); ?></p>
+				</div>
+				<div class="fbsseop-module-card is-enabled">
+					<h3>⚡ <?php esc_html_e( '429 Anti-Bot Flood Rate Limiter', 'fbs-secure-optimize' ); ?></h3>
+					<p><?php esc_html_e( 'Stops aggressive scraper bots and DDoS request floods from causing 502 Bad Gateway crashes with sliding-window 429 rate limiting.', 'fbs-secure-optimize' ); ?></p>
+				</div>
+				<div class="fbsseop-module-card is-enabled">
+					<h3>👤 <?php esc_html_e( 'Real-Time User & Capability Integrity Guard', 'fbs-secure-optimize' ); ?></h3>
+					<p><?php esc_html_e( 'Locks an Approved Admin Whitelist and instantly disarms unauthorized usermeta capability escalation while destroying rogue login sessions.', 'fbs-secure-optimize' ); ?></p>
+				</div>
+				<div class="fbsseop-module-card is-enabled">
+					<h3>🧹 <?php esc_html_e( '1-Click Malware Eradication & Auto-Quarantine', 'fbs-secure-optimize' ); ?></h3>
+					<p><?php esc_html_e( 'Delete backdoor PHP files, malicious database snippets, and rogue users directly from the 6-Layer Scanner + daily scheduled email alerts.', 'fbs-secure-optimize' ); ?></p>
+				</div>
+				<div class="fbsseop-module-card is-enabled">
+					<h3>🔒 <?php esc_html_e( 'Custom Content-Security-Policy (CSP) Builder', 'fbs-secure-optimize' ); ?></h3>
+					<p><?php esc_html_e( 'Test CSP rules safely in Report-Only mode before enforcing Grade A+ SecurityHeaders.com protection without breaking Google Fonts or Stripe.', 'fbs-secure-optimize' ); ?></p>
+				</div>
+				<div class="fbsseop-module-card is-enabled">
+					<h3>🚀 <?php esc_html_e( 'Need Hands-On Speed or Malware Rescue?', 'fbs-secure-optimize' ); ?></h3>
+					<p><?php esc_html_e( 'Hire Fazle Bari & the FBS Fusion engineering studio for guaranteed 95–100/100 Lighthouse optimization and deep server malware cleanup.', 'fbs-secure-optimize' ); ?></p>
+				</div>
+			</div>
+
+			<div class="fbsseop-pro-showcase__cta">
+				<a href="https://fbsfusion.com/plugins/" target="_blank" rel="noopener noreferrer" class="fbsseop-btn fbsseop-btn--emerald fbsseop-btn--lg">
+					<?php esc_html_e( 'Get FBS Secure Optimize Pro ↗', 'fbs-secure-optimize' ); ?>
+				</a>
+				<a href="https://fbsfusion.com/hire-us/" target="_blank" rel="noopener noreferrer" class="fbsseop-btn fbsseop-btn--primary fbsseop-btn--lg">
+					<?php esc_html_e( 'Request Free Engineering Audit at FBSFusion.com ↗', 'fbs-secure-optimize' ); ?>
+				</a>
+			</div>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Render "Our Plugins" showcase template.
+	 *
+	 * @since 1.0.2
+	 * @return void
+	 */
+	public function render_our_plugins_page() {
+		$template = FBS_SECURE_OPTIMIZE_PLUGIN_DIR . 'admin/templates/our-plugins.php';
+		if ( file_exists( $template ) ) {
+			include $template;
+		}
+	}
+
+	/**
+	 * Render "Meet The Author" profile template.
+	 *
+	 * @since 1.0.2
+	 * @return void
+	 */
+	public function render_author_page() {
+		$template = FBS_SECURE_OPTIMIZE_PLUGIN_DIR . 'admin/templates/plugin-author.php';
+		if ( file_exists( $template ) ) {
+			include $template;
+		}
+	}
 }
