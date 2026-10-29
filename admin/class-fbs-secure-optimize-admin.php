@@ -111,10 +111,30 @@ class FBS_Secure_Optimize_Admin {
 	 * @return void
 	 */
 	private function init_hooks() {
+		add_action( 'admin_init', array( $this, 'maybe_redirect_shortcut_submenus' ) );
 		add_action( 'admin_menu', array( $this, 'add_admin_menu' ) );
 		add_action( 'admin_post_fbsseop_save_settings', array( $this, 'handle_save_settings_post' ) );
 		add_action( 'wp_ajax_fbsseop_toggle_module', array( $this, 'ajax_toggle_module' ) );
 		add_action( 'wp_ajax_fbsseop_cleanup_database', array( $this, 'ajax_cleanup_database' ) );
+	}
+
+	/**
+	 * Redirect shortcut submenu slugs on admin_init before WordPress sends admin headers.
+	 *
+	 * @since 2.0.0
+	 * @return void
+	 */
+	public function maybe_redirect_shortcut_submenus() {
+		if ( headers_sent() || ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only admin menu routing check.
+		$page = isset( $_GET['page'] ) ? sanitize_key( wp_unslash( $_GET['page'] ) ) : '';
+		if ( 'fbs-secure-optimize-scanner-shortcut' === $page ) {
+			wp_safe_redirect( admin_url( 'admin.php?page=fbs-secure-optimize&tab=scanner' ) );
+			exit;
+		}
 	}
 
 	/**
@@ -149,7 +169,7 @@ class FBS_Secure_Optimize_Admin {
 			__( 'Malware Scanner', 'fbs-secure-optimize' ),
 			'manage_options',
 			'fbs-secure-optimize-scanner-shortcut',
-			array( $this, 'redirect_to_scanner_tab' )
+			array( $this, 'render_scanner_shortcut_page' )
 		);
 
 		add_submenu_page(
@@ -172,14 +192,14 @@ class FBS_Secure_Optimize_Admin {
 	}
 
 	/**
-	 * Redirect shortcut submenu item to the Malware Scanner tab.
+	 * Fallback render callback for the Malware Scanner submenu if headers were already sent.
 	 *
 	 * @since 2.0.0
 	 * @return void
 	 */
-	public function redirect_to_scanner_tab() {
-		wp_safe_redirect( admin_url( 'admin.php?page=fbs-secure-optimize&tab=scanner' ) );
-		exit;
+	public function render_scanner_shortcut_page() {
+		$this->current_tab = 'scanner';
+		$this->render_admin_page();
 	}
 
 	/**
@@ -528,7 +548,7 @@ class FBS_Secure_Optimize_Admin {
 			'wp_hardening'     => array(
 				'title'   => __( 'WP Hardening & Uploads Shield', 'fbs-secure-optimize' ),
 				'badge'   => __( 'Security', 'fbs-secure-optimize' ),
-				'icon'    => 'dashicons-Cue',
+				'icon'    => 'dashicons-admin-tools',
 				'desc'    => __( 'Disable XML-RPC, lock theme/plugin editors, block ?author=1 scans, and block PHP execution in uploads/.', 'fbs-secure-optimize' ),
 				'cfg_tab' => 'security',
 			),
@@ -608,10 +628,7 @@ class FBS_Secure_Optimize_Admin {
 						),
 						admin_url( 'admin.php' )
 					);
-					$icon_cls = ( 'dashicons-Cue' === $meta['icon'] ) ? 'dashicons-Lock' : $meta['icon'];
-					if ( 'wp_hardening' === $mkey ) {
-						$icon_cls = 'dashicons-admin-tools';
-					}
+					$icon_cls = $meta['icon'];
 					?>
 					<div class="fbsseop-module-card <?php echo $enabled ? 'is-enabled' : 'is-disabled'; ?>">
 						<div class="fbsseop-module-card__top">
@@ -803,7 +820,7 @@ class FBS_Secure_Optimize_Admin {
 
 					<div class="fbsseop-inline-action">
 						<button type="button" id="fbsseop-run-cleanup-btn" class="fbsseop-btn fbsseop-btn--emerald">
-							<span class="dashicons dashicons-Trash"></span>
+							<span class="dashicons dashicons-trash"></span>
 							<?php esc_html_e( 'Clean & Optimize Database Now', 'fbs-secure-optimize' ); ?>
 						</button>
 					</div>
