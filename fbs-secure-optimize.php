@@ -11,7 +11,7 @@
  * Text Domain:       fbs-secure-optimize
  * Domain Path:       /languages
  * Requires at least: 5.8
- * Tested up to:      6.9
+ * Tested up to:      7.1
  * Requires PHP:      7.4
  *
  * @package FBS_Secure_Optimize

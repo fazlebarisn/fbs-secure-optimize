@@ -440,11 +440,10 @@ class FBS_Secure_Optimize_Controller {
 			$table_found = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $login_table ) );
 			if ( $table_found === $login_table ) {
 				$since = gmdate( 'Y-m-d H:i:s', time() - DAY_IN_SECONDS );
-				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Safe prefixed table name, cached below.
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Cached below via wp_cache_set.
 				$stats['failed_logins'] = (int) $wpdb->get_var(
 					$wpdb->prepare(
-						// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-						"SELECT COUNT(*) FROM {$login_table} WHERE success = 0 AND attempt_time > %s",
+						"SELECT COUNT(*) FROM {$wpdb->prefix}fbsseop_login_attempts WHERE success = 0 AND attempt_time > %s",
 						$since
 					)
 				);

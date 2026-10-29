@@ -16,6 +16,5 @@ delete_option( 'fbsseop_last_scan_summary' );
 wp_clear_scheduled_hook( 'fbsseop_cleanup_database' );
 
 global $wpdb;
-$fbsseop_table = $wpdb->prefix . 'fbsseop_login_attempts';
-// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Uninstall cleanup of custom table.
-$wpdb->query( "DROP TABLE IF EXISTS {$fbsseop_table}" );
+// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange -- Uninstall cleanup of custom table.
+$wpdb->query( "DROP TABLE IF EXISTS {$wpdb->prefix}fbsseop_login_attempts" );

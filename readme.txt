@@ -2,7 +2,7 @@
 Contributors: fazlebari
 Tags: performance, security, pagespeed, malware-scanner, security-headers
 Requires at least: 5.8
-Tested up to: 6.9
+Tested up to: 7.1
 Requires PHP: 7.4
 Stable tag: 2.0.0
 License: GPLv2 or later

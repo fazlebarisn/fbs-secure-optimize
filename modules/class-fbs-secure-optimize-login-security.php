@@ -163,11 +163,10 @@ class FBS_Secure_Optimize_Login_Security {
 		);
 
 		$cutoff = gmdate( 'Y-m-d H:i:s', time() - ( 30 * DAY_IN_SECONDS ) );
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Custom table retention cleanup.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Custom table retention cleanup.
 		$wpdb->query(
 			$wpdb->prepare(
-				// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-				"DELETE FROM {$table_name} WHERE attempt_time < %s",
+				"DELETE FROM {$wpdb->prefix}fbsseop_login_attempts WHERE attempt_time < %s",
 				$cutoff
 			)
 		);
@@ -183,7 +182,6 @@ class FBS_Secure_Optimize_Login_Security {
 	public function is_ip_blocked( $ip_address ) {
 		global $wpdb;
 
-		$table_name       = $wpdb->prefix . 'fbsseop_login_attempts';
 		$max_attempts     = max( 2, (int) FBS_Secure_Optimize_Controller::get_setting( 'login_security', 'max_attempts', 5 ) );
 		$lockout_duration = max( 1, (int) FBS_Secure_Optimize_Controller::get_setting( 'login_security', 'lockout_duration', 15 ) );
 		$window_start     = gmdate( 'Y-m-d H:i:s', time() - ( $lockout_duration * MINUTE_IN_SECONDS ) );
@@ -191,8 +189,7 @@ class FBS_Secure_Optimize_Login_Security {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Real-time lockout check.
 		$failed_count = (int) $wpdb->get_var(
 			$wpdb->prepare(
-				// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-				"SELECT COUNT(*) FROM {$table_name} WHERE ip_address = %s AND success = 0 AND attempt_time > %s",
+				"SELECT COUNT(*) FROM {$wpdb->prefix}fbsseop_login_attempts WHERE ip_address = %s AND success = 0 AND attempt_time > %s",
 				$ip_address,
 				$window_start
 			)
@@ -268,8 +265,7 @@ class FBS_Secure_Optimize_Login_Security {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Admin telemetry view.
 		$rows = $wpdb->get_results(
 			$wpdb->prepare(
-				// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-				"SELECT ip_address, username, attempt_time FROM {$table_name} WHERE success = 0 ORDER BY id DESC LIMIT %d",
+				"SELECT ip_address, username, attempt_time FROM {$wpdb->prefix}fbsseop_login_attempts WHERE success = 0 ORDER BY id DESC LIMIT %d",
 				$limit
 			),
 			ARRAY_A
@@ -292,10 +288,9 @@ class FBS_Secure_Optimize_Login_Security {
 		}
 
 		global $wpdb;
-		$table_name = $wpdb->prefix . 'fbsseop_login_attempts';
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Admin clear action.
-		$wpdb->query( "DELETE FROM {$table_name} WHERE success = 0" );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Admin clear action.
+		$wpdb->query( "DELETE FROM {$wpdb->prefix}fbsseop_login_attempts WHERE success = 0" );
 		FBS_Secure_Optimize_Controller::clear_stats_cache();
 
 		wp_send_json_success(

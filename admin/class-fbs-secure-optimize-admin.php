@@ -718,7 +718,7 @@ class FBS_Secure_Optimize_Admin {
 						),
 						'disable_emojis'    => array(
 							__( 'Remove WP Emoji JS & CSS Bloat', 'fbs-secure-optimize' ),
-							__( 'Eliminates wp-emoji-release.min.js and s.w.org DNS lookup on every page.', 'fbs-secure-optimize' ),
+							__( 'Eliminates inline WordPress emoji scripts, styles, and redundant DNS prefetching on every page.', 'fbs-secure-optimize' ),
 						),
 						'disable_dashicons' => array(
 							__( 'Disable Frontend Dashicons for Guests', 'fbs-secure-optimize' ),
