@@ -8,7 +8,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-$fbsseop_author_img = FBS_SECURE_OPTIMIZE_PLUGIN_URL . 'assets/img/' . rawurlencode( 'fazle bari profile.jpg' );
+$fbsseop_author_img = FBS_SECURE_OPTIMIZE_PLUGIN_URL . 'assets/img/fazle-bari-profile.jpg';
 ?>
 <div class="wrap fbsseop-author-wrap">
 	<style>
