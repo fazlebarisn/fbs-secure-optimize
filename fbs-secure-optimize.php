@@ -1,6 +1,6 @@
 <?php
 /**
- * Plugin Name:       FBS Secure Optimize
+ * Plugin Name:       FBS Secure Optimize – Speed Optimization, Security Headers & Malware Scanner
  * Plugin URI:        https://fbsfusion.com/plugins/
  * Description:       Modular WordPress performance optimization and fortress security suite with independent module toggles: Asset & Bloat Optimizer, Database & Autoload Cleaner, HTTP Security Headers, Login Brute-Force Shield, WP Core Hardening, and 6-Layer Malware & Hidden-Admin Scanner.
  * Version:           2.0.0

@@ -1,6 +1,6 @@
-=== FBS Secure Optimize ===
+=== FBS Secure Optimize – Speed Optimization, Security Headers & Malware Scanner ===
 Contributors: fazlebari
-Tags: performance, security, pagespeed, malware-scanner, security-headers
+Tags: performance, security, malware-scanner, security-headers, database-cleanup
 Requires at least: 5.8
 Tested up to: 7.1
 Requires PHP: 7.4
