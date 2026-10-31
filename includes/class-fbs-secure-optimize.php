@@ -186,18 +186,21 @@ class FBS_Secure_Optimize_Controller {
 			return;
 		}
 
+		$css_ver = FBS_SECURE_OPTIMIZE_VERSION . '.' . (int) filemtime( FBS_SECURE_OPTIMIZE_PLUGIN_DIR . 'assets/css/admin.css' );
+		$js_ver  = FBS_SECURE_OPTIMIZE_VERSION . '.' . (int) filemtime( FBS_SECURE_OPTIMIZE_PLUGIN_DIR . 'assets/js/admin.js' );
+
 		wp_enqueue_style(
 			'fbsseop-admin',
 			FBS_SECURE_OPTIMIZE_PLUGIN_URL . 'assets/css/admin.css',
 			array(),
-			FBS_SECURE_OPTIMIZE_VERSION
+			$css_ver
 		);
 
 		wp_enqueue_script(
 			'fbsseop-admin',
 			FBS_SECURE_OPTIMIZE_PLUGIN_URL . 'assets/js/admin.js',
 			array( 'jquery' ),
-			FBS_SECURE_OPTIMIZE_VERSION,
+			$js_ver,
 			true
 		);
 

@@ -25,7 +25,49 @@
 		return $('<div>').text(str == null ? '' : String(str)).html();
 	}
 
-	// 1. Instant Independent Module Toggle via AJAX
+	function syncModuleVisibility(modulesMap) {
+		var showPerf = !!(modulesMap.asset_optimizer || modulesMap.database_cleanup);
+		var showSec = !!(modulesMap.security_headers || modulesMap.login_security || modulesMap.wp_hardening);
+		var showScan = !!modulesMap.malware_scanner;
+
+		var $perfTab = $('.fbsseop-tab[data-tab="performance"]');
+		var $secTab = $('.fbsseop-tab[data-tab="security"]');
+		var $scanTab = $('.fbsseop-tab[data-tab="scanner"]');
+		var $heroScanBtn = $('#fbsseop-hero-scan-btn');
+		var $wpSubmenuScan = $('#toplevel_page_fbs-secure-optimize .wp-submenu a[href*="scanner"]').closest('li');
+
+		if (showPerf) {
+			$perfTab.fadeIn(150);
+		} else {
+			$perfTab.fadeOut(150);
+		}
+
+		if (showSec) {
+			$secTab.fadeIn(150);
+		} else {
+			$secTab.fadeOut(150);
+		}
+
+		if (showScan) {
+			$scanTab.fadeIn(150);
+			$heroScanBtn.fadeIn(150);
+			$wpSubmenuScan.show();
+		} else {
+			$scanTab.fadeOut(150);
+			$heroScanBtn.fadeOut(150);
+			$wpSubmenuScan.hide();
+		}
+	}
+
+	function collectCurrentModuleStates() {
+		var states = {};
+		$('.fbsseop-ajax-module-toggle').each(function () {
+			states[$(this).data('module')] = $(this).is(':checked') ? 1 : 0;
+		});
+		return states;
+	}
+
+	// 1. Instant Independent Module Toggle via AJAX + Live Auto-Hide
 	$(document).on('change', '.fbsseop-ajax-module-toggle', function () {
 		var $checkbox = $(this);
 		var moduleKey = $checkbox.data('module');
@@ -34,6 +76,14 @@
 
 		$card.toggleClass('is-enabled', !!isEnabled).toggleClass('is-disabled', !isEnabled);
 		$card.find('.fbsseop-status-text').text(isEnabled ? '● Active' : '○ Disabled');
+
+		if (isEnabled) {
+			$card.find('.fbsseop-configure-link').fadeIn(140);
+		} else {
+			$card.find('.fbsseop-configure-link').fadeOut(140);
+		}
+
+		syncModuleVisibility(collectCurrentModuleStates());
 
 		$.post(fbsseopAdmin.ajaxUrl, {
 			action: 'fbsseop_toggle_module',
@@ -46,11 +96,39 @@
 					'<span class="fbsseop-dot"></span> ' +
 					escHtml(res.data.active_count + ' / ' + res.data.total_count + ' Modules Active')
 				);
+				if (res.data.modules) {
+					syncModuleVisibility(res.data.modules);
+				}
 				showToast(res.data.message, false);
 			} else {
 				showToast((res && res.data && res.data.message) || fbsseopAdmin.strings.genericError, true);
 			}
 		});
+	});
+
+	// 1b. Live Auto-Hide for Pro Independent Module Toggles
+	$(document).on('change', '.fbsseop-pro-module-toggle', function () {
+		var $checkbox = $(this);
+		var proKey = $checkbox.data('pro-module');
+		var isEnabled = $checkbox.is(':checked');
+		var $card = $checkbox.closest('.fbsseop-module-card');
+
+		$card.toggleClass('is-enabled', isEnabled).toggleClass('is-disabled', !isEnabled);
+
+		var $sections = $('.fbsseop-pro-section[data-pro-section="' + proKey + '"]');
+		if (isEnabled) {
+			$sections.stop(true, true).slideDown(160);
+		} else {
+			$sections.stop(true, true).slideUp(160);
+		}
+
+		var wafOn = $('.fbsseop-pro-module-toggle[data-pro-module="pro_waf"]').is(':checked');
+		var rateOn = $('.fbsseop-pro-module-toggle[data-pro-module="pro_ratelimit"]').is(':checked');
+		if (wafOn || rateOn) {
+			$('#fbsseop-pro-left-panel').stop(true, true).fadeIn(160);
+		} else {
+			$('#fbsseop-pro-left-panel').stop(true, true).fadeOut(160);
+		}
 	});
 
 	// 2. Manual 1-Click Database Cleanup

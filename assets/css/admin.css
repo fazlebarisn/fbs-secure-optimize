@@ -500,6 +500,10 @@
 	align-items: start;
 }
 
+.fbsseop-two-col > .fbsseop-panel:only-child {
+	grid-column: 1 / -1;
+}
+
 .fbsseop-panel {
 	background: #ffffff;
 	border: 1px solid #e2e8f0;
