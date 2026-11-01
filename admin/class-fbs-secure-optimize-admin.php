@@ -138,6 +138,7 @@ class FBS_Secure_Optimize_Admin {
 		add_action( 'admin_post_fbsseop_save_settings', array( $this, 'handle_save_settings_post' ) );
 		add_action( 'wp_ajax_fbsseop_toggle_module', array( $this, 'ajax_toggle_module' ) );
 		add_action( 'wp_ajax_fbsseop_cleanup_database', array( $this, 'ajax_cleanup_database' ) );
+		add_action( 'wp_ajax_fbsseop_purge_cache', array( $this, 'ajax_purge_cache' ) );
 	}
 
 	/**
@@ -255,6 +256,10 @@ class FBS_Secure_Optimize_Admin {
 		} elseif ( 'performance' === $section_tab ) {
 			if ( ! empty( $current['modules']['asset_optimizer'] ) ) {
 				$asset_bools = array(
+					'non_blocking_google_fonts',
+					'inline_small_css',
+					'cls_image_dimensions',
+					'delay_third_party_js',
 					'minify_css',
 					'minify_js',
 					'defer_js',
@@ -329,6 +334,7 @@ class FBS_Secure_Optimize_Admin {
 		}
 
 		update_option( 'fbsseop_settings', $current );
+		FBS_Secure_Optimize_Controller::purge_all_caches();
 
 		$redirect_tab = ( isset( $this->tabs[ $section_tab ] ) && $this->is_tab_visible( $section_tab, $current['modules'] ) )
 			? $section_tab
@@ -370,6 +376,7 @@ class FBS_Secure_Optimize_Admin {
 
 		$current['modules'][ $module ] = $enabled;
 		update_option( 'fbsseop_settings', $current );
+		FBS_Secure_Optimize_Controller::purge_all_caches();
 
 		$active_count = array_sum( array_map( 'intval', $current['modules'] ) );
 
@@ -415,6 +422,33 @@ class FBS_Secure_Optimize_Admin {
 					(int) $results['transients'],
 					(int) $results['orphaned_meta'],
 					(int) $results['optimized_tables']
+				),
+			)
+		);
+	}
+
+	/**
+	 * AJAX handler: 1-Click Purge All Caches (FBS Asset/CLS, WP Object Cache, OPcache & Host/Plugin Caches).
+	 *
+	 * @since 2.1.0
+	 * @return void
+	 */
+	public function ajax_purge_cache() {
+		check_ajax_referer( 'fbsseop_admin_nonce', 'nonce' );
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( array( 'message' => __( 'Permission denied.', 'fbs-secure-optimize' ) ) );
+		}
+
+		$cleared = FBS_Secure_Optimize_Controller::purge_all_caches();
+
+		wp_send_json_success(
+			array(
+				'cleared' => $cleared,
+				'message' => sprintf(
+					/* translators: %s: Comma-separated list of cache layers purged. */
+					__( 'All caches purged! Cleared: %s.', 'fbs-secure-optimize' ),
+					implode( ', ', $cleared )
 				),
 			)
 		);
@@ -470,6 +504,10 @@ class FBS_Secure_Optimize_Admin {
 						);
 						?>
 					</span>
+					<button type="button" id="fbsseop-purge-cache-btn" class="fbsseop-btn fbsseop-btn--glass">
+						<span class="dashicons dashicons-update"></span>
+						<span><?php esc_html_e( 'Purge Cache', 'fbs-secure-optimize' ); ?></span>
+					</button>
 					<a href="<?php echo esc_url( admin_url( 'admin.php?page=fbs-secure-optimize&tab=scanner' ) ); ?>" id="fbsseop-hero-scan-btn" class="fbsseop-btn fbsseop-btn--glass"<?php echo empty( $settings['modules']['malware_scanner'] ) ? ' style="display:none;"' : ''; ?>>
 						<span class="dashicons dashicons-search"></span>
 						<?php esc_html_e( 'Run 6-Layer Scan', 'fbs-secure-optimize' ); ?>
@@ -489,7 +527,17 @@ class FBS_Secure_Optimize_Admin {
 				?>
 				<div class="fbsseop-toast fbsseop-toast--success">
 					<span class="dashicons dashicons-yes-alt"></span>
-					<span><?php esc_html_e( 'Settings saved and synchronized successfully.', 'fbs-secure-optimize' ); ?></span>
+					<span><?php esc_html_e( 'Settings saved and caches synchronized successfully.', 'fbs-secure-optimize' ); ?></span>
+				</div>
+			<?php endif; ?>
+
+			<?php
+			// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Display-only purged toast flag.
+			if ( isset( $_GET['fbsseop_purged'] ) && '1' === $_GET['fbsseop_purged'] ) :
+				?>
+				<div class="fbsseop-toast fbsseop-toast--success">
+					<span class="dashicons dashicons-yes-alt"></span>
+					<span><?php esc_html_e( 'All optimization, CSS/CLS, object, OPcache, and compatible page caches purged successfully.', 'fbs-secure-optimize' ); ?></span>
 				</div>
 			<?php endif; ?>
 
@@ -561,10 +609,10 @@ class FBS_Secure_Optimize_Admin {
 
 		$module_cards = array(
 			'asset_optimizer'  => array(
-				'title'   => __( 'Asset & Bloat Optimizer', 'fbs-secure-optimize' ),
+				'title'   => __( 'Asset & Core Web Vitals Optimizer', 'fbs-secure-optimize' ),
 				'badge'   => __( 'Speed', 'fbs-secure-optimize' ),
 				'icon'    => 'dashicons-performance',
-				'desc'    => __( 'LCP-safe native lazy loading, JS deferring, Emoji/Dashicons removal, and Heartbeat API throttling.', 'fbs-secure-optimize' ),
+				'desc'    => __( 'Non-blocking Google Fonts, small-CSS auto-inlining, zero-CLS image dimensions, LCP priority, and 3rd-party JS delay.', 'fbs-secure-optimize' ),
 				'cfg_tab' => 'performance',
 			),
 			'database_cleanup' => array(
@@ -749,11 +797,27 @@ class FBS_Secure_Optimize_Admin {
 
 					<?php
 					$asset_fields = array(
-						'lazy_load_images'  => array(
+						'non_blocking_google_fonts' => array(
+							__( 'Non-Blocking Google Fonts & Preconnect', 'fbs-secure-optimize' ),
+							__( 'Eliminates render-blocking Google Fonts CSS via media="print" swap, enforces display=swap, and adds preconnect hints.', 'fbs-secure-optimize' ),
+						),
+						'inline_small_css'          => array(
+							__( 'Auto-Inline Small Local CSS (≤ 8 KB)', 'fbs-secure-optimize' ),
+							__( 'Inlines tiny render-blocking theme/plugin stylesheets into <head> while safely rewriting relative url() paths.', 'fbs-secure-optimize' ),
+						),
+						'cls_image_dimensions'      => array(
+							__( 'Zero-CLS Missing Image Width & Height', 'fbs-secure-optimize' ),
+							__( 'Automatically detects and injects missing width & height attributes on local images to prevent layout shifts (CLS).', 'fbs-secure-optimize' ),
+						),
+						'lazy_load_images'          => array(
 							__( 'LCP-Safe Native Image Lazy Loading', 'fbs-secure-optimize' ),
 							__( 'Adds native loading="lazy" & decoding="async" while automatically giving fetchpriority="high" to your first hero image.', 'fbs-secure-optimize' ),
 						),
-						'lazy_load_iframes' => array(
+						'delay_third_party_js'      => array(
+							__( 'Delay Third-Party Analytics & Pixels (TBT/INP)', 'fbs-secure-optimize' ),
+							__( 'Delays GTM, GA4, Meta Pixel, Clarity & Hotjar until first user interaction or 3.5s (auto-bypassed on cart/checkout).', 'fbs-secure-optimize' ),
+						),
+						'lazy_load_iframes'         => array(
 							__( 'Native Iframe & Video Lazy Loading', 'fbs-secure-optimize' ),
 							__( 'Defers offscreen YouTube, Google Maps, and embedded iframes until scrolled near.', 'fbs-secure-optimize' ),
 						),

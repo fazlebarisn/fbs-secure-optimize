@@ -1,5 +1,5 @@
 /**
- * Admin Interactive Controller for FBS Secure Optimize v2.0.0
+ * Admin Interactive Controller for FBS Secure Optimize v2.1.0
  */
 (function ($) {
 	'use strict';
@@ -129,6 +129,28 @@
 		} else {
 			$('#fbsseop-pro-left-panel').stop(true, true).fadeOut(160);
 		}
+	});
+
+	// 1c. 1-Click Universal Cache Purge (Hero Header Button)
+	$('#fbsseop-purge-cache-btn').on('click', function () {
+		var $btn = $(this);
+		var origHtml = $btn.html();
+		$btn.prop('disabled', true).find('span:last').text(fbsseopAdmin.strings.purging || 'Purging cache...');
+
+		$.post(fbsseopAdmin.ajaxUrl, {
+			action: 'fbsseop_purge_cache',
+			nonce: fbsseopAdmin.nonce
+		}).done(function (res) {
+			if (res && res.success) {
+				showToast(res.data.message, false);
+			} else {
+				showToast((res && res.data && res.data.message) || fbsseopAdmin.strings.genericError, true);
+			}
+		}).fail(function () {
+			showToast(fbsseopAdmin.strings.genericError, true);
+		}).always(function () {
+			$btn.prop('disabled', false).html(origHtml);
+		});
 	});
 
 	// 2. Manual 1-Click Database Cleanup

@@ -4,7 +4,7 @@ Tags: performance, security, malware-scanner, security-headers, database-cleanup
 Requires at least: 5.8
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 2.0.0
+Stable tag: 2.1.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -21,9 +21,14 @@ Most sites don't need bloated, all-or-nothing plugins that slow down `wp-admin` 
 
 = 6 Independent Modules Included Free =
 
-**1. Asset & Core Web Vitals Optimizer**
-Boost Lighthouse Performance and Largest Contentful Paint (LCP) without jQuery bloat or fragile script bundling:
-* **LCP-Safe Native Lazy Loading:** Adds native `loading="lazy"` and `decoding="async"` to offscreen images while automatically prioritizing your first above-the-fold hero image with `fetchpriority="high"`.
+**1. Asset & Core Web Vitals Optimizer (with 1-Click Universal Cache Purge)**
+Boost Lighthouse Performance, Largest Contentful Paint (LCP), Cumulative Layout Shift (CLS), and Total Blocking Time (TBT) without jQuery bloat or fragile script bundling:
+* **Non-Blocking Google Fonts & Preconnect:** Converts render-blocking Google Fonts stylesheets to asynchronous `media="print"` swap with `<noscript>` fallback, enforces `display=swap`, and injects `preconnect` hints for `fonts.googleapis.com` and `fonts.gstatic.com`.
+* **Auto-Inline Small Local CSS (`<= 8 KB`):** Automatically inlines tiny render-blocking theme and plugin CSS files into `<head>` while safely rewriting relative `url(...)` paths and caching minified output.
+* **Zero-CLS Missing Image `width` & `height` Injection:** Automatically detects local `<img>` tags missing explicit dimensions and injects cached `width` and `height` attributes to prevent layout shifts.
+* **LCP-Safe Native Lazy Loading:** Adds native `loading="lazy"` and `decoding="async"` to offscreen images while stripping lazy-loading and applying `fetchpriority="high"` on your first above-the-fold hero image.
+* **Delay Third-Party Analytics & Pixels (TBT/INP):** Optional 1-click toggle to delay heavy third-party trackers (GTM, GA4, Meta Pixel, Microsoft Clarity, Hotjar, LinkedIn, TikTok) until first user interaction or a 3.5s fallback—automatically bypassed on WooCommerce cart, checkout, and account pages.
+* **Top Admin Bar & Dashboard 1-Click "Purge Cache":** Instantly clears FBS inlined CSS & CLS dimension caches, WordPress Object Cache (Redis/Memcached), PHP OPcache, and triggers compatible cache flushes across LiteSpeed Cache, WP Rocket, W3 Total Cache, WP Fastest Cache, WP Super Cache, Autoptimize, SiteGround, Breeze, and WP Engine.
 * **Iframe & Video Lazy Loading:** Defers embedded maps and video players until visitors scroll near them.
 * **Safe Non-Critical JS Deferring:** Adds `defer` to frontend scripts while automatically excluding `jQuery` core and sensitive checkout/account flows.
 * **Core Bloat Removal:** Strip inline emoji scripts/styles, disable frontend Dashicons for logged-out visitors, dequeue unused oEmbed scripts, and clean `<head>` RSD, WLW, and shortlink tags.
@@ -119,6 +124,10 @@ Sophisticated malware often creates a backdoor administrator account and hooks `
 
 Never automatically. In the Free edition, the 6-Layer Scanner performs a 100% safe, read-only forensic audit and lets you inspect suspicious code inside the **Safe File Snippet Preview** modal so core or custom files are never accidentally deleted. One-click deletion and auto-disarming are optional tools available in Pro.
 
+= How does the 1-Click "Purge Cache" button work? =
+
+Whenever you edit theme CSS, upload new images, or change optimization toggles, click **Purge Cache** in the WordPress Top Admin Bar (frontend or backend) or inside the FBS Secure Optimize header. It immediately invalidates cached inline CSS and image CLS dimension maps, flushes WordPress Object Cache (Redis/Memcached) and PHP OPcache, and triggers cache-clear hooks for LiteSpeed Cache, WP Rocket, Autoptimize, W3 Total Cache, WP Super Cache, WP Fastest Cache, SiteGround, Breeze, and WP Engine. Caches also auto-purge when you switch themes, save Customizer changes, or update plugins/themes.
+
 = What happens if I uninstall FBS Secure Optimize? =
 
 Uninstalling the plugin through the **Plugins** screen cleanly removes its saved options, clears scheduled cleanup cron hooks, and drops its custom `fbsseop_login_attempts` database table—leaving zero orphaned clutter behind.
@@ -133,6 +142,13 @@ Uninstalling the plugin through the **Plugins** screen cleanly removes its saved
 6. **Meet The Author & Engineering Studio** — Engineered by Fazle Bari & FBS Fusion following strict WordPress Coding Standards (WPCS).
 
 == Changelog ==
+
+= 2.1.0 =
+* New: Non-Blocking Google Fonts & Preconnect optimizer (eliminates render-blocking Google Fonts CSS, enforces `display=swap`, and adds automatic `preconnect` resource hints).
+* New: Auto-Inline Small Local CSS (`<= 8 KB`) with automatic relative `url(...)` path rewriting and salt-versioned transient caching.
+* New: Zero-CLS Missing Image `width` & `height` auto-injection for local content, thumbnail, and widget images, plus stronger LCP hero image protection (strips theme-injected `loading="lazy"` on image #1).
+* New: Delay Third-Party Analytics & Tracking Pixels (`gtag.js`, `gtm.js`, Meta Pixel, Clarity, Hotjar, LinkedIn, TikTok) until first user interaction or 3.5s fallback, automatically bypassing WooCommerce cart/checkout/account pages.
+* New: 1-Click **Purge Cache** button in both the WordPress Top Admin Bar (frontend & `wp-admin`) and plugin Hero Header—flushes FBS Asset/CLS caches, WP Object Cache, PHP OPcache, and compatible host/page caches, plus automatic invalidation on theme/plugin updates.
 
 = 2.0.0 =
 * Major Release: Re-architected around 6 Independent Zero-Overhead Module Toggles with live Auto-Hide admin UX.
@@ -153,6 +169,9 @@ Uninstalling the plugin through the **Plugins** screen cleanly removes its saved
 * Initial release on WordPress.org.
 
 == Upgrade Notice ==
+
+= 2.1.0 =
+Adds 4 universal Core Web Vitals boosters (Non-Blocking Google Fonts, Small-CSS Auto-Inlining, Zero-CLS Image Width/Height Injection, and Third-Party JS Interaction Delay) plus 1-Click Top Admin Bar & Universal Cache Purge.
 
 = 2.0.0 =
 Major v2.0 upgrade! Adds 6 Independent Zero-Overhead Module Toggles with Auto-Hide UI, 6-Layer Malware & Hidden-Admin Scanner, 1-Click Uploads PHP Shield, Autoload Bloat Inspector, and LCP-safe lazy loading.

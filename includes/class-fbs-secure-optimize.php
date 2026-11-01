@@ -100,6 +100,138 @@ class FBS_Secure_Optimize_Controller {
 		add_action( 'init', array( $this, 'init_admin' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_scripts' ) );
 		add_filter( 'plugin_action_links_' . FBS_SECURE_OPTIMIZE_PLUGIN_BASENAME, array( $this, 'add_plugin_action_links' ) );
+
+		// Universal Top Admin Bar 1-Click Cache Purge & Auto-Invalidation Hooks.
+		add_action( 'admin_bar_menu', array( $this, 'register_admin_bar_menu' ), 99 );
+		add_action( 'admin_post_fbsseop_purge_cache', array( $this, 'handle_admin_bar_purge_cache' ) );
+		add_action( 'admin_notices', array( $this, 'maybe_render_purge_admin_notice' ) );
+		add_action( 'switch_theme', array( __CLASS__, 'purge_all_caches' ) );
+		add_action( 'customize_save_after', array( __CLASS__, 'purge_all_caches' ) );
+		add_action( 'upgrader_process_complete', array( __CLASS__, 'purge_all_caches' ) );
+	}
+
+	/**
+	 * Add 1-Click "Purge Cache" menu node to the WordPress Top Admin Bar (frontend & backend).
+	 *
+	 * @since 2.1.0
+	 * @param WP_Admin_Bar $wp_admin_bar WordPress Admin Bar instance.
+	 * @return void
+	 */
+	public function register_admin_bar_menu( $wp_admin_bar ) {
+		if ( ! is_admin_bar_showing() || ! current_user_can( 'manage_options' ) || ! ( $wp_admin_bar instanceof WP_Admin_Bar ) ) {
+			return;
+		}
+
+		$purge_url = wp_nonce_url(
+			admin_url( 'admin-post.php?action=fbsseop_purge_cache' ),
+			'fbsseop_purge_cache_action'
+		);
+
+		$wp_admin_bar->add_node(
+			array(
+				'id'    => 'fbsseop-toolbar',
+				'title' => '<span class="ab-icon dashicons dashicons-performance" style="margin-top:2px;"></span><span class="ab-label">' . esc_html__( 'Purge Cache', 'fbs-secure-optimize' ) . '</span>',
+				'href'  => $purge_url,
+				'meta'  => array(
+					'title' => esc_attr__( 'Purge FBS Secure Optimize, Object, OPcache & Host Caches', 'fbs-secure-optimize' ),
+				),
+			)
+		);
+
+		$wp_admin_bar->add_node(
+			array(
+				'id'     => 'fbsseop-toolbar-purge-all',
+				'parent' => 'fbsseop-toolbar',
+				'title'  => esc_html__( '⚡ Purge All Caches Now', 'fbs-secure-optimize' ),
+				'href'   => $purge_url,
+			)
+		);
+
+		$wp_admin_bar->add_node(
+			array(
+				'id'     => 'fbsseop-toolbar-speed',
+				'parent' => 'fbsseop-toolbar',
+				'title'  => esc_html__( 'Speed & Core Web Vitals', 'fbs-secure-optimize' ),
+				'href'   => admin_url( 'admin.php?page=fbs-secure-optimize&tab=performance' ),
+			)
+		);
+
+		$wp_admin_bar->add_node(
+			array(
+				'id'     => 'fbsseop-toolbar-control',
+				'parent' => 'fbsseop-toolbar',
+				'title'  => esc_html__( 'Module Control Center', 'fbs-secure-optimize' ),
+				'href'   => admin_url( 'admin.php?page=fbs-secure-optimize' ),
+			)
+		);
+
+		if ( self::is_module_enabled( 'malware_scanner' ) ) {
+			$wp_admin_bar->add_node(
+				array(
+					'id'     => 'fbsseop-toolbar-scanner',
+					'parent' => 'fbsseop-toolbar',
+					'title'  => esc_html__( '6-Layer Malware Scanner', 'fbs-secure-optimize' ),
+					'href'   => admin_url( 'admin.php?page=fbs-secure-optimize&tab=scanner' ),
+				)
+			);
+		}
+	}
+
+	/**
+	 * Handle Top Admin Bar 1-Click Cache Purge request and redirect back safely.
+	 *
+	 * @since 2.1.0
+	 * @return void
+	 */
+	public function handle_admin_bar_purge_cache() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Permission denied.', 'fbs-secure-optimize' ) );
+		}
+
+		check_admin_referer( 'fbsseop_purge_cache_action' );
+
+		self::purge_all_caches();
+
+		$referer = wp_get_referer();
+		if ( ! $referer ) {
+			$referer = admin_url( 'admin.php?page=fbs-secure-optimize' );
+		}
+
+		$referer = remove_query_arg( array( 'fbsseop_purged', '_wpnonce' ), $referer );
+		$target  = add_query_arg( 'fbsseop_purged', '1', $referer );
+
+		wp_safe_redirect( $target );
+		exit;
+	}
+
+	/**
+	 * Display confirmation admin notice on standard wp-admin screens after a Top Bar cache purge.
+	 *
+	 * @since 2.1.0
+	 * @return void
+	 */
+	public function maybe_render_purge_admin_notice() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Display-only notice flag after verified admin-post redirect.
+		if ( ! isset( $_GET['fbsseop_purged'] ) || '1' !== $_GET['fbsseop_purged'] ) {
+			return;
+		}
+
+		// FBS Secure Optimize screens render their own native SaaS toast banner.
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$page = isset( $_GET['page'] ) ? sanitize_key( wp_unslash( $_GET['page'] ) ) : '';
+		if ( 0 === strpos( $page, 'fbs-secure-optimize' ) ) {
+			return;
+		}
+
+		printf(
+			'<div class="notice notice-success is-dismissible"><p><strong>%s</strong> %s</p></div>',
+			esc_html__( 'FBS Secure Optimize:', 'fbs-secure-optimize' ),
+			esc_html__( 'All optimization, CSS/CLS, object, OPcache, and compatible page caches have been purged.', 'fbs-secure-optimize' )
+		);
 	}
 
 	/**
@@ -215,6 +347,7 @@ class FBS_Secure_Optimize_Controller {
 				'strings' => array(
 					'confirmCleanup' => __( 'Run database cleanup now? Selected revisions, drafts, spam, and expired transients will be permanently removed.', 'fbs-secure-optimize' ),
 					'cleaning'       => __( 'Running cleanup...', 'fbs-secure-optimize' ),
+					'purging'        => __( 'Purging cache...', 'fbs-secure-optimize' ),
 					'scanning'       => __( 'Running 6-Layer Deep Scan...', 'fbs-secure-optimize' ),
 					'scanBtnLabel'   => __( 'Run 6-Layer Deep Scan', 'fbs-secure-optimize' ),
 					'confirmDelete'  => __( 'Permanently delete this threat? Make sure you have verified the preview first.', 'fbs-secure-optimize' ),
@@ -341,16 +474,20 @@ class FBS_Secure_Optimize_Controller {
 				'malware_scanner'  => 1,
 			),
 			'asset_optimization' => array(
-				'minify_css'        => 0,
-				'minify_js'         => 0,
-				'defer_js'          => 0,
-				'lazy_load_images'  => 1,
-				'lazy_load_iframes' => 1,
-				'disable_emojis'    => 1,
-				'disable_dashicons' => 1,
-				'disable_embeds'    => 0,
-				'clean_wp_head'     => 1,
-				'heartbeat_control' => 1,
+				'non_blocking_google_fonts' => 1,
+				'inline_small_css'          => 1,
+				'cls_image_dimensions'      => 1,
+				'delay_third_party_js'      => 0,
+				'minify_css'                => 0,
+				'minify_js'                 => 0,
+				'defer_js'                  => 0,
+				'lazy_load_images'          => 1,
+				'lazy_load_iframes'         => 1,
+				'disable_emojis'            => 1,
+				'disable_dashicons'         => 1,
+				'disable_embeds'            => 0,
+				'clean_wp_head'             => 1,
+				'heartbeat_control'         => 1,
 			),
 			'database_cleanup'   => array(
 				'cleanup_revisions'     => 1,
@@ -468,6 +605,113 @@ class FBS_Secure_Optimize_Controller {
 	 */
 	public static function clear_stats_cache() {
 		wp_cache_delete( 'fbsseop_stats_v2', 'fbsseop' );
+	}
+
+	/**
+	 * Retrieve active cache version salt used for O(1) instant cache invalidation.
+	 *
+	 * @since 2.1.0
+	 * @return string
+	 */
+	public static function get_cache_salt() {
+		$salt = get_option( 'fbsseop_cache_salt', '' );
+		if ( empty( $salt ) ) {
+			$salt = 'v1';
+			update_option( 'fbsseop_cache_salt', $salt, true );
+		}
+		return (string) $salt;
+	}
+
+	/**
+	 * Purge all FBS Secure Optimize asset/CLS caches, WP Object Cache, PHP OPcache,
+	 * and trigger compatible host/third-party page cache flushes.
+	 *
+	 * @since 2.1.0
+	 * @return array<int, string> List of cache layers cleared.
+	 */
+	public static function purge_all_caches() {
+		$cleared = array();
+
+		// 1. Rotate FBS cache salt (instantly invalidates inlined CSS & image dimension transients).
+		$old_salt = get_option( 'fbsseop_cache_salt', 'v1' );
+		delete_transient( 'fbsseop_img_dims_' . $old_salt );
+		$new_salt = 'v' . time() . '_' . wp_rand( 100, 999 );
+		update_option( 'fbsseop_cache_salt', $new_salt, true );
+		self::clear_stats_cache();
+		$cleared[] = __( 'FBS Asset & CLS Cache', 'fbs-secure-optimize' );
+
+		// 2. WordPress Object Cache (Redis / Memcached / runtime).
+		if ( function_exists( 'wp_cache_flush' ) ) {
+			wp_cache_flush();
+			$cleared[] = __( 'WP Object Cache', 'fbs-secure-optimize' );
+		}
+
+		// 3. PHP OPcache (when allowed by server configuration).
+		if ( function_exists( 'opcache_reset' ) ) {
+			$restrict_api = (string) ini_get( 'opcache.restrict_api' );
+			if ( '' === $restrict_api || 0 === strpos( __FILE__, $restrict_api ) ) {
+				opcache_reset();
+				$cleared[] = __( 'PHP OPcache', 'fbs-secure-optimize' );
+			}
+		}
+
+		// 4. Compatible third-party & managed host page cache hooks (zero-conflict bridge).
+		if ( has_action( 'litespeed_purge_all' ) ) {
+			// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- Official LiteSpeed Cache API hook.
+			do_action( 'litespeed_purge_all' );
+			$cleared[] = 'LiteSpeed Cache';
+		}
+
+		if ( function_exists( 'rocket_clean_domain' ) ) {
+			rocket_clean_domain();
+			$cleared[] = 'WP Rocket';
+		}
+
+		if ( function_exists( 'w3tc_flush_all' ) ) {
+			w3tc_flush_all();
+			$cleared[] = 'W3 Total Cache';
+		}
+
+		if ( function_exists( 'wpfc_clear_all_cache' ) ) {
+			wpfc_clear_all_cache( true );
+			$cleared[] = 'WP Fastest Cache';
+		}
+
+		if ( function_exists( 'wp_cache_clear_cache' ) ) {
+			wp_cache_clear_cache();
+			$cleared[] = 'WP Super Cache';
+		}
+
+		if ( class_exists( 'autoptimizeCache' ) && method_exists( 'autoptimizeCache', 'clearall' ) ) {
+			autoptimizeCache::clearall();
+			$cleared[] = 'Autoptimize';
+		}
+
+		if ( function_exists( 'sg_cachepress_purge_cache' ) ) {
+			sg_cachepress_purge_cache();
+			$cleared[] = 'SiteGround Optimizer';
+		}
+
+		if ( has_action( 'breeze_clear_all_cache' ) ) {
+			// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- Official Cloudways Breeze API hook.
+			do_action( 'breeze_clear_all_cache' );
+			$cleared[] = 'Breeze Cache';
+		}
+
+		if ( class_exists( 'WpeCommon' ) && method_exists( 'WpeCommon', 'purge_varnish_cache' ) ) {
+			WpeCommon::purge_varnish_cache();
+			$cleared[] = 'WP Engine Cache';
+		}
+
+		/**
+		 * Fires after FBS Secure Optimize purges all optimization and ecosystem caches.
+		 *
+		 * @since 2.1.0
+		 * @param array<int, string> $cleared Names of cleared cache layers.
+		 */
+		do_action( 'fbsseop_cache_purged', $cleared );
+
+		return $cleared;
 	}
 
 	/**
