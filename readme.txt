@@ -4,7 +4,7 @@ Tags: performance, security, malware-scanner, security-headers, database-cleanup
 Requires at least: 5.8
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 2.1.0
+Stable tag: 2.1.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -143,6 +143,10 @@ Uninstalling the plugin through the **Plugins** screen cleanly removes its saved
 
 == Changelog ==
 
+= 2.1.1 =
+* Fix: Eliminated false-positive `OS Command Execution (shell_exec/system)` alerts in the 6-Layer Malware Scanner on legitimate Composer vendor libraries (such as `Monolog\Handler\ProcessHandler` used by FluentSMTP / Google API Client, `Symfony\Component\Process`, and `Composer\Util\ProcessExecutor`) while preserving full detection if those files are tampered with or contain superglobal input (`$_GET`, `$_POST`, `$_REQUEST`, `$_COOKIE`).
+* Dev: Added the `fbsseop_scanner_is_safe_match` filter for custom scanner false-positive exclusions.
+
 = 2.1.0 =
 * New: Non-Blocking Google Fonts & Preconnect optimizer (eliminates render-blocking Google Fonts CSS, enforces `display=swap`, and adds automatic `preconnect` resource hints).
 * New: Auto-Inline Small Local CSS (`<= 8 KB`) with automatic relative `url(...)` path rewriting and salt-versioned transient caching.
@@ -169,6 +173,9 @@ Uninstalling the plugin through the **Plugins** screen cleanly removes its saved
 * Initial release on WordPress.org.
 
 == Upgrade Notice ==
+
+= 2.1.1 =
+Eliminates false-positive malware scanner warnings on legitimate Composer vendor libraries (e.g. Monolog ProcessHandler in FluentSMTP) without reducing real threat detection.
 
 = 2.1.0 =
 Adds 4 universal Core Web Vitals boosters (Non-Blocking Google Fonts, Small-CSS Auto-Inlining, Zero-CLS Image Width/Height Injection, and Third-Party JS Interaction Delay) plus 1-Click Top Admin Bar & Universal Cache Purge.

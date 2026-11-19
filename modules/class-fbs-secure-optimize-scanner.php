@@ -488,6 +488,10 @@ class FBS_Secure_Optimize_Scanner {
 					if ( false !== $content ) {
 						foreach ( $signatures as $label => $pattern ) {
 							if ( preg_match( $pattern, $content, $matches, PREG_OFFSET_CAPTURE ) ) {
+								if ( self::is_known_safe_library_match( $normalized, $label, $content ) ) {
+									continue;
+								}
+
 								$offset  = isset( $matches[0][1] ) ? (int) $matches[0][1] : 0;
 								$start   = max( 0, $offset - 100 );
 								$snippet = substr( $content, $start, 350 );
@@ -511,6 +515,60 @@ class FBS_Secure_Optimize_Scanner {
 		}
 
 		return $infected;
+	}
+
+	/**
+	 * Verify whether a heuristic match belongs to a known-safe Composer/vendor library file.
+	 *
+	 * Prevents false positives (e.g. Monolog\Handler\ProcessHandler::proc_open) while still
+	 * rejecting tampered files that inject superglobal input or other malware signatures.
+	 *
+	 * @since 2.1.1
+	 * @param string $normalized_path Forward-slash normalized absolute file path.
+	 * @param string $label           Matched heuristic signature label.
+	 * @param string $content         Raw PHP file contents.
+	 * @return bool
+	 */
+	private static function is_known_safe_library_match( $normalized_path, $label, $content ) {
+		$is_safe = false;
+
+		if ( 'OS Command Execution (shell_exec/system)' === $label && ! preg_match( '/\$_(?:GET|POST|REQUEST|COOKIE)\b/', $content ) ) {
+			$known_libraries = array(
+				'/monolog/monolog/src/Monolog/Handler/ProcessHandler.php' => array( 'namespace Monolog\Handler;', 'class ProcessHandler' ),
+				'/symfony/process/Process.php'                            => array( 'namespace Symfony\Component\Process;', 'class Process' ),
+				'/symfony/process/Pipes/UnixPipes.php'                    => array( 'namespace Symfony\Component\Process\Pipes;', 'class UnixPipes' ),
+				'/symfony/process/Pipes/WindowsPipes.php'                 => array( 'namespace Symfony\Component\Process\Pipes;', 'class WindowsPipes' ),
+				'/composer/composer/src/Composer/Util/ProcessExecutor.php' => array( 'namespace Composer\Util;', 'class ProcessExecutor' ),
+			);
+
+			$lower_path = strtolower( $normalized_path );
+			foreach ( $known_libraries as $path_suffix => $markers ) {
+				if ( substr( $lower_path, -strlen( $path_suffix ) ) === strtolower( $path_suffix ) ) {
+					$has_all_markers = true;
+					foreach ( $markers as $marker ) {
+						if ( false === strpos( $content, $marker ) ) {
+							$has_all_markers = false;
+							break;
+						}
+					}
+					if ( $has_all_markers ) {
+						$is_safe = true;
+						break;
+					}
+				}
+			}
+		}
+
+		/**
+		 * Filters whether a matched heuristic finding should be treated as a known-safe library match.
+		 *
+		 * @since 2.1.1
+		 * @param bool   $is_safe         Whether to suppress this specific signature match.
+		 * @param string $normalized_path Normalized file path.
+		 * @param string $label           Matched heuristic signature label.
+		 * @param string $content         File contents.
+		 */
+		return (bool) apply_filters( 'fbsseop_scanner_is_safe_match', $is_safe, $normalized_path, $label, $content );
 	}
 
 	/**
