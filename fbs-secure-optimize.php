@@ -11,7 +11,6 @@
  * Text Domain:       fbs-secure-optimize
  * Domain Path:       /languages
  * Requires at least: 5.8
- * Tested up to:      7.1
  * Requires PHP:      7.4
  *
  * @package FBS_Secure_Optimize
@@ -134,7 +133,10 @@ final class FBS_Secure_Optimize {
 	public function deactivate() {
 		wp_clear_scheduled_hook( 'fbsseop_cleanup_database' );
 		if ( class_exists( 'FBS_Secure_Optimize_Controller' ) ) {
-			FBS_Secure_Optimize_Controller::delete_cache_directory_contents( trailingslashit( WP_CONTENT_DIR ) . 'cache/fbs-optimize' );
+			$cache_info = FBS_Secure_Optimize_Controller::get_cache_dir_info();
+			if ( ! empty( $cache_info['basedir'] ) ) {
+				FBS_Secure_Optimize_Controller::delete_cache_directory_contents( $cache_info['basedir'] );
+			}
 		}
 	}
 

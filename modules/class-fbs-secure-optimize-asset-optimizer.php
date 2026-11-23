@@ -80,9 +80,9 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 		$settings = FBS_Secure_Optimize_Controller::get_all_settings();
 		$opts     = isset( $settings['asset_optimization'] ) ? $settings['asset_optimization'] : array();
 
-		// Serve static guest HTML cache early on plugins_loaded (after Priority 0 Pro WAF).
+		// Serve static guest HTML cache early on init priority 0 (so wp_upload_dir() is initialized).
 		if ( ! empty( $opts['enable_page_cache'] ) && ! is_admin() ) {
-			$this->maybe_serve_guest_page_cache();
+			add_action( 'init', array( $this, 'maybe_serve_guest_page_cache' ), 0 );
 		}
 
 		// 1. Disable WordPress Emojis (saves extra JS + DNS request on every page).
@@ -686,6 +686,7 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 
 		return $preconnect
 			. sprintf(
+				// phpcs:ignore WordPress.WP.EnqueuedResources.NonEnqueuedStylesheet -- Rewriting enqueued stylesheet tag inside style_loader_tag filter.
 				"<link rel=\"stylesheet\"%s href=\"%s\" media=\"print\" onload=\"this.media='all'\">\n<noscript><link rel=\"stylesheet\" href=\"%s\"></noscript>\n",
 				$id_part,
 				$escaped_url,
@@ -858,11 +859,16 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 			return $tag;
 		}
 
+		$cache_info = FBS_Secure_Optimize_Controller::get_cache_dir_info();
+		if ( '' === $cache_info['basedir'] || '' === $cache_info['baseurl'] ) {
+			return $tag;
+		}
+
 		$mtime      = (int) filemtime( $local_path );
 		$salt       = FBS_Secure_Optimize_Controller::get_cache_salt();
 		$hash       = substr( md5( $salt . '|' . $handle . '|' . $local_path . '|' . $mtime ), 0, 16 );
 		$safe_slug  = preg_replace( '/[^a-z0-9_-]/i', '-', $handle );
-		$cache_dir  = trailingslashit( WP_CONTENT_DIR ) . 'cache/fbs-optimize/css';
+		$cache_dir  = $cache_info['basedir'] . '/css';
 		$cache_file = $cache_dir . '/' . $safe_slug . '-' . $hash . '.css';
 		$meta_key   = 'fbsseop_imp_' . $hash;
 		$font_urls  = get_transient( $meta_key );
@@ -906,7 +912,7 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 			$base_dir_url = trailingslashit( dirname( $clean_href ) );
 			$rewritten    = $this->rewrite_and_minify_css( $stripped_css, $base_dir_url );
 
-			// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- Writing static optimized CSS cache file.
+			// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- Writing static optimized CSS cache file inside wp_upload_dir().
 			$written = @file_put_contents( $cache_file, $rewritten, LOCK_EX ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
 			if ( false === $written ) {
 				return $tag;
@@ -916,7 +922,7 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 			set_transient( $meta_key, $font_urls, 7 * DAY_IN_SECONDS );
 		}
 
-		$cached_url   = content_url( 'cache/fbs-optimize/css/' . $safe_slug . '-' . $hash . '.css' );
+		$cached_url   = $cache_info['baseurl'] . '/css/' . $safe_slug . '-' . $hash . '.css';
 		$hoisted_html = '';
 		foreach ( $font_urls as $idx => $furl ) {
 			$hoisted_html .= $this->build_non_blocking_google_font_html( $furl, $handle . '-gfont-' . $idx );
@@ -952,8 +958,6 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 		$icon_patterns = array(
 			'font-awesome',
 			'fontawesome',
-			'use.fontawesome.com',
-			'kit.fontawesome.com',
 			'elementor-icons',
 			'ionicons',
 			'line-awesome',
@@ -2235,6 +2239,11 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 	 * @return string
 	 */
 	private function get_guest_page_cache_filepath() {
+		$cache_info = FBS_Secure_Optimize_Controller::get_cache_dir_info();
+		if ( '' === $cache_info['basedir'] ) {
+			return '';
+		}
+
 		$host   = isset( $_SERVER['HTTP_HOST'] ) ? strtolower( sanitize_text_field( wp_unslash( $_SERVER['HTTP_HOST'] ) ) ) : 'localhost';
 		$scheme = is_ssl() ? 'https' : 'http';
 		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Stripped to path component and hashed via md5.
@@ -2247,7 +2256,7 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 		$salt = FBS_Secure_Optimize_Controller::get_cache_salt();
 		$hash = md5( $salt . '|' . $scheme . '://' . $host . $path );
 
-		return trailingslashit( WP_CONTENT_DIR ) . 'cache/fbs-optimize/pages/' . $hash . '.html';
+		return $cache_info['basedir'] . '/pages/' . $hash . '.html';
 	}
 
 	/**
@@ -2256,13 +2265,13 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 	 * @since 2.2.0
 	 * @return void
 	 */
-	private function maybe_serve_guest_page_cache() {
+	public function maybe_serve_guest_page_cache() {
 		if ( headers_sent() || ! $this->is_guest_cache_eligible_request() ) {
 			return;
 		}
 
 		$file = $this->get_guest_page_cache_filepath();
-		if ( ! is_file( $file ) || ! is_readable( $file ) ) {
+		if ( '' === $file || ! is_file( $file ) || ! is_readable( $file ) ) {
 			return;
 		}
 
@@ -2324,17 +2333,25 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 			return;
 		}
 
-		$pages_dir = trailingslashit( WP_CONTENT_DIR ) . 'cache/fbs-optimize/pages';
+		$cache_info = FBS_Secure_Optimize_Controller::get_cache_dir_info();
+		if ( '' === $cache_info['basedir'] ) {
+			return;
+		}
+
+		$pages_dir = $cache_info['basedir'] . '/pages';
 		if ( ! is_dir( $pages_dir ) && ! wp_mkdir_p( $pages_dir ) ) {
 			return;
 		}
 
 		$this->ensure_cache_index_guard( $pages_dir, true );
 
-		$file    = $this->get_guest_page_cache_filepath();
+		$file = $this->get_guest_page_cache_filepath();
+		if ( '' === $file ) {
+			return;
+		}
 		$stamped = $html . "\n<!-- Cached & Optimized by FBS Secure Optimize -->";
 
-		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- Writing verified local HTML page cache file.
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- Writing verified local HTML page cache file inside wp_upload_dir().
 		@file_put_contents( $file, $stamped, LOCK_EX ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
 	}
 

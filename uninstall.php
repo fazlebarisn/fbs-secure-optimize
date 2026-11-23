@@ -20,21 +20,24 @@ delete_option( 'fbsseop_last_scan_summary' );
 
 wp_clear_scheduled_hook( 'fbsseop_cleanup_database' );
 
-// Remove static CSS & page cache files inside wp-content/cache/fbs-optimize.
-$fbsseop_cache_root = trailingslashit( WP_CONTENT_DIR ) . 'cache/fbs-optimize';
-if ( is_dir( $fbsseop_cache_root ) ) {
-	$fbsseop_iter = new RecursiveIteratorIterator(
-		new RecursiveDirectoryIterator( $fbsseop_cache_root, RecursiveDirectoryIterator::SKIP_DOTS ),
-		RecursiveIteratorIterator::CHILD_FIRST
-	);
-	foreach ( $fbsseop_iter as $fbsseop_item ) {
-		if ( $fbsseop_item->isDir() ) {
-			@rmdir( $fbsseop_item->getPathname() ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_rmdir, WordPress.PHP.NoSilencedErrors.Discouraged
-		} else {
-			wp_delete_file( $fbsseop_item->getPathname() );
+// Remove static CSS & page cache files inside uploads/fbs-optimize-cache.
+$fbsseop_uploads = wp_upload_dir( null, false );
+if ( is_array( $fbsseop_uploads ) && empty( $fbsseop_uploads['error'] ) && ! empty( $fbsseop_uploads['basedir'] ) ) {
+	$fbsseop_cache_root = trailingslashit( $fbsseop_uploads['basedir'] ) . 'fbs-optimize-cache';
+	if ( is_dir( $fbsseop_cache_root ) ) {
+		$fbsseop_iter = new RecursiveIteratorIterator(
+			new RecursiveDirectoryIterator( $fbsseop_cache_root, RecursiveDirectoryIterator::SKIP_DOTS ),
+			RecursiveIteratorIterator::CHILD_FIRST
+		);
+		foreach ( $fbsseop_iter as $fbsseop_item ) {
+			if ( $fbsseop_item->isDir() ) {
+				@rmdir( $fbsseop_item->getPathname() ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_rmdir, WordPress.PHP.NoSilencedErrors.Discouraged
+			} else {
+				wp_delete_file( $fbsseop_item->getPathname() );
+			}
 		}
+		@rmdir( $fbsseop_cache_root ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_rmdir, WordPress.PHP.NoSilencedErrors.Discouraged
 	}
-	@rmdir( $fbsseop_cache_root ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_rmdir, WordPress.PHP.NoSilencedErrors.Discouraged
 }
 
 global $wpdb;

@@ -649,25 +649,55 @@ class FBS_Secure_Optimize_Controller {
 	}
 
 	/**
-	 * Purge only cached guest HTML pages inside wp-content/cache/fbs-optimize/pages/.
+	 * Return base filesystem directory and public URL for FBS cache artifacts inside wp_upload_dir().
+	 *
+	 * Uses wp_upload_dir() rather than WP_CONTENT_DIR to comply with WordPress Plugin Check and read-only hosts.
+	 *
+	 * @since 2.2.0
+	 * @return array{basedir: string, baseurl: string}
+	 */
+	public static function get_cache_dir_info() {
+		$uploads = wp_upload_dir( null, false );
+		if ( ! is_array( $uploads ) || ! empty( $uploads['error'] ) || empty( $uploads['basedir'] ) || empty( $uploads['baseurl'] ) ) {
+			return array(
+				'basedir' => '',
+				'baseurl' => '',
+			);
+		}
+
+		return array(
+			'basedir' => trailingslashit( $uploads['basedir'] ) . 'fbs-optimize-cache',
+			'baseurl' => trailingslashit( $uploads['baseurl'] ) . 'fbs-optimize-cache',
+		);
+	}
+
+	/**
+	 * Purge only cached guest HTML pages inside uploads/fbs-optimize-cache/pages/.
 	 *
 	 * @since 2.2.0
 	 * @return void
 	 */
 	public static function purge_disk_page_cache() {
-		$pages_dir = trailingslashit( WP_CONTENT_DIR ) . 'cache/fbs-optimize/pages';
-		self::delete_cache_directory_contents( $pages_dir );
+		$cache_info = self::get_cache_dir_info();
+		if ( '' !== $cache_info['basedir'] ) {
+			self::delete_cache_directory_contents( $cache_info['basedir'] . '/pages' );
+		}
 	}
 
 	/**
-	 * Recursively remove files inside a verified plugin cache directory inside WP_CONTENT_DIR/cache/fbs-optimize.
+	 * Recursively remove files inside a verified plugin cache directory inside uploads/fbs-optimize-cache.
 	 *
 	 * @since 2.2.0
-	 * @param string $dir_path Target directory inside WP_CONTENT_DIR/cache/fbs-optimize.
+	 * @param string $dir_path Target directory inside uploads/fbs-optimize-cache.
 	 * @return void
 	 */
 	public static function delete_cache_directory_contents( $dir_path ) {
-		$allowed_root = wp_normalize_path( trailingslashit( WP_CONTENT_DIR ) . 'cache/fbs-optimize' );
+		$cache_info = self::get_cache_dir_info();
+		if ( '' === $cache_info['basedir'] ) {
+			return;
+		}
+
+		$allowed_root = wp_normalize_path( $cache_info['basedir'] );
 		$norm_target  = wp_normalize_path( $dir_path );
 
 		if ( 0 !== strpos( $norm_target, $allowed_root ) || ! is_dir( $dir_path ) ) {
@@ -708,7 +738,10 @@ class FBS_Secure_Optimize_Controller {
 		delete_transient( 'fbsseop_img_dims_' . $old_salt );
 		$new_salt = 'v' . time() . '_' . wp_rand( 100, 999 );
 		update_option( 'fbsseop_cache_salt', $new_salt, true );
-		self::delete_cache_directory_contents( trailingslashit( WP_CONTENT_DIR ) . 'cache/fbs-optimize' );
+		$cache_info = self::get_cache_dir_info();
+		if ( '' !== $cache_info['basedir'] ) {
+			self::delete_cache_directory_contents( $cache_info['basedir'] );
+		}
 		self::clear_stats_cache();
 		$cleared[] = __( 'FBS Asset, CLS & Page Cache', 'fbs-secure-optimize' );
 
