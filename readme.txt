@@ -147,13 +147,14 @@ Uninstalling the plugin through the **Plugins** screen cleanly removes its saved
 == Changelog ==
 
 = 2.2.0 =
-* New: Auto-Preload Above-the-Fold LCP Image & Hero CSS Background (detects both hero `<img>` banners and page-builder CSS `background-image` heroes, injects early `<link rel="preload" as="image" fetchpriority="high">`, skips header logos/SVGs, and removes misplaced `fetchpriority="high"` from offscreen lazy images, plus optional manual URL override).
-* New: Zero-CLS Full-Width Builder Rows & Inline SVG Stabilizer (eliminates `0.70+` layout shifts from JS-stretched full-bleed rows in SiteOrigin Page Builder & WPBakery before First Paint, and injects intrinsic `viewBox` dimensions on un-sized inline `<svg>` icons).
+* New: Auto-Preload Above-the-Fold LCP Image & Hero CSS Background (detects both hero `<img>` banners and page-builder CSS `background-image` heroes, injects `<link rel="preload" as="image" fetchpriority="high">` after `<meta name="viewport">`, skips header logos/SVGs, and demotes offscreen `loading="lazy"` images to `fetchpriority="low"`, plus optional manual URL override).
+* New: Zero-CLS Full-Width Builder Rows & Inline SVG Stabilizer (measures exact post-viewport `--fbs-cw` geometry immediately after `<body ...>` to eliminate `0.70+` layout shifts from JS-stretched full-bleed rows in SiteOrigin Page Builder & WPBakery before First Paint, and injects intrinsic `viewBox` dimensions on un-sized inline `<svg>` icons).
 * New: Hoist & De-Block Chained CSS `@import` Google Fonts (extracts blocking `@import` Google Fonts inside theme `style.css` files into non-blocking `preconnect` + swap links and serves a cached de-blocked stylesheet).
 * New: Non-Blocking Icon & Decorative Stylesheets (converts Font Awesome, Elementor Icons, Ionicons, Line Awesome, and Magnific Popup CSS to async `media="print"` swap).
-* New: Smart Post-Render Unused Plugin CSS/JS & reCAPTCHA Unloader (inspects complete rendered HTML and safely strips unused Contact Form 7, orphaned Google reCAPTCHA v3, Smash Balloon Instagram Feed, Slick/Carousel, WPForms, TablePress, and unused block social-links CSS on pages where absent).
-* New: Upgraded Third-Party JS Delay to capture both external `<script src>` and inline tracker bootstrap snippets (GTM4WP, Microsoft Clarity, Meta Pixel, Hotjar) plus invisible reCAPTCHA v3.
+* New: Smart Post-Render Unused Plugin CSS/JS & reCAPTCHA Unloader (inspects complete rendered HTML DOM and safely strips unused Contact Form 7, orphaned Google reCAPTCHA v3, orphaned `wp-polyfill`/`wp-i18n`/`wp-hooks` dependencies, Smash Balloon Instagram Feed, Slick/Carousel, WPForms, TablePress, and unused block social-links CSS on pages where absent).
+* New: Smart Inline-Verified `jQuery` Deferring & Upgraded Third-Party JS Delay (captures both external `<script src>` and inline GTM/Clarity/Meta/Hotjar bootstrap snippets plus invisible reCAPTCHA v3, and auto-defers `jquery-core`/`jquery-migrate` when zero synchronous inline scripts reference `jQuery`/`$`).
 * New: Optional Ultra-Light Guest HTML Disk Page Cache (`X-FBS-Cache: HIT`) with marketing parameter (`utm_*`, `gclid`, `fbclid`) cache-hit support, automatic content invalidation, and 1-Click "Apply Max PageSpeed Preset" button.
+* Fix: Eliminated false-positive `CRITICAL` scanner alerts on content-verified legitimate root WAF bootstrap files (`wordfence-waf.php`, `aios-bootstrap.php`, `malcare-waf.php`) and compiled Timber/Twig (`wp-content/uploads/timber-cache/`) or Blade template cache files while still catching tampered or spoofed webshells.
 * Fix: Eliminated wasted render-blocking HTTP requests on empty `0`-byte local plugin stylesheets and protected `wp_add_inline_script(..., 'after')` handles during JS deferring.
 
 = 2.1.1 =

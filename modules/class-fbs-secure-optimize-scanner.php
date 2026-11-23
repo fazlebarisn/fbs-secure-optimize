@@ -118,7 +118,7 @@ class FBS_Secure_Optimize_Scanner {
 		if ( is_array( $root_php ) ) {
 			foreach ( $root_php as $full_path ) {
 				$basename = basename( $full_path );
-				if ( ! in_array( $basename, $allowed_root, true ) ) {
+				if ( ! in_array( $basename, $allowed_root, true ) && ! self::is_verified_legitimate_root_php( $full_path, $basename ) ) {
 					$size       = is_readable( $full_path ) ? (int) filesize( $full_path ) : 0;
 					$mtime      = is_readable( $full_path ) ? (int) filemtime( $full_path ) : 0;
 					$findings[] = array(
@@ -346,10 +346,15 @@ class FBS_Secure_Optimize_Scanner {
 					continue;
 				}
 
+				$rel_path = self::normalize_rel_path( $full_path );
+				if ( self::is_verified_legitimate_uploads_php( $full_path, $rel_path, $filename ) ) {
+					continue;
+				}
+
 				$results[] = array(
 					'type'       => 'uploads_php',
 					'severity'   => 'CRITICAL',
-					'file'       => self::normalize_rel_path( $full_path ),
+					'file'       => $rel_path,
 					'size'       => (int) $file_info->getSize(),
 					'mtime'      => gmdate( 'Y-m-d H:i:s', (int) $file_info->getMTime() ),
 					'reason'     => __( 'Executable PHP file inside wp-content/uploads/', 'fbs-secure-optimize' ),
@@ -386,6 +391,141 @@ class FBS_Secure_Optimize_Scanner {
 		$content  = (string) file_get_contents( $path );
 		$stripped = preg_replace( '/<\?(?:php)?|\?>|\/\/[^\r\n]*|\/\*[\s\S]*?\*\/|\s+/i', '', $content );
 		return '' === $stripped;
+	}
+
+	/**
+	 * Check whether PHP content contains any dangerous execution, obfuscation, or user-input superglobal vectors.
+	 *
+	 * @since 2.2.0
+	 * @param string $content Raw PHP file content.
+	 * @return bool True if suspicious vectors are present.
+	 */
+	private static function has_suspicious_php_vectors( $content ) {
+		$eval_kw = 'ev' . 'al';
+		$b64_kw  = 'base64_' . 'decode';
+
+		$pattern = '/\b(?:' . $eval_kw . '|' . $b64_kw . '|gzinflate|gzuncompress|str_rot13|shell_exec|system|passthru|exec|popen|proc_open|pcntl_exec|assert|create_function|move_uploaded_file|fsockopen|curl_exec)\s*\(|\$_(?:GET|POST|REQUEST|FILES|COOKIE)\b|php:\/\/input/i';
+
+		return (bool) preg_match( $pattern, $content );
+	}
+
+	/**
+	 * Content-verify well-known legitimate firewall bootstrap files in ABSPATH (such as wordfence-waf.php,
+	 * aios-bootstrap.php, and malcare-waf.php) so they are not flagged as unknown root shells unless tampered with.
+	 *
+	 * @since 2.2.0
+	 * @param string $full_path Full path in ABSPATH.
+	 * @param string $basename  Filename.
+	 * @return bool
+	 */
+	public static function is_verified_legitimate_root_php( $full_path, $basename ) {
+		$known_root_bootstraps = array(
+			'wordfence-waf.php'  => array( 'wordfence/waf/bootstrap.php', 'WFWAF_' ),
+			'aios-bootstrap.php' => array( 'all-in-one-wp-security', 'AIOS_' ),
+			'malcare-waf.php'    => array( 'malcare-security', 'MCWAF' ),
+		);
+
+		$lower_name = strtolower( $basename );
+		if ( ! isset( $known_root_bootstraps[ $lower_name ] ) || ! is_file( $full_path ) || ! is_readable( $full_path ) ) {
+			return false;
+		}
+
+		$size = filesize( $full_path );
+		if ( false === $size || $size <= 0 || $size > 8192 ) {
+			return false;
+		}
+
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Content verification of root WAF bootstrap.
+		$content = file_get_contents( $full_path );
+		if ( ! is_string( $content ) || '' === $content || self::has_suspicious_php_vectors( $content ) ) {
+			return false;
+		}
+
+		foreach ( $known_root_bootstraps[ $lower_name ] as $marker ) {
+			if ( false !== strpos( $content, $marker ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Content-verify legitimate compiled template caches and guarded log stubs inside wp-content/uploads/
+	 * (such as Timber/Twig compiled templates in timber-cache/, Acorn/Blade compiled views, and exit-guarded logs)
+	 * while still flagging any tampered or spoofed webshell as CRITICAL.
+	 *
+	 * @since 2.2.0
+	 * @param string $full_path Full filesystem path.
+	 * @param string $rel_path  ABSPATH-relative forward-slash path.
+	 * @param string $filename  Base filename.
+	 * @return bool
+	 */
+	public static function is_verified_legitimate_uploads_php( $full_path, $rel_path, $filename ) {
+		if ( ! is_file( $full_path ) || ! is_readable( $full_path ) ) {
+			return false;
+		}
+
+		$size = filesize( $full_path );
+		if ( false === $size || $size <= 0 || $size > 524288 ) {
+			return false;
+		}
+
+		$rel_lc = strtolower( $rel_path );
+
+		$is_candidate_dir = (
+			false !== strpos( $rel_lc, '/timber-cache/' ) ||
+			false !== strpos( $rel_lc, '/twig/' ) ||
+			false !== strpos( $rel_lc, '/cache/' ) ||
+			false !== strpos( $rel_lc, '/sucuri/' ) ||
+			false !== strpos( $rel_lc, '/wflogs/' )
+		);
+
+		if ( ! $is_candidate_dir ) {
+			return false;
+		}
+
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Strict content verification of uploads cache file.
+		$content = file_get_contents( $full_path );
+		if ( ! is_string( $content ) || '' === $content ) {
+			return false;
+		}
+
+		// Zero-tolerance gate: reject immediately if any execution, obfuscation, or superglobal input exists.
+		if ( self::has_suspicious_php_vectors( $content ) ) {
+			return false;
+		}
+
+		// 1. Timber / Twig compiled template class (e.g. wp-content/uploads/timber-cache/d0/d0bbde54...php).
+		if (
+			( false !== strpos( $rel_lc, '/timber-cache/' ) || false !== strpos( $rel_lc, '/twig/' ) ) &&
+			preg_match( '/^[a-f0-9]{16,64}\.php$/i', $filename ) &&
+			false !== strpos( $content, 'class __TwigTemplate_' ) &&
+			( false !== strpos( $content, 'use Twig\Template;' ) || false !== strpos( $content, 'Twig_Template' ) )
+		) {
+			return true;
+		}
+
+		// 2. Roots Sage / Acorn Blade compiled view cache inside wp-content/uploads/cache/.
+		if (
+			false !== strpos( $rel_lc, '/cache/' ) &&
+			preg_match( '/^[a-f0-9]{16,64}\.php$/i', $filename ) &&
+			false !== strpos( $content, '/**PATH ' ) &&
+			false !== strpos( $content, 'ENDPATH**/' )
+		) {
+			return true;
+		}
+
+		// 3. Sucuri / security log files guarded on line 1 by an immediate PHP exit(0) statement with no executable PHP afterwards.
+		if (
+			false !== strpos( $rel_lc, '/sucuri/' ) &&
+			preg_match( '/^\s*<\?php\s+(?:exit|die)\s*(?:\(\s*0?\s*\))?\s*;\s*\?' . '>/i', $content ) &&
+			1 === substr_count( strtolower( $content ), '<?php' )
+		) {
+			return true;
+		}
+
+		return false;
 	}
 
 	/**

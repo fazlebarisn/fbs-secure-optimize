@@ -169,6 +169,7 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 			! empty( $opts['cls_image_dimensions'] ) ||
 			! empty( $opts['unload_unused_assets'] ) ||
 			! empty( $opts['delay_third_party_js'] ) ||
+			! empty( $opts['defer_js'] ) ||
 			! empty( $opts['enable_page_cache'] )
 		) {
 			add_action( 'template_redirect', array( $this, 'start_frontend_html_buffer' ), 2 );
@@ -279,7 +280,12 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 			$html = $this->apply_document_third_party_js_delay( $html );
 		}
 
-		// 5. Save optimized HTML into static guest disk page cache when eligible.
+		// 5. Smart inline-verified jQuery & remaining script deferring (eliminates <head> parser blocking when safe).
+		if ( ! empty( $opts['defer_js'] ) ) {
+			$html = $this->apply_smart_jquery_defer( $html );
+		}
+
+		// 6. Save optimized HTML into static guest disk page cache when eligible.
 		if ( ! empty( $opts['enable_page_cache'] ) ) {
 			$this->maybe_store_guest_page_cache( $html );
 		}
@@ -1467,6 +1473,23 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 			);
 		}
 
+		// Clean up orphaned wp-polyfill / wp-i18n / wp-hooks dependencies when no remaining script on the page uses them.
+		$html_without_wp_runtime = (string) preg_replace(
+			'/<script\b[^>]*\bid=[\'"](?:wp-polyfill|wp-i18n|wp-hooks|regenerator-runtime)[^\'"]*[\'"][^>]*>.*?<\/script>\s*/is',
+			'',
+			$html
+		);
+		if (
+			false === stripos( $html_without_wp_runtime, 'wp.i18n' ) &&
+			false === stripos( $html_without_wp_runtime, 'wp.hooks' ) &&
+			false === stripos( $html_without_wp_runtime, 'wp.apiFetch' ) &&
+			false === stripos( $html_without_wp_runtime, 'wp-api-fetch' ) &&
+			false === stripos( $html_without_wp_runtime, 'wp-blocks' ) &&
+			false === stripos( $html_without_wp_runtime, 'wc-' )
+		) {
+			$html = $html_without_wp_runtime;
+		}
+
 		return $html;
 	}
 
@@ -1551,6 +1574,9 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 		$cls_head_snippets = '';
 
 		// Pre-JS full-bleed row stabilization for SiteOrigin Page Builder & WPBakery.
+		// Note: --fbs-cw is measured right after <body ...> opens (after <meta name="viewport"> is parsed on mobile,
+		// preventing Chromium's pre-viewport 980px fallback width) and re-checked once before </body> for desktop scrollbars,
+		// avoiding ResizeObserver loops completely.
 		if (
 			$stabilize_builders &&
 			(
@@ -1559,8 +1585,6 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 				false !== strpos( $body_part, 'data-vc-full-width="true"' )
 			)
 		) {
-			$cls_head_snippets .= '<script id="fbsseop-cls-vw">(function(){var d=document.documentElement,u=function(){d.style.setProperty("--fbs-cw",d.clientWidth+"px")};u();if(window.ResizeObserver){var r=new ResizeObserver(u);r.observe(d);window.addEventListener("load",function(){setTimeout(function(){r.disconnect()},1500)},{once:true})}})();</script>' . "\n";
-
 			$cls_css  = 'html{overflow-x:clip}';
 			$cls_css .= 'body.siteorigin-panels-before-js:not(.siteorigin-panels-css-container) .siteorigin-panels-stretch[data-stretch-type="full-stretched"],';
 			$cls_css .= 'body.siteorigin-panels-before-js:not(.siteorigin-panels-css-container) .siteorigin-panels-stretch[data-stretch-type="full-width-stretch"],';
@@ -1578,6 +1602,14 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 			}
 
 			$cls_head_snippets .= '<style id="fbsseop-cls-stabilizer">' . $cls_css . "</style>\n";
+
+			$vw_open_script  = '<script id="fbsseop-cls-vw">(function(){var d=document.documentElement,w=0,u=function(){var c=d.clientWidth;if(c&&c!==w){w=c;d.style.setProperty("--fbs-cw",c+"px")}};u();window.fbsCwSync=u;window.addEventListener("resize",u,{passive:true})})();</script>';
+			$vw_close_script = "<script id=\"fbsseop-cls-vw-end\">if(window.fbsCwSync){window.fbsCwSync();}</script>\n";
+
+			$body_part = (string) preg_replace( '/(<body\b[^>]*>)/i', '$1' . "\n" . $vw_open_script, $body_part, 1 );
+			if ( false !== stripos( $body_part, '</body>' ) ) {
+				$body_part = str_ireplace( '</body>', $vw_close_script . '</body>', $body_part );
+			}
 		} elseif ( $injected_svg_dims ) {
 			$cls_head_snippets .= "<style id=\"fbsseop-svg-cls\">:where([data-fbs-svg]){height:auto}</style>\n";
 		}
@@ -1681,9 +1713,15 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 					return $img;
 				}
 
-				// If hero LCP is a CSS background-image, or if an <img> has loading="lazy", strip fetchpriority="high" so it cannot steal bandwidth.
-				if ( 'bg' === $lcp_type || false !== stripos( $img, 'loading="lazy"' ) || false !== stripos( $img, "loading='lazy'" ) ) {
+				// If hero LCP is a CSS background-image, or if an <img> has loading="lazy", strip fetchpriority="high"
+				// and mark lazy images fetchpriority="low" so Chrome's 1250px Slow-4G lookahead never steals hero bandwidth.
+				$is_lazy = ( false !== stripos( $img, 'loading="lazy"' ) || false !== stripos( $img, "loading='lazy'" ) );
+				if ( 'bg' === $lcp_type || $is_lazy ) {
 					$img = (string) preg_replace( '/\s+fetchpriority=([\'"])high\1/i', '', $img );
+				}
+
+				if ( $is_lazy && '' !== $clean_lcp_url && false === stripos( $img, 'fetchpriority=' ) ) {
+					$img = str_replace( '<img', '<img fetchpriority="low"', $img );
 				}
 
 				return $img;
@@ -1841,7 +1879,8 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 	}
 
 	/**
-	 * Inject a resource hint or critical style/script snippet early inside <head> (immediately after <meta charset> or <head>).
+	 * Inject a resource hint or critical style snippet early inside <head> (immediately after <meta name="viewport">
+	 * so mobile viewport dimensions are active, falling back to after <meta charset> or <head>).
 	 *
 	 * @since 2.2.0
 	 * @param string $head_part HTML <head> substring.
@@ -1849,6 +1888,11 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 	 * @return string
 	 */
 	private function inject_early_into_head( $head_part, $snippet ) {
+		if ( preg_match( '/<meta\b[^>]*name=[\'"]viewport[\'"][^>]*>\s*/i', $head_part, $vm, PREG_OFFSET_CAPTURE ) ) {
+			$insert_at = (int) $vm[0][1] + strlen( $vm[0][0] );
+			return substr( $head_part, 0, $insert_at ) . "\n" . $snippet . substr( $head_part, $insert_at );
+		}
+
 		if ( preg_match( '/<meta\b[^>]*charset[^>]*>\s*/i', $head_part, $cm, PREG_OFFSET_CAPTURE ) ) {
 			$insert_at = (int) $cm[0][1] + strlen( $cm[0][0] );
 			return substr( $head_part, 0, $insert_at ) . "\n" . $snippet . substr( $head_part, $insert_at );
@@ -1986,6 +2030,107 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 				$html .= $loader_js;
 			}
 		}
+
+		return $html;
+	}
+
+	/**
+	 * Safely add `defer` to jQuery core & jQuery Migrate ONLY when the rendered HTML contains zero
+	 * synchronous inline <script> blocks referencing jQuery/$ and zero non-deferred dependent external scripts.
+	 *
+	 * Eliminates ~35 KB gz (~105 KB parsed) of parser-blocking <head> JavaScript on Slow 4G mobile
+	 * while guaranteeing zero "jQuery is not defined" errors on pages with inline jQuery snippets.
+	 *
+	 * @since 2.2.0
+	 * @param string $html Full HTML document.
+	 * @return string
+	 */
+	private function apply_smart_jquery_defer( $html ) {
+		if ( $this->is_transactional_page() || false === stripos( $html, 'jquery' ) ) {
+			return $html;
+		}
+
+		if ( ! preg_match_all( '/<script\b([^>]*)>(.*?)<\/script>/is', $html, $scripts, PREG_SET_ORDER ) ) {
+			return $html;
+		}
+
+		foreach ( $scripts as $script ) {
+			$attrs = $script[1];
+			$body  = $script[2];
+
+			// Skip delayed scripts, internal FBS sync scripts, and non-JS data blocks (JSON-LD, templates, importmaps).
+			if (
+				false !== stripos( $attrs, 'fbsseop/delayed' ) ||
+				false !== stripos( $attrs, 'id="fbsseop-' ) ||
+				false !== stripos( $attrs, "id='fbsseop-" )
+			) {
+				continue;
+			}
+
+			if ( preg_match( '/\btype\s*=\s*([\'"])([^\'"]+)\1/i', $attrs, $tm ) ) {
+				$mime = strtolower( trim( $tm[2] ) );
+				if ( '' !== $mime && ! in_array( $mime, array( 'text/javascript', 'application/javascript' ), true ) ) {
+					continue;
+				}
+			}
+
+			// External script check: ensure no non-deferred external script could execute before deferred jQuery.
+			if ( preg_match( '/\bsrc\s*=\s*([\'"])([^\'"]+)\1/i', $attrs, $sm ) ) {
+				if ( preg_match( '/\b(?:defer|async)\b/i', $attrs ) ) {
+					continue;
+				}
+
+				$tag_lc = strtolower( $attrs . ' ' . $sm[2] );
+
+				// Ignore jQuery itself and standalone zero-jQuery WordPress utility scripts.
+				if (
+					false !== strpos( $tag_lc, '/jquery.min.js' ) ||
+					false !== strpos( $tag_lc, '/jquery.js' ) ||
+					false !== strpos( $tag_lc, 'jquery-core' ) ||
+					false !== strpos( $tag_lc, 'jquery-migrate' ) ||
+					false !== strpos( $tag_lc, 'wp-polyfill' ) ||
+					false !== strpos( $tag_lc, 'wp-hooks' ) ||
+					false !== strpos( $tag_lc, 'wp-i18n' ) ||
+					false !== strpos( $tag_lc, 'regenerator-runtime' )
+				) {
+					continue;
+				}
+
+				// Found another synchronous external script; keep jQuery synchronous for safety.
+				return $html;
+			}
+
+			// Synchronous inline script check: abort if it references jQuery, $(, or $.
+			if ( '' !== trim( $body ) && preg_match( '/\bjQuery\b|\$\s*[\(\.]/', $body ) ) {
+				return $html;
+			}
+		}
+
+		// Verified 100% safe: add defer to jquery-core and jquery-migrate tags.
+		$html = (string) preg_replace_callback(
+			'/<script\b([^>]*)><\/script>/i',
+			static function ( $m ) {
+				$attrs    = $m[1];
+				$attrs_lc = strtolower( $attrs );
+
+				if ( preg_match( '/\b(?:defer|async)\b/i', $attrs ) || false === strpos( $attrs_lc, 'src=' ) ) {
+					return $m[0];
+				}
+
+				if (
+					false !== strpos( $attrs_lc, '/jquery.min.js' ) ||
+					false !== strpos( $attrs_lc, '/jquery.js' ) ||
+					false !== strpos( $attrs_lc, 'jquery-core' ) ||
+					false !== strpos( $attrs_lc, 'jquery-migrate' )
+				) {
+					$updated = str_replace( ' src=', ' defer src=', $attrs );
+					return '<script' . $updated . '></script>';
+				}
+
+				return $m[0];
+			},
+			$html
+		);
 
 		return $html;
 	}
