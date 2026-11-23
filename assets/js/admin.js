@@ -153,6 +153,40 @@
 		});
 	});
 
+	// 1d. 1-Click Apply Max PageSpeed / Core Web Vitals Preset
+	$('#fbsseop-apply-cwv-preset').on('click', function () {
+		var recommended = [
+			'preload_lcp_image',
+			'cls_stabilize_builders',
+			'cls_image_dimensions',
+			'deblock_css_imports',
+			'non_blocking_google_fonts',
+			'async_icon_css',
+			'inline_small_css',
+			'unload_unused_assets',
+			'delay_third_party_js',
+			'defer_js',
+			'enable_page_cache',
+			'lazy_load_images',
+			'lazy_load_iframes',
+			'disable_emojis',
+			'disable_dashicons',
+			'clean_wp_head',
+			'heartbeat_control',
+			'disable_embeds',
+			'minify_css'
+		];
+
+		$('.fbsseop-asset-opt-checkbox').each(function () {
+			var opt = $(this).data('opt');
+			if ($.inArray(opt, recommended) !== -1) {
+				$(this).prop('checked', true);
+			}
+		});
+
+		showToast('Max PageSpeed Preset toggled on! Click "Save Speed & Database Settings" below to activate.', false);
+	});
+
 	// 2. Manual 1-Click Database Cleanup
 	$('#fbsseop-run-cleanup-btn').on('click', function () {
 		if (!window.confirm(fbsseopAdmin.strings.confirmCleanup)) {

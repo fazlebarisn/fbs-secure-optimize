@@ -256,13 +256,19 @@ class FBS_Secure_Optimize_Admin {
 		} elseif ( 'performance' === $section_tab ) {
 			if ( ! empty( $current['modules']['asset_optimizer'] ) ) {
 				$asset_bools = array(
-					'non_blocking_google_fonts',
-					'inline_small_css',
+					'preload_lcp_image',
+					'cls_stabilize_builders',
 					'cls_image_dimensions',
+					'non_blocking_google_fonts',
+					'deblock_css_imports',
+					'async_icon_css',
+					'inline_small_css',
+					'unload_unused_assets',
 					'delay_third_party_js',
+					'defer_js',
+					'enable_page_cache',
 					'minify_css',
 					'minify_js',
-					'defer_js',
 					'lazy_load_images',
 					'lazy_load_iframes',
 					'disable_emojis',
@@ -274,6 +280,11 @@ class FBS_Secure_Optimize_Admin {
 				foreach ( $asset_bools as $ab ) {
 					$current['asset_optimization'][ $ab ] = ! empty( $raw_input['asset_optimization'][ $ab ] ) ? 1 : 0;
 				}
+
+				$lcp_url = isset( $raw_input['asset_optimization']['lcp_preload_url'] )
+					? esc_url_raw( trim( (string) $raw_input['asset_optimization']['lcp_preload_url'] ) )
+					: '';
+				$current['asset_optimization']['lcp_preload_url'] = $lcp_url;
 			}
 
 			if ( ! empty( $current['modules']['database_cleanup'] ) ) {
@@ -612,7 +623,7 @@ class FBS_Secure_Optimize_Admin {
 				'title'   => __( 'Asset & Core Web Vitals Optimizer', 'fbs-secure-optimize' ),
 				'badge'   => __( 'Speed', 'fbs-secure-optimize' ),
 				'icon'    => 'dashicons-performance',
-				'desc'    => __( 'Non-blocking Google Fonts, small-CSS auto-inlining, zero-CLS image dimensions, LCP priority, and 3rd-party JS delay.', 'fbs-secure-optimize' ),
+				'desc'    => __( 'Hero LCP background preload, full-bleed builder & SVG CLS stabilizer, @import font de-blocker, unused bloat unloader, 3rd-party JS delay, and guest page cache.', 'fbs-secure-optimize' ),
 				'cfg_tab' => 'performance',
 			),
 			'database_cleanup' => array(
@@ -791,31 +802,63 @@ class FBS_Secure_Optimize_Admin {
 					<div class="fbsseop-panel__header">
 						<div>
 							<h2><?php esc_html_e( 'Asset & Core Web Vitals Optimizer', 'fbs-secure-optimize' ); ?></h2>
-							<p><?php esc_html_e( 'Zero-jQuery frontend speed enhancements designed for 95–100/100 Lighthouse.', 'fbs-secure-optimize' ); ?></p>
+							<p><?php esc_html_e( 'Zero-jQuery frontend speed enhancements designed for 90–100/100 Lighthouse.', 'fbs-secure-optimize' ); ?></p>
 						</div>
+						<button type="button" id="fbsseop-apply-cwv-preset" class="fbsseop-btn fbsseop-btn--sm fbsseop-btn--emerald" style="white-space:nowrap;">
+							<span class="dashicons dashicons-performance"></span>
+							<span><?php esc_html_e( 'Apply Max PageSpeed Preset', 'fbs-secure-optimize' ); ?></span>
+						</button>
 					</div>
 
 					<?php
 					$asset_fields = array(
+						'preload_lcp_image'         => array(
+							__( 'Auto-Preload Above-the-Fold LCP Image & Hero Background', 'fbs-secure-optimize' ),
+							__( 'Automatically detects your top hero banner (including CSS background-image heroes) and injects early <link rel="preload" fetchpriority="high"> while stopping offscreen images from stealing priority.', 'fbs-secure-optimize' ),
+						),
+						'cls_stabilize_builders'    => array(
+							__( 'Zero-CLS Full-Width Builder Rows & Inline SVG Stabilizer', 'fbs-secure-optimize' ),
+							__( 'Eliminates large layout shifts (0.70+ CLS) caused by JS-stretched full-bleed rows (SiteOrigin, WPBakery) and un-sized inline <svg> icons before First Paint.', 'fbs-secure-optimize' ),
+						),
+						'cls_image_dimensions'      => array(
+							__( 'Zero-CLS Missing Image Width & Height (Full-Page)', 'fbs-secure-optimize' ),
+							__( 'Automatically detects and injects cached width & height attributes on local raster & .svg images across headers, content, widgets, and footers.', 'fbs-secure-optimize' ),
+						),
+						'deblock_css_imports'       => array(
+							__( 'Hoist & De-Block Chained CSS @import Google Fonts', 'fbs-secure-optimize' ),
+							__( 'Extracts render-blocking @import Google Fonts inside theme style.css files into parallel non-blocking preconnect links and serves a cached de-blocked stylesheet.', 'fbs-secure-optimize' ),
+						),
 						'non_blocking_google_fonts' => array(
 							__( 'Non-Blocking Google Fonts & Preconnect', 'fbs-secure-optimize' ),
 							__( 'Eliminates render-blocking Google Fonts CSS via media="print" swap, enforces display=swap, and adds preconnect hints.', 'fbs-secure-optimize' ),
 						),
-						'inline_small_css'          => array(
-							__( 'Auto-Inline Small Local CSS (≤ 8 KB)', 'fbs-secure-optimize' ),
-							__( 'Inlines tiny render-blocking theme/plugin stylesheets into <head> while safely rewriting relative url() paths.', 'fbs-secure-optimize' ),
+						'async_icon_css'            => array(
+							__( 'Non-Blocking Icon & Lightbox Stylesheets', 'fbs-secure-optimize' ),
+							__( 'Converts render-blocking Font Awesome, Elementor Icons, Ionicons, Line Awesome, and Magnific Popup stylesheets to async swap without layout FOUC.', 'fbs-secure-optimize' ),
 						),
-						'cls_image_dimensions'      => array(
-							__( 'Zero-CLS Missing Image Width & Height', 'fbs-secure-optimize' ),
-							__( 'Automatically detects and injects missing width & height attributes on local images to prevent layout shifts (CLS).', 'fbs-secure-optimize' ),
+						'inline_small_css'          => array(
+							__( 'Auto-Inline Small Local CSS (≤ 8 KB) & Strip 0-Byte CSS', 'fbs-secure-optimize' ),
+							__( 'Inlines tiny render-blocking theme/plugin stylesheets into <head> while rewriting relative url() paths and removing empty 0-byte CSS requests.', 'fbs-secure-optimize' ),
+						),
+						'unload_unused_assets'      => array(
+							__( 'Smart Unused Plugin CSS/JS & reCAPTCHA Unloader', 'fbs-secure-optimize' ),
+							__( 'Inspects final rendered HTML and strips unused Contact Form 7, orphaned Google reCAPTCHA v3, Instagram Feed, Slick/Carousel, WPForms, and TablePress assets when absent on the page.', 'fbs-secure-optimize' ),
+						),
+						'delay_third_party_js'      => array(
+							__( 'Delay Third-Party Analytics, Inline GTM/Clarity & reCAPTCHA v3', 'fbs-secure-optimize' ),
+							__( 'Delays external & inline GTM, GA4, Microsoft Clarity, Meta Pixel, Hotjar, and invisible reCAPTCHA v3 until first user interaction (auto-bypassed on cart/checkout).', 'fbs-secure-optimize' ),
+						),
+						'defer_js'                  => array(
+							__( 'Defer Non-Critical JavaScript (Inline-Safe)', 'fbs-secure-optimize' ),
+							__( 'Adds defer attribute to frontend scripts while automatically protecting jQuery, WooCommerce checkout, and scripts with synchronous inline dependencies.', 'fbs-secure-optimize' ),
+						),
+						'enable_page_cache'         => array(
+							__( 'Ultra-Light Guest HTML Disk Page Cache', 'fbs-secure-optimize' ),
+							__( 'Serves pre-optimized static HTML from disk for logged-out visitors (X-FBS-Cache: HIT) with auto-invalidation and automatic bypass when LiteSpeed or WP Rocket is active.', 'fbs-secure-optimize' ),
 						),
 						'lazy_load_images'          => array(
 							__( 'LCP-Safe Native Image Lazy Loading', 'fbs-secure-optimize' ),
-							__( 'Adds native loading="lazy" & decoding="async" while automatically giving fetchpriority="high" to your first hero image.', 'fbs-secure-optimize' ),
-						),
-						'delay_third_party_js'      => array(
-							__( 'Delay Third-Party Analytics & Pixels (TBT/INP)', 'fbs-secure-optimize' ),
-							__( 'Delays GTM, GA4, Meta Pixel, Clarity & Hotjar until first user interaction or 3.5s (auto-bypassed on cart/checkout).', 'fbs-secure-optimize' ),
+							__( 'Adds native loading="lazy" & decoding="async" while skipping logos/icons and prioritizing your real above-the-fold hero image.', 'fbs-secure-optimize' ),
 						),
 						'lazy_load_iframes'         => array(
 							__( 'Native Iframe & Video Lazy Loading', 'fbs-secure-optimize' ),
@@ -841,10 +884,6 @@ class FBS_Secure_Optimize_Admin {
 							__( 'Disable WP oEmbed Script', 'fbs-secure-optimize' ),
 							__( 'Dequeues wp-embed.min.js if your site does not embed third-party WordPress posts.', 'fbs-secure-optimize' ),
 						),
-						'defer_js'          => array(
-							__( 'Defer Non-Critical JavaScript', 'fbs-secure-optimize' ),
-							__( 'Adds defer attribute to frontend scripts while automatically excluding jQuery & WooCommerce checkout.', 'fbs-secure-optimize' ),
-						),
 						'minify_css'        => array(
 							__( 'Optimize Stylesheet Tags', 'fbs-secure-optimize' ),
 							__( 'Cleans redundant whitespace in enqueued stylesheet tags.', 'fbs-secure-optimize' ),
@@ -858,11 +897,23 @@ class FBS_Secure_Optimize_Admin {
 								<span><?php echo esc_html( $fmeta[1] ); ?></span>
 							</div>
 							<label class="fbsseop-switch">
-								<input type="checkbox" name="fbsseop[asset_optimization][<?php echo esc_attr( $fkey ); ?>]" value="1" <?php checked( ! empty( $asset[ $fkey ] ) ); ?>>
+								<input type="checkbox" class="fbsseop-asset-opt-checkbox" data-opt="<?php echo esc_attr( $fkey ); ?>" name="fbsseop[asset_optimization][<?php echo esc_attr( $fkey ); ?>]" value="1" <?php checked( ! empty( $asset[ $fkey ] ) ); ?>>
 								<span class="fbsseop-switch__slider"></span>
 							</label>
 						</div>
 					<?php endforeach; ?>
+
+					<div class="fbsseop-field-block">
+						<label for="fbsseop-lcp-preload-url"><strong><?php esc_html_e( 'Optional LCP Hero Image URL Override (Leave blank for automatic detection)', 'fbs-secure-optimize' ); ?></strong></label>
+						<input
+							type="url"
+							id="fbsseop-lcp-preload-url"
+							name="fbsseop[asset_optimization][lcp_preload_url]"
+							value="<?php echo esc_attr( isset( $asset['lcp_preload_url'] ) ? (string) $asset['lcp_preload_url'] : '' ); ?>"
+							placeholder="https://example.com/wp-content/uploads/hero-banner.jpg"
+						>
+						<small><?php esc_html_e( 'Only needed if you want to manually pin a specific hero image URL on pages where that image appears.', 'fbs-secure-optimize' ); ?></small>
+					</div>
 				</div>
 				<?php endif; ?>
 

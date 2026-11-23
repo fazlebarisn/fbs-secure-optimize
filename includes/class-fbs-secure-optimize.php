@@ -108,6 +108,25 @@ class FBS_Secure_Optimize_Controller {
 		add_action( 'switch_theme', array( __CLASS__, 'purge_all_caches' ) );
 		add_action( 'customize_save_after', array( __CLASS__, 'purge_all_caches' ) );
 		add_action( 'upgrader_process_complete', array( __CLASS__, 'purge_all_caches' ) );
+		add_action( 'save_post', array( __CLASS__, 'maybe_purge_page_cache_on_post_change' ) );
+		add_action( 'deleted_post', array( __CLASS__, 'purge_disk_page_cache' ) );
+		add_action( 'wp_update_nav_menu', array( __CLASS__, 'purge_disk_page_cache' ) );
+		add_action( 'comment_post', array( __CLASS__, 'purge_disk_page_cache' ) );
+		add_action( 'wp_set_comment_status', array( __CLASS__, 'purge_disk_page_cache' ) );
+	}
+
+	/**
+	 * Purge guest HTML page cache when a published post or page is created or updated.
+	 *
+	 * @since 2.2.0
+	 * @param int $post_id Post ID.
+	 * @return void
+	 */
+	public static function maybe_purge_page_cache_on_post_change( $post_id ) {
+		if ( wp_is_post_revision( $post_id ) || wp_is_post_autosave( $post_id ) ) {
+			return;
+		}
+		self::purge_disk_page_cache();
 	}
 
 	/**
@@ -474,13 +493,20 @@ class FBS_Secure_Optimize_Controller {
 				'malware_scanner'  => 1,
 			),
 			'asset_optimization' => array(
-				'non_blocking_google_fonts' => 1,
-				'inline_small_css'          => 1,
+				'preload_lcp_image'         => 1,
+				'lcp_preload_url'           => '',
+				'cls_stabilize_builders'    => 1,
 				'cls_image_dimensions'      => 1,
+				'non_blocking_google_fonts' => 1,
+				'deblock_css_imports'       => 1,
+				'async_icon_css'            => 1,
+				'inline_small_css'          => 1,
+				'unload_unused_assets'      => 0,
 				'delay_third_party_js'      => 0,
+				'defer_js'                  => 0,
+				'enable_page_cache'         => 0,
 				'minify_css'                => 0,
 				'minify_js'                 => 0,
-				'defer_js'                  => 0,
 				'lazy_load_images'          => 1,
 				'lazy_load_iframes'         => 1,
 				'disable_emojis'            => 1,
@@ -623,7 +649,52 @@ class FBS_Secure_Optimize_Controller {
 	}
 
 	/**
-	 * Purge all FBS Secure Optimize asset/CLS caches, WP Object Cache, PHP OPcache,
+	 * Purge only cached guest HTML pages inside wp-content/cache/fbs-optimize/pages/.
+	 *
+	 * @since 2.2.0
+	 * @return void
+	 */
+	public static function purge_disk_page_cache() {
+		$pages_dir = trailingslashit( WP_CONTENT_DIR ) . 'cache/fbs-optimize/pages';
+		self::delete_cache_directory_contents( $pages_dir );
+	}
+
+	/**
+	 * Recursively remove files inside a verified plugin cache directory inside WP_CONTENT_DIR/cache/fbs-optimize.
+	 *
+	 * @since 2.2.0
+	 * @param string $dir_path Target directory inside WP_CONTENT_DIR/cache/fbs-optimize.
+	 * @return void
+	 */
+	public static function delete_cache_directory_contents( $dir_path ) {
+		$allowed_root = wp_normalize_path( trailingslashit( WP_CONTENT_DIR ) . 'cache/fbs-optimize' );
+		$norm_target  = wp_normalize_path( $dir_path );
+
+		if ( 0 !== strpos( $norm_target, $allowed_root ) || ! is_dir( $dir_path ) ) {
+			return;
+		}
+
+		$items = @scandir( $dir_path ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+		if ( ! is_array( $items ) ) {
+			return;
+		}
+
+		foreach ( $items as $item ) {
+			if ( '.' === $item || '..' === $item ) {
+				continue;
+			}
+			$full = trailingslashit( $dir_path ) . $item;
+			if ( is_dir( $full ) && ! is_link( $full ) ) {
+				self::delete_cache_directory_contents( $full );
+				@rmdir( $full ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_rmdir, WordPress.PHP.NoSilencedErrors.Discouraged
+			} elseif ( is_file( $full ) || is_link( $full ) ) {
+				wp_delete_file( $full );
+			}
+		}
+	}
+
+	/**
+	 * Purge all FBS Secure Optimize asset/CLS/page caches, WP Object Cache, PHP OPcache,
 	 * and trigger compatible host/third-party page cache flushes.
 	 *
 	 * @since 2.1.0
@@ -632,13 +703,14 @@ class FBS_Secure_Optimize_Controller {
 	public static function purge_all_caches() {
 		$cleared = array();
 
-		// 1. Rotate FBS cache salt (instantly invalidates inlined CSS & image dimension transients).
+		// 1. Rotate FBS cache salt & clear static disk CSS / Guest HTML Page Cache.
 		$old_salt = get_option( 'fbsseop_cache_salt', 'v1' );
 		delete_transient( 'fbsseop_img_dims_' . $old_salt );
 		$new_salt = 'v' . time() . '_' . wp_rand( 100, 999 );
 		update_option( 'fbsseop_cache_salt', $new_salt, true );
+		self::delete_cache_directory_contents( trailingslashit( WP_CONTENT_DIR ) . 'cache/fbs-optimize' );
 		self::clear_stats_cache();
-		$cleared[] = __( 'FBS Asset & CLS Cache', 'fbs-secure-optimize' );
+		$cleared[] = __( 'FBS Asset, CLS & Page Cache', 'fbs-secure-optimize' );
 
 		// 2. WordPress Object Cache (Redis / Memcached / runtime).
 		if ( function_exists( 'wp_cache_flush' ) ) {

@@ -9,7 +9,8 @@
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Handles frontend Core Web Vitals asset optimization and WordPress bloat removal.
+ * Handles frontend Core Web Vitals asset optimization, CLS stabilization, LCP preloading,
+ * unused plugin bloat unloading, and optional guest HTML disk caching.
  *
  * @since 1.0.0
  */
@@ -24,7 +25,7 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 	private static $instance = null;
 
 	/**
-	 * Counter to skip lazy-loading the first above-the-fold image (protects LCP).
+	 * Counter to skip lazy-loading the first real above-the-fold content image (protects LCP).
 	 *
 	 * @since 2.0.0
 	 * @var int
@@ -38,6 +39,14 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 	 * @var bool
 	 */
 	private $has_delayed_scripts = false;
+
+	/**
+	 * Tracks whether Google Fonts preconnect hints have already been queued/emitted.
+	 *
+	 * @since 2.2.0
+	 * @var bool
+	 */
+	private $emitted_gfonts_preconnect = false;
 
 	/**
 	 * Retrieve singleton instance.
@@ -70,6 +79,11 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 	private function init_hooks() {
 		$settings = FBS_Secure_Optimize_Controller::get_all_settings();
 		$opts     = isset( $settings['asset_optimization'] ) ? $settings['asset_optimization'] : array();
+
+		// Serve static guest HTML cache early on plugins_loaded (after Priority 0 Pro WAF).
+		if ( ! empty( $opts['enable_page_cache'] ) && ! is_admin() ) {
+			$this->maybe_serve_guest_page_cache();
+		}
 
 		// 1. Disable WordPress Emojis (saves extra JS + DNS request on every page).
 		if ( ! empty( $opts['disable_emojis'] ) ) {
@@ -123,13 +137,20 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 			add_filter( 'style_loader_tag', array( $this, 'maybe_inline_small_css' ), 25, 4 );
 		}
 
+		if ( ! empty( $opts['deblock_css_imports'] ) ) {
+			add_filter( 'style_loader_tag', array( $this, 'maybe_deblock_css_imports' ), 28, 4 );
+		}
+
+		if ( ! empty( $opts['async_icon_css'] ) ) {
+			add_filter( 'style_loader_tag', array( $this, 'maybe_async_icon_stylesheet' ), 32, 4 );
+		}
+
 		if ( ! empty( $opts['defer_js'] ) ) {
 			add_filter( 'script_loader_tag', array( $this, 'defer_non_critical_scripts' ), 20, 2 );
 		}
 
 		if ( ! empty( $opts['delay_third_party_js'] ) ) {
 			add_filter( 'script_loader_tag', array( $this, 'maybe_delay_third_party_script' ), 30, 3 );
-			add_action( 'wp_footer', array( $this, 'print_delayed_scripts_loader' ), 99 );
 		}
 
 		if ( ! empty( $opts['minify_css'] ) ) {
@@ -140,6 +161,18 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 			add_filter( 'wp_inline_script_attributes', array( $this, 'noop_inline_attr' ), 10, 1 );
 			add_filter( 'print_scripts_array', array( $this, 'filter_scripts_array' ), 10, 1 );
 		}
+
+		// Unified single-pass frontend HTML buffer when any full-document optimizer or page cache is active.
+		if (
+			! empty( $opts['preload_lcp_image'] ) ||
+			! empty( $opts['cls_stabilize_builders'] ) ||
+			! empty( $opts['cls_image_dimensions'] ) ||
+			! empty( $opts['unload_unused_assets'] ) ||
+			! empty( $opts['delay_third_party_js'] ) ||
+			! empty( $opts['enable_page_cache'] )
+		) {
+			add_action( 'template_redirect', array( $this, 'start_frontend_html_buffer' ), 2 );
+		}
 	}
 
 	/**
@@ -149,11 +182,11 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 	 * @return bool
 	 */
 	private function should_bypass_frontend() {
-		if ( is_admin() || is_feed() || is_preview() || is_customize_preview() || wp_doing_ajax() ) {
+		if ( is_admin() || is_feed() || is_preview() || is_customize_preview() || wp_doing_ajax() || is_robots() || is_trackback() ) {
 			return true;
 		}
 
-		if ( defined( 'REST_REQUEST' ) && REST_REQUEST ) {
+		if ( ( defined( 'REST_REQUEST' ) && REST_REQUEST ) || ( defined( 'XMLRPC_REQUEST' ) && XMLRPC_REQUEST ) ) {
 			return true;
 		}
 
@@ -164,6 +197,9 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 			'ct_builder',
 			'bricks',
 			'vc_editable',
+			'so_live_editor',
+			'siteorigin_panels_live_editor',
+			'fbsseop_bypass',
 		);
 
 		foreach ( $builder_params as $param ) {
@@ -174,6 +210,81 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 		}
 
 		return false;
+	}
+
+	/**
+	 * Start single-pass output buffering on standard frontend HTML requests.
+	 *
+	 * @since 2.2.0
+	 * @return void
+	 */
+	public function start_frontend_html_buffer() {
+		if ( $this->should_bypass_frontend() ) {
+			return;
+		}
+
+		ob_start( array( $this, 'process_frontend_html_buffer' ) );
+	}
+
+	/**
+	 * Process the rendered frontend HTML document in a single fast pass.
+	 *
+	 * Applies post-render DOM-verified unused asset unloading, full-page image/SVG dimension
+	 * injection, full-width builder row CLS stabilization, above-the-fold LCP image/background
+	 * preloading, inline+external third-party script delay, and optional guest HTML disk caching.
+	 *
+	 * @since 2.2.0
+	 * @param string $html Rendered HTML buffer.
+	 * @return string
+	 */
+	public function process_frontend_html_buffer( $html ) {
+		if ( ! is_string( $html ) || strlen( $html ) < 256 ) {
+			return $html;
+		}
+
+		// Only transform valid HTML documents containing both </head> and <body.
+		if ( false === stripos( $html, '<html' ) || false === stripos( $html, '</head>' ) || false === stripos( $html, '<body' ) ) {
+			return $html;
+		}
+
+		if ( $this->should_bypass_frontend() ) {
+			return $html;
+		}
+
+		$settings = FBS_Secure_Optimize_Controller::get_all_settings();
+		$opts     = isset( $settings['asset_optimization'] ) ? $settings['asset_optimization'] : array();
+
+		// 1. Post-render DOM-verified unused plugin CSS/JS & reCAPTCHA unloader.
+		if ( ! empty( $opts['unload_unused_assets'] ) ) {
+			$html = $this->unload_unused_rendered_assets( $html );
+		}
+
+		// 2. Full-page image width/height & inline SVG dimensions + full-width builder CLS stabilizer.
+		if ( ! empty( $opts['cls_image_dimensions'] ) || ! empty( $opts['cls_stabilize_builders'] ) ) {
+			$html = $this->apply_document_cls_stabilization(
+				$html,
+				! empty( $opts['cls_image_dimensions'] ),
+				! empty( $opts['cls_stabilize_builders'] )
+			);
+		}
+
+		// 3. Above-the-fold LCP hero image / CSS background-image preloader & fetchpriority sanitizer.
+		if ( ! empty( $opts['preload_lcp_image'] ) ) {
+			$manual_lcp_url = isset( $opts['lcp_preload_url'] ) ? trim( (string) $opts['lcp_preload_url'] ) : '';
+			$html           = $this->apply_lcp_preload_and_priority( $html, $manual_lcp_url );
+		}
+
+		// 4. Third-party external + inline tracker bootstrap & invisible reCAPTCHA v3 interaction delay.
+		if ( ! empty( $opts['delay_third_party_js'] ) ) {
+			$html = $this->apply_document_third_party_js_delay( $html );
+		}
+
+		// 5. Save optimized HTML into static guest disk page cache when eligible.
+		if ( ! empty( $opts['enable_page_cache'] ) ) {
+			$this->maybe_store_guest_page_cache( $html );
+		}
+
+		return $html;
 	}
 
 	/**
@@ -241,7 +352,39 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 	}
 
 	/**
-	 * Add native decoding="async" and loading="lazy" while protecting the first LCP image.
+	 * Determine whether an image URL or class list represents a small UI logo, icon, or SVG
+	 * that should not consume the single high-priority LCP slot.
+	 *
+	 * @since 2.2.0
+	 * @param string $src        Image URL.
+	 * @param string $class_attr Image class attribute or full tag.
+	 * @param int    $width      Explicit width (0 if unknown).
+	 * @param int    $height     Explicit height (0 if unknown).
+	 * @return bool
+	 */
+	private function is_non_lcp_ui_graphic( $src, $class_attr = '', $width = 0, $height = 0 ) {
+		$clean_src = strtolower( (string) strtok( $src, '?#' ) );
+		if ( '' === $clean_src || 0 === strpos( $clean_src, 'data:' ) || '.svg' === substr( $clean_src, -4 ) ) {
+			return true;
+		}
+
+		if ( ( $width > 0 && $width < 200 ) || ( $height > 0 && $height < 120 ) ) {
+			return true;
+		}
+
+		$haystack = strtolower( $clean_src . ' ' . $class_attr );
+		$markers  = array( 'custom-logo', 'site-logo', 'logo', 'avatar', 'site-icon', 'scroll-down', 'icon-', 'wp-smiley' );
+		foreach ( $markers as $marker ) {
+			if ( false !== strpos( $haystack, $marker ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Add native decoding="async" and loading="lazy" while protecting the first substantial LCP image.
 	 *
 	 * @since 2.0.0
 	 * @param array<string, string> $attr Image HTML attributes.
@@ -252,14 +395,26 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 			return $attr;
 		}
 
-		++$this->image_count;
+		$src    = isset( $attr['src'] ) ? (string) $attr['src'] : '';
+		$cls    = isset( $attr['class'] ) ? (string) $attr['class'] : '';
+		$width  = isset( $attr['width'] ) ? (int) $attr['width'] : 0;
+		$height = isset( $attr['height'] ) ? (int) $attr['height'] : 0;
+
 		$attr['decoding'] = 'async';
+
+		if ( $this->is_non_lcp_ui_graphic( $src, $cls, $width, $height ) ) {
+			unset( $attr['fetchpriority'] );
+			return $attr;
+		}
+
+		++$this->image_count;
 
 		if ( 1 === $this->image_count ) {
 			unset( $attr['loading'] );
 			$attr['fetchpriority'] = 'high';
 		} elseif ( empty( $attr['loading'] ) ) {
 			$attr['loading'] = 'lazy';
+			unset( $attr['fetchpriority'] );
 		}
 
 		return $attr;
@@ -277,26 +432,34 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 			return $content;
 		}
 
-		$index   = 0;
 		$content = (string) preg_replace_callback(
 			'/<img\b[^>]*>/i',
-			function ( $matches ) use ( &$index ) {
-				++$index;
+			function ( $matches ) {
 				$img = $matches[0];
 
 				if ( false === stripos( $img, 'decoding=' ) ) {
 					$img = str_replace( '<img', '<img decoding="async"', $img );
 				}
 
-				if ( 1 === $index && 0 === $this->image_count ) {
+				$src    = preg_match( '/\bsrc\s*=\s*([\'"])([^\'"]+)\1/i', $img, $sm ) ? $sm[2] : '';
+				$width  = preg_match( '/\bwidth\s*=\s*([\'"]?)(\d+)\1/i', $img, $wm ) ? (int) $wm[2] : 0;
+				$height = preg_match( '/\bheight\s*=\s*([\'"]?)(\d+)\1/i', $img, $hm ) ? (int) $hm[2] : 0;
+
+				if ( $this->is_non_lcp_ui_graphic( $src, $img, $width, $height ) ) {
+					return $img;
+				}
+
+				if ( 0 === $this->image_count ) {
 					++$this->image_count;
-					// Strip any theme/editor-injected loading="lazy" on the first LCP image.
 					$img = (string) preg_replace( '/\s+loading=([\'"])lazy\1/i', '', $img );
 					if ( false === stripos( $img, 'fetchpriority=' ) ) {
 						$img = str_replace( '<img', '<img fetchpriority="high"', $img );
 					}
-				} elseif ( $index > 1 && false === stripos( $img, 'loading=' ) ) {
-					$img = str_replace( '<img', '<img loading="lazy"', $img );
+				} else {
+					++$this->image_count;
+					if ( false === stripos( $img, 'loading=' ) ) {
+						$img = str_replace( '<img', '<img loading="lazy"', $img );
+					}
 				}
 
 				return $img;
@@ -308,7 +471,7 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 	}
 
 	/**
-	 * Feature 3: Automatically inject missing width and height attributes on local images to prevent CLS.
+	 * Automatically inject missing width and height attributes on local images to prevent CLS.
 	 *
 	 * Dimensions are cached in a salt-versioned transient so filesystem lookups only run once per image URL.
 	 *
@@ -367,10 +530,12 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 							if ( is_array( $img_size ) && ! empty( $img_size[0] ) && ! empty( $img_size[1] ) ) {
 								$dims = array( (int) $img_size[0], (int) $img_size[1] );
 							}
+						} elseif ( 'svg' === $ext ) {
+							$dims = $this->extract_svg_file_dimensions( $local_path );
 						}
 					}
 
-					if ( count( $dims_cache ) < 250 ) {
+					if ( count( $dims_cache ) < 300 ) {
 						$dims_cache[ $clean_src ] = $dims;
 						$cache_dirty              = true;
 					}
@@ -405,7 +570,38 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 	}
 
 	/**
-	 * Feature 1a: Inject preconnect resource hints for Google Fonts when enqueued by theme/plugins.
+	 * Extract intrinsic width and height from a local .svg image file's root <svg> attributes or viewBox.
+	 *
+	 * @since 2.2.0
+	 * @param string $svg_path Verified local SVG path.
+	 * @return array{0: int, 1: int}
+	 */
+	private function extract_svg_file_dimensions( $svg_path ) {
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Read first 2 KB of verified local SVG asset.
+		$head = @file_get_contents( $svg_path, false, null, 0, 2048 ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+		if ( ! is_string( $head ) || '' === $head ) {
+			return array( 0, 0 );
+		}
+
+		if ( preg_match( '/<svg\b[^>]*>/is', $head, $svg_tag ) ) {
+			$tag = $svg_tag[0];
+			if (
+				preg_match( '/\bwidth\s*=\s*[\'"]([0-9]+(?:\.[0-9]+)?)(?:px)?[\'"]/i', $tag, $wm ) &&
+				preg_match( '/\bheight\s*=\s*[\'"]([0-9]+(?:\.[0-9]+)?)(?:px)?[\'"]/i', $tag, $hm )
+			) {
+				return array( (int) round( (float) $wm[1] ), (int) round( (float) $hm[1] ) );
+			}
+
+			if ( preg_match( '/\bviewBox\s*=\s*[\'"][^\'"]*?([0-9]+(?:\.[0-9]+)?)[\s,]+([0-9]+(?:\.[0-9]+)?)\s*[\'"]/i', $tag, $vb ) ) {
+				return array( (int) round( (float) $vb[1] ), (int) round( (float) $vb[2] ) );
+			}
+		}
+
+		return array( 0, 0 );
+	}
+
+	/**
+	 * Inject preconnect resource hints for Google Fonts when enqueued by theme/plugins.
 	 *
 	 * @since 2.1.0
 	 * @param array<int, mixed> $urls          Existing hint URLs.
@@ -421,8 +617,9 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 			return $urls;
 		}
 
-		$urls[] = 'https://fonts.googleapis.com';
-		$urls[] = array(
+		$this->emitted_gfonts_preconnect = true;
+		$urls[]                          = 'https://fonts.googleapis.com';
+		$urls[]                          = array(
 			'href'        => 'https://fonts.gstatic.com',
 			'crossorigin' => 'anonymous',
 		);
@@ -454,7 +651,44 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 	}
 
 	/**
-	 * Feature 1b: Convert render-blocking Google Fonts stylesheets to non-blocking print/onload swap + display=swap.
+	 * Convert a Google Fonts URL into a non-blocking print/onload <link> pair with display=swap.
+	 *
+	 * @since 2.2.0
+	 * @param string $font_url Google Fonts stylesheet URL.
+	 * @param string $id_attr  Optional link id attribute.
+	 * @return string
+	 */
+	private function build_non_blocking_google_font_html( $font_url, $id_attr = '' ) {
+		$clean_url = html_entity_decode( trim( $font_url ), ENT_QUOTES, 'UTF-8' );
+		if ( 0 === strpos( $clean_url, '//' ) ) {
+			$clean_url = 'https:' . $clean_url;
+		}
+
+		if ( false === stripos( $clean_url, 'display=' ) ) {
+			$clean_url = add_query_arg( 'display', 'swap', $clean_url );
+		}
+
+		$escaped_url = esc_url( $clean_url );
+		$id_part     = '' !== $id_attr ? ' id="' . esc_attr( $id_attr ) . '"' : '';
+
+		$preconnect = '';
+		if ( ! $this->emitted_gfonts_preconnect ) {
+			$this->emitted_gfonts_preconnect = true;
+			$preconnect                      = "<link rel=\"preconnect\" href=\"https://fonts.googleapis.com\">\n"
+				. "<link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin>\n";
+		}
+
+		return $preconnect
+			. sprintf(
+				"<link rel=\"stylesheet\"%s href=\"%s\" media=\"print\" onload=\"this.media='all'\">\n<noscript><link rel=\"stylesheet\" href=\"%s\"></noscript>\n",
+				$id_part,
+				$escaped_url,
+				$escaped_url
+			);
+	}
+
+	/**
+	 * Convert render-blocking Google Fonts stylesheets to non-blocking print/onload swap + display=swap.
 	 *
 	 * @since 2.1.0
 	 * @param string $tag    Enqueued style HTML tag.
@@ -464,8 +698,6 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 	 * @return string
 	 */
 	public function optimize_google_fonts_tag( $tag, $handle, $href, $media ) {
-		unset( $handle );
-
 		if ( $this->should_bypass_frontend() || empty( $href ) || false === stripos( $href, 'fonts.googleapis.com/css' ) ) {
 			return $tag;
 		}
@@ -474,30 +706,11 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 			return $tag;
 		}
 
-		// Ensure font-display: swap is active to prevent invisible text (FOIT) and CLS shifts.
-		if ( false === stripos( $href, 'display=' ) ) {
-			$swap_href = add_query_arg( 'display', 'swap', $href );
-			$tag       = str_replace( $href, esc_url( $swap_href ), $tag );
-		}
-
-		$noscript_fallback = '<noscript>' . trim( $tag ) . '</noscript>';
-
-		if ( preg_match( '/\bmedia=([\'"])(?:all|screen)?\1/i', $tag ) ) {
-			$async_tag = (string) preg_replace(
-				'/\bmedia=([\'"])(?:all|screen)?\1/i',
-				'media="print" onload="this.media=\'all\'"',
-				$tag,
-				1
-			);
-		} else {
-			$async_tag = str_replace( 'href=', 'media="print" onload="this.media=\'all\'" href=', $tag );
-		}
-
-		return trim( $async_tag ) . "\n" . $noscript_fallback . "\n";
+		return $this->build_non_blocking_google_font_html( $href, $handle . '-css' );
 	}
 
 	/**
-	 * Feature 2: Auto-inline small render-blocking local stylesheets (<= 8 KB) to eliminate network round-trips.
+	 * Auto-inline small render-blocking local stylesheets (<= 8 KB) and strip empty 0-byte CSS requests.
 	 *
 	 * Safely rewrites relative url(...) assets to absolute URLs and caches minified CSS via salt-versioned transients.
 	 *
@@ -548,6 +761,13 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 			return $tag;
 		}
 
+		$file_size = (int) filesize( $local_path );
+
+		// Eliminate wasted render-blocking HTTP round-trips on empty 0-byte plugin stylesheets.
+		if ( 0 === $file_size ) {
+			return '';
+		}
+
 		/**
 		 * Filters the maximum file size (in bytes) eligible for automatic CSS inlining.
 		 *
@@ -555,8 +775,7 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 		 * @param int $max_bytes Default 8192 bytes (8 KB).
 		 */
 		$max_bytes = (int) apply_filters( 'fbsseop_inline_css_max_bytes', 8192 );
-		$file_size = (int) filesize( $local_path );
-		if ( $file_size <= 0 || $file_size > $max_bytes ) {
+		if ( $file_size < 0 || $file_size > $max_bytes ) {
 			return $tag;
 		}
 
@@ -572,7 +791,7 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 				return $tag;
 			}
 
-			// Skip files containing @import rules, since @import must precede other rules or stay external.
+			// Skip files containing @import rules here so maybe_deblock_css_imports can hoist them cleanly.
 			if ( false !== stripos( $raw_css, '@import' ) ) {
 				return $tag;
 			}
@@ -601,7 +820,180 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 	}
 
 	/**
-	 * Rewrite relative url(...) references to absolute URLs and minify CSS comments/whitespace.
+	 * Hoist chained render-blocking @import Google Fonts out of local stylesheets (such as theme style.css)
+	 * and serve a static de-blocked & minified CSS copy from wp-content/cache/fbs-optimize/css/.
+	 *
+	 * @since 2.2.0
+	 * @param string $tag    Enqueued style HTML tag.
+	 * @param string $handle Registered style handle.
+	 * @param string $href   Stylesheet URL.
+	 * @param string $media  Stylesheet media attribute.
+	 * @return string
+	 */
+	public function maybe_deblock_css_imports( $tag, $handle, $href, $media ) {
+		if ( $this->should_bypass_frontend() || empty( $href ) || 0 === strpos( ltrim( $tag ), '<style' ) ) {
+			return $tag;
+		}
+
+		if ( ! in_array( $media, array( '', 'all', 'screen' ), true ) ) {
+			return $tag;
+		}
+
+		$clean_href = (string) strtok( $href, '?#' );
+		$local_path = $this->resolve_local_asset_path( $clean_href, '.css' );
+		if ( '' === $local_path ) {
+			return $tag;
+		}
+
+		// Quick 4 KB header check: valid CSS @import rules must appear at the top of the stylesheet.
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Fast 4KB header inspection of local CSS file.
+		$css_head = @file_get_contents( $local_path, false, null, 0, 4096 ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+		if ( ! is_string( $css_head ) || false === stripos( $css_head, '@import' ) || false === stripos( $css_head, 'fonts.googleapis.com' ) ) {
+			return $tag;
+		}
+
+		$mtime      = (int) filemtime( $local_path );
+		$salt       = FBS_Secure_Optimize_Controller::get_cache_salt();
+		$hash       = substr( md5( $salt . '|' . $handle . '|' . $local_path . '|' . $mtime ), 0, 16 );
+		$safe_slug  = preg_replace( '/[^a-z0-9_-]/i', '-', $handle );
+		$cache_dir  = trailingslashit( WP_CONTENT_DIR ) . 'cache/fbs-optimize/css';
+		$cache_file = $cache_dir . '/' . $safe_slug . '-' . $hash . '.css';
+		$meta_key   = 'fbsseop_imp_' . $hash;
+		$font_urls  = get_transient( $meta_key );
+
+		if ( ! is_file( $cache_file ) || ! is_array( $font_urls ) ) {
+			// phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Verified local CSS file inside ABSPATH.
+			$raw_css = file_get_contents( $local_path );
+			if ( false === $raw_css ) {
+				return $tag;
+			}
+
+			$extracted_fonts = array();
+			$stripped_css    = (string) preg_replace_callback(
+				'/@import\s+(?:url\(\s*([\'"]?)([^\'")]+)\1\s*\)|([\'"])([^\'"]+)\3)\s*;/i',
+				static function ( $matches ) use ( &$extracted_fonts ) {
+					$import_url = ! empty( $matches[2] ) ? trim( $matches[2] ) : trim( $matches[4] );
+					if ( false !== stripos( $import_url, 'fonts.googleapis.com/css' ) ) {
+						$extracted_fonts[] = $import_url;
+						return '';
+					}
+					return $matches[0];
+				},
+				$raw_css
+			);
+
+			if ( empty( $extracted_fonts ) ) {
+				return $tag;
+			}
+
+			if ( ! is_dir( $cache_dir ) && ! wp_mkdir_p( $cache_dir ) ) {
+				// Filesystem read-only fallback: still hoist preconnect + async Google Fonts ahead of the tag.
+				$hoisted_html = '';
+				foreach ( array_unique( $extracted_fonts ) as $idx => $furl ) {
+					$hoisted_html .= $this->build_non_blocking_google_font_html( $furl, $handle . '-gfont-' . $idx );
+				}
+				return $hoisted_html . $tag;
+			}
+
+			$this->ensure_cache_index_guard( $cache_dir );
+
+			$base_dir_url = trailingslashit( dirname( $clean_href ) );
+			$rewritten    = $this->rewrite_and_minify_css( $stripped_css, $base_dir_url );
+
+			// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- Writing static optimized CSS cache file.
+			$written = @file_put_contents( $cache_file, $rewritten, LOCK_EX ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+			if ( false === $written ) {
+				return $tag;
+			}
+
+			$font_urls = array_values( array_unique( $extracted_fonts ) );
+			set_transient( $meta_key, $font_urls, 7 * DAY_IN_SECONDS );
+		}
+
+		$cached_url   = content_url( 'cache/fbs-optimize/css/' . $safe_slug . '-' . $hash . '.css' );
+		$hoisted_html = '';
+		foreach ( $font_urls as $idx => $furl ) {
+			$hoisted_html .= $this->build_non_blocking_google_font_html( $furl, $handle . '-gfont-' . $idx );
+		}
+
+		$updated_tag = str_replace( $href, esc_url( $cached_url ), $tag );
+
+		return $hoisted_html . $updated_tag;
+	}
+
+	/**
+	 * Convert render-blocking icon & decorative stylesheets (Font Awesome, Elementor Icons, Ionicons, Line Awesome)
+	 * to non-blocking media="print" swap with <noscript> fallback.
+	 *
+	 * Never touches layout/grid CSS so zero FOUC or CLS occurs.
+	 *
+	 * @since 2.2.0
+	 * @param string $tag    Enqueued style HTML tag.
+	 * @param string $handle Registered style handle.
+	 * @param string $href   Stylesheet URL.
+	 * @param string $media  Stylesheet media attribute.
+	 * @return string
+	 */
+	public function maybe_async_icon_stylesheet( $tag, $handle, $href, $media ) {
+		if ( $this->should_bypass_frontend() || empty( $href ) || 0 === strpos( ltrim( $tag ), '<style' ) ) {
+			return $tag;
+		}
+
+		if ( 'print' === $media || false !== stripos( $tag, 'onload=' ) ) {
+			return $tag;
+		}
+
+		$icon_patterns = array(
+			'font-awesome',
+			'fontawesome',
+			'use.fontawesome.com',
+			'kit.fontawesome.com',
+			'elementor-icons',
+			'ionicons',
+			'line-awesome',
+			'genericons',
+			'magnific-popup',
+		);
+
+		/**
+		 * Filters handle/URL patterns converted to non-blocking async icon stylesheets.
+		 *
+		 * @since 2.2.0
+		 * @param array<int, string> $icon_patterns Substrings matched against handle or href.
+		 */
+		$icon_patterns = apply_filters( 'fbsseop_async_icon_css_patterns', $icon_patterns );
+
+		$haystack = strtolower( $handle . ' ' . $href );
+		$matched  = false;
+		foreach ( $icon_patterns as $pat ) {
+			if ( '' !== $pat && false !== strpos( $haystack, strtolower( $pat ) ) ) {
+				$matched = true;
+				break;
+			}
+		}
+
+		if ( ! $matched ) {
+			return $tag;
+		}
+
+		$noscript = '<noscript>' . trim( $tag ) . '</noscript>';
+
+		if ( preg_match( '/\bmedia=([\'"])(?:all|screen)?\1/i', $tag ) ) {
+			$async_tag = (string) preg_replace(
+				'/\bmedia=([\'"])(?:all|screen)?\1/i',
+				'media="print" onload="this.media=\'all\'"',
+				$tag,
+				1
+			);
+		} else {
+			$async_tag = str_replace( 'href=', 'media="print" onload="this.media=\'all\'" href=', $tag );
+		}
+
+		return trim( $async_tag ) . "\n" . $noscript . "\n";
+	}
+
+	/**
+	 * Rewrite relative url(...) references to normalized absolute URLs and minify CSS comments/whitespace.
 	 *
 	 * @since 2.1.0
 	 * @param string $css          Raw stylesheet content.
@@ -616,10 +1008,11 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 		// Strip CSS block comments.
 		$css = (string) preg_replace( '#/\*.*?\*/#s', '', $css );
 
-		// Rewrite relative url(...) references so background images and fonts never 404 when inlined.
-		$css = (string) preg_replace_callback(
+		// Rewrite relative url(...) references so background images and fonts never 404 when inlined or relocated.
+		$self = $this;
+		$css  = (string) preg_replace_callback(
 			'/url\(\s*([\'"]?)([^\'")]+)\1\s*\)/i',
-			static function ( $matches ) use ( $base_dir_url ) {
+			static function ( $matches ) use ( $base_dir_url, $self ) {
 				$quote = $matches[1];
 				$url   = trim( $matches[2] );
 
@@ -635,13 +1028,13 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 					return $matches[0];
 				}
 
-				$abs_url = $base_dir_url . $url;
+				$abs_url = $self->normalize_url_dot_segments( $base_dir_url . $url );
 				return 'url(' . $quote . esc_url_raw( $abs_url ) . $quote . ')';
 			},
 			$css
 		);
 
-		// Safe lightweight whitespace minification.
+		// Safe lightweight whitespace minification (note: preserve spaces around '+' and '-' inside calc()).
 		$css = (string) preg_replace( '/\s+/', ' ', $css );
 		$css = (string) preg_replace( '/\s*([\{\};:,>~])\s*/', '$1', $css );
 		$css = str_replace( ';}', '}', $css );
@@ -650,6 +1043,41 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 		$css = str_ireplace( '</style', '', $css );
 
 		return trim( $css );
+	}
+
+	/**
+	 * Normalize './' and '../' segments inside a full HTTP(S) URL.
+	 *
+	 * @since 2.2.0
+	 * @param string $url Full URL string.
+	 * @return string
+	 */
+	public function normalize_url_dot_segments( $url ) {
+		$parts = wp_parse_url( $url );
+		if ( ! is_array( $parts ) || empty( $parts['scheme'] ) || empty( $parts['host'] ) || empty( $parts['path'] ) ) {
+			return $url;
+		}
+
+		$segments = explode( '/', $parts['path'] );
+		$resolved = array();
+		foreach ( $segments as $seg ) {
+			if ( '.' === $seg ) {
+				continue;
+			}
+			if ( '..' === $seg ) {
+				if ( ! empty( $resolved ) && '' !== end( $resolved ) ) {
+					array_pop( $resolved );
+				}
+				continue;
+			}
+			$resolved[] = $seg;
+		}
+
+		$port  = isset( $parts['port'] ) ? ':' . (int) $parts['port'] : '';
+		$query = isset( $parts['query'] ) ? '?' . $parts['query'] : '';
+		$frag  = isset( $parts['fragment'] ) ? '#' . $parts['fragment'] : '';
+
+		return $parts['scheme'] . '://' . $parts['host'] . $port . implode( '/', $resolved ) . $query . $frag;
 	}
 
 	/**
@@ -743,7 +1171,8 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 	}
 
 	/**
-	 * Safely add defer attribute to non-critical frontend scripts while excluding core & checkout handles.
+	 * Safely add defer attribute to non-critical frontend scripts while excluding core, checkout,
+	 * and handles with synchronous inline "after" scripts.
 	 *
 	 * @since 2.0.0
 	 * @param string $tag    Script HTML tag.
@@ -759,6 +1188,7 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 			'jquery',
 			'jquery-core',
 			'jquery-migrate',
+			'wp-polyfill',
 			'wp-hooks',
 			'wp-i18n',
 			'wp-api-fetch',
@@ -779,6 +1209,15 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 			return $tag;
 		}
 
+		// Protect handles that attach synchronous wp_add_inline_script(..., 'after') blocks.
+		$wp_scripts = wp_scripts();
+		if ( $wp_scripts instanceof WP_Scripts ) {
+			$after_data = $wp_scripts->get_data( $handle, 'after' );
+			if ( ! empty( $after_data ) ) {
+				return $tag;
+			}
+		}
+
 		if ( false !== stripos( $tag, ' defer' ) || false !== stripos( $tag, ' async' ) || false === stripos( $tag, ' src=' ) ) {
 			return $tag;
 		}
@@ -787,9 +1226,50 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 	}
 
 	/**
-	 * Feature 4a: Delay heavy third-party analytics & tracking scripts until first user interaction or 3.5s timer.
+	 * Check whether the current page is a sensitive transactional eCommerce screen.
 	 *
-	 * Automatically bypasses WooCommerce cart, checkout, and account pages to protect conversion tracking.
+	 * @since 2.2.0
+	 * @return bool
+	 */
+	private function is_transactional_page() {
+		return (
+			( function_exists( 'is_cart' ) && is_cart() ) ||
+			( function_exists( 'is_checkout' ) && is_checkout() ) ||
+			( function_exists( 'is_account_page' ) && is_account_page() )
+		);
+	}
+
+	/**
+	 * Retrieve third-party tracker URL patterns eligible for interaction delay.
+	 *
+	 * @since 2.2.0
+	 * @return array<int, string>
+	 */
+	private function get_delayed_tracker_patterns() {
+		$patterns = array(
+			'googletagmanager.com/gtag/js',
+			'googletagmanager.com/gtm.js',
+			'google-analytics.com/analytics.js',
+			'connect.facebook.net/',
+			'clarity.ms/',
+			'scripts.clarity.ms/',
+			'static.hotjar.com/',
+			'snap.licdn.com/',
+			'analytics.tiktok.com/',
+			'gtm4wp-form-move-tracker',
+		);
+
+		/**
+		 * Filters URL substrings matched for third-party JS interaction delay.
+		 *
+		 * @since 2.1.0
+		 * @param array<int, string> $patterns Third-party script URL patterns.
+		 */
+		return (array) apply_filters( 'fbsseop_delayed_script_patterns', $patterns );
+	}
+
+	/**
+	 * Delay enqueued external third-party analytics & tracking scripts via script_loader_tag.
 	 *
 	 * @since 2.1.0
 	 * @param string $tag    Script HTML tag.
@@ -804,35 +1284,12 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 			return $tag;
 		}
 
-		// Protect eCommerce transactional pages (cart, checkout, customer account).
-		if (
-			( function_exists( 'is_cart' ) && is_cart() ) ||
-			( function_exists( 'is_checkout' ) && is_checkout() ) ||
-			( function_exists( 'is_account_page' ) && is_account_page() )
-		) {
+		if ( $this->is_transactional_page() ) {
 			return $tag;
 		}
 
-		$patterns = array(
-			'googletagmanager.com/gtag/js',
-			'googletagmanager.com/gtm.js',
-			'google-analytics.com/analytics.js',
-			'connect.facebook.net/',
-			'clarity.ms/',
-			'static.hotjar.com/',
-			'snap.licdn.com/',
-			'analytics.tiktok.com/',
-		);
-
-		/**
-		 * Filters URL substrings matched for third-party JS interaction delay.
-		 *
-		 * @since 2.1.0
-		 * @param array<int, string> $patterns Third-party script URL patterns.
-		 */
-		$patterns = apply_filters( 'fbsseop_delayed_script_patterns', $patterns );
-
-		$matched = false;
+		$patterns = $this->get_delayed_tracker_patterns();
+		$matched  = false;
 		foreach ( $patterns as $pattern ) {
 			if ( '' !== $pattern && false !== stripos( $src, $pattern ) ) {
 				$matched = true;
@@ -844,7 +1301,6 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 			return $tag;
 		}
 
-		// Replace existing type="..." if present, then mark as fbsseop/delayed with data-fbsseop-src.
 		$delayed_tag = (string) preg_replace( '/\s+type=([\'"])[^\'"]*\1/i', '', $tag );
 		$delayed_tag = (string) preg_replace( '/\bsrc=([\'"])/i', 'type="fbsseop/delayed" data-fbsseop-src=$1', $delayed_tag, 1 );
 
@@ -856,22 +1312,910 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 	}
 
 	/**
-	 * Feature 4b: Print lightweight (<500B) interaction + 3.5s fallback loader only when scripts were delayed.
+	 * Post-render DOM-verified unloader for unused plugin CSS/JS & orphaned reCAPTCHA v3.
 	 *
-	 * @since 2.1.0
+	 * Because this inspects the COMPLETE rendered <body> (including header, page-builder rows,
+	 * popups, widgets, and footer), forms or widgets placed outside post_content are never broken.
+	 *
+	 * @since 2.2.0
+	 * @param string $html Complete rendered HTML document.
+	 * @return string
+	 */
+	private function unload_unused_rendered_assets( $html ) {
+		$body_pos = stripos( $html, '<body' );
+		if ( false === $body_pos ) {
+			return $html;
+		}
+
+		$body_html = substr( $html, $body_pos );
+		// Strip <script> and <style> blocks when checking rendered DOM markup so plugin footer localization scripts do not self-match.
+		$dom_only         = (string) preg_replace( '#<(script|style)\b[^>]*>.*?</\1>#is', '', $body_html );
+		$strip_tokens     = array();
+		$strip_inline_ids = array();
+
+		// 1. Contact Form 7 + Add-ons + Orphaned Google reCAPTCHA v3 on formless pages.
+		if ( false === stripos( $dom_only, 'wpcf7' ) ) {
+			$strip_tokens[]     = 'contact-form-7';
+			$strip_tokens[]     = 'dnd-upload-cf7';
+			$strip_tokens[]     = 'codedropz-uploader';
+			$strip_tokens[]     = 'cf7apps-honeypot';
+			$strip_tokens[]     = 'gtm4wp-contact-form-7-tracker';
+			$strip_inline_ids[] = 'contact-form-7';
+			$strip_inline_ids[] = 'dnd-upload-cf7';
+			$strip_inline_ids[] = 'wpcf7-recaptcha';
+
+			// Strip Google reCAPTCHA v3 only when no other form/captcha DOM element exists on the page.
+			$other_captcha_consumers = array(
+				'g-recaptcha',
+				'wpforms',
+				'gform_',
+				'fluentform',
+				'nf-form',
+				'elementor-form',
+				'woocommerce',
+				'loginform',
+				'um-form',
+			);
+			$has_other_consumer      = false;
+			foreach ( $other_captcha_consumers as $marker ) {
+				if ( false !== stripos( $dom_only, $marker ) ) {
+					$has_other_consumer = true;
+					break;
+				}
+			}
+
+			if ( ! $has_other_consumer ) {
+				$strip_tokens[]     = 'google.com/recaptcha/api.js';
+				$strip_tokens[]     = 'google-recaptcha-js';
+				$strip_inline_ids[] = 'google-recaptcha';
+			}
+		}
+
+		// 2. Smash Balloon Instagram Feed when no feed container exists in the DOM.
+		if ( false === stripos( $dom_only, 'sb_instagram' ) && false === stripos( $dom_only, 'sbi_' ) ) {
+			$strip_tokens[]     = 'instagram-feed/';
+			$strip_tokens[]     = 'sbi_styles';
+			$strip_tokens[]     = 'sbi-tokens-local';
+			$strip_inline_ids[] = 'sbi_';
+		}
+
+		// 3. SiteOrigin Anything Carousel & Slick Slider when zero carousel/slick DOM elements exist.
+		if ( false === stripos( $dom_only, 'sow-carousel' ) ) {
+			$strip_tokens[]     = 'sow-anything-carousel';
+			$strip_tokens[]     = 'so-widgets-bundle/js/carousel';
+			$strip_inline_ids[] = 'sow-anything-carousel';
+
+			// Only strip shared slick library if neither DOM classes nor non-Slick theme inline scripts call .slick(.
+			$body_without_slick_lib = (string) preg_replace( '#<script\b[^>]*(?:sow-anything-carousel|so-widgets-bundle/js/(?:carousel|lib/slick))[^>]*>.*?</script>#is', '', $body_html );
+			if ( false === stripos( $dom_only, 'slick' ) && false === stripos( $body_without_slick_lib, '.slick(' ) ) {
+				$strip_tokens[]     = 'so-widgets-bundle/js/lib/slick';
+				$strip_tokens[]     = 'so-widgets-bundle/css/lib/slick';
+				$strip_inline_ids[] = 'slick-fbs-inline-css';
+				$strip_inline_ids[] = 'sow-slick';
+			}
+		}
+
+		// 4. WPForms & TablePress when absent from rendered DOM.
+		if ( false === stripos( $dom_only, 'wpforms' ) ) {
+			$strip_tokens[]     = '/plugins/wpforms';
+			$strip_inline_ids[] = 'wpforms';
+		}
+
+		if ( false === stripos( $dom_only, 'tablepress' ) ) {
+			$strip_tokens[]     = '/plugins/tablepress';
+			$strip_inline_ids[] = 'tablepress';
+		}
+
+		// 5. Unused WordPress Core Social Links block inline CSS (~12 KB) when block is absent.
+		if ( false === stripos( $dom_only, 'wp-block-social-links' ) ) {
+			$strip_inline_ids[] = 'wp-block-social-links-inline-css';
+		}
+
+		if ( empty( $strip_tokens ) && empty( $strip_inline_ids ) ) {
+			return $html;
+		}
+
+		// Remove matched <link rel="stylesheet" ...> tags.
+		if ( ! empty( $strip_tokens ) ) {
+			$html = (string) preg_replace_callback(
+				'/<link\b[^>]*rel=[\'"]stylesheet[\'"][^>]*>\s*/i',
+				static function ( $m ) use ( $strip_tokens ) {
+					$tag_lc = strtolower( $m[0] );
+					foreach ( $strip_tokens as $tok ) {
+						if ( false !== strpos( $tag_lc, strtolower( $tok ) ) ) {
+							return '';
+						}
+					}
+					return $m[0];
+				},
+				$html
+			);
+		}
+
+		// Remove matched <style id="...">...</style> blocks (including FBS inlined small CSS for unused plugins).
+		if ( ! empty( $strip_inline_ids ) ) {
+			$html = (string) preg_replace_callback(
+				'/<style\b([^>]*)>.*?<\/style>\s*/is',
+				static function ( $m ) use ( $strip_inline_ids ) {
+					$attrs_lc = strtolower( $m[1] );
+					foreach ( $strip_inline_ids as $id_tok ) {
+						if ( false !== strpos( $attrs_lc, strtolower( $id_tok ) ) ) {
+							return '';
+						}
+					}
+					return $m[0];
+				},
+				$html
+			);
+		}
+
+		// Remove matched <script ...>...</script> tags (external + associated -js-extra/-js-before/-js-after blocks).
+		$all_script_tokens = array_unique( array_merge( $strip_tokens, $strip_inline_ids ) );
+		if ( ! empty( $all_script_tokens ) ) {
+			$html = (string) preg_replace_callback(
+				'/<script\b([^>]*)>.*?<\/script>\s*/is',
+				static function ( $m ) use ( $all_script_tokens ) {
+					$attrs_lc = strtolower( $m[1] );
+					foreach ( $all_script_tokens as $tok ) {
+						if ( false !== strpos( $attrs_lc, strtolower( $tok ) ) ) {
+							return '';
+						}
+					}
+					return $m[0];
+				},
+				$html
+			);
+		}
+
+		return $html;
+	}
+
+	/**
+	 * Apply full-document CLS stabilization:
+	 * 1) Inject missing width & height on header/hero/builder/footer <img> tags.
+	 * 2) Inject intrinsic viewBox width & height + zero-specificity auto-height CSS on inline <svg> icons.
+	 * 3) Pre-stabilize full-width JS-stretched page-builder rows (SiteOrigin, WPBakery) before First Paint.
+	 *
+	 * @since 2.2.0
+	 * @param string $html               Full HTML document.
+	 * @param bool   $fix_img_dims       Whether to inject missing <img> dimensions across body.
+	 * @param bool   $stabilize_builders Whether to stabilize full-width builder rows and inline <svg>s.
+	 * @return string
+	 */
+	private function apply_document_cls_stabilization( $html, $fix_img_dims, $stabilize_builders ) {
+		$body_pos = stripos( $html, '<body' );
+		if ( false === $body_pos ) {
+			return $html;
+		}
+
+		$head_part = substr( $html, 0, $body_pos );
+		$body_part = substr( $html, $body_pos );
+
+		// Protect <script> and <style> blocks inside <body> while rewriting <img> and <svg> tags.
+		$placeholders = array();
+		$protected    = (string) preg_replace_callback(
+			'/<(script|style|template)\b[^>]*>.*?<\/\1>/is',
+			static function ( $m ) use ( &$placeholders ) {
+				$key                  = '<!--FBSSEOP_HOLD_' . count( $placeholders ) . '-->';
+				$placeholders[ $key ] = $m[0];
+				return $key;
+			},
+			$body_part
+		);
+
+		if ( $fix_img_dims ) {
+			$protected = $this->inject_missing_image_dimensions( $protected );
+		}
+
+		$injected_svg_dims = false;
+		if ( $stabilize_builders && false !== stripos( $protected, '<svg' ) ) {
+			$protected = (string) preg_replace_callback(
+				'/<svg\b[^>]*>/i',
+				static function ( $m ) use ( &$injected_svg_dims ) {
+					$svg = $m[0];
+					if (
+						preg_match( '/\bwidth\s*=/i', $svg ) ||
+						preg_match( '/\bheight\s*=/i', $svg ) ||
+						preg_match( '/\bstyle\s*=\s*[\'"][^\'"]*(?:width|height)\s*:/i', $svg )
+					) {
+						return $svg;
+					}
+
+					if ( ! preg_match( '/\bviewBox\s*=\s*[\'"][+-]?[0-9.]+\s+[+-]?[0-9.]+\s+([0-9]+(?:\.[0-9]+)?)\s+([0-9]+(?:\.[0-9]+)?)\s*[\'"]/i', $svg, $vb ) ) {
+						return $svg;
+					}
+
+					$w = round( (float) $vb[1], 2 );
+					$h = round( (float) $vb[2], 2 );
+					if ( $w <= 0 || $h <= 0 ) {
+						return $svg;
+					}
+
+					$injected_svg_dims = true;
+					return str_replace(
+						'<svg',
+						'<svg width="' . esc_attr( (string) $w ) . '" height="' . esc_attr( (string) $h ) . '" data-fbs-svg="1"',
+						$svg
+					);
+				},
+				$protected
+			);
+		}
+
+		if ( ! empty( $placeholders ) ) {
+			$body_part = strtr( $protected, $placeholders );
+		} else {
+			$body_part = $protected;
+		}
+
+		$cls_head_snippets = '';
+
+		// Pre-JS full-bleed row stabilization for SiteOrigin Page Builder & WPBakery.
+		if (
+			$stabilize_builders &&
+			(
+				false !== strpos( $body_part, 'siteorigin-panels-before-js' ) ||
+				false !== strpos( $body_part, 'data-stretch-type="full' ) ||
+				false !== strpos( $body_part, 'data-vc-full-width="true"' )
+			)
+		) {
+			$cls_head_snippets .= '<script id="fbsseop-cls-vw">(function(){var d=document.documentElement,u=function(){d.style.setProperty("--fbs-cw",d.clientWidth+"px")};u();if(window.ResizeObserver){var r=new ResizeObserver(u);r.observe(d);window.addEventListener("load",function(){setTimeout(function(){r.disconnect()},1500)},{once:true})}})();</script>' . "\n";
+
+			$cls_css  = 'html{overflow-x:clip}';
+			$cls_css .= 'body.siteorigin-panels-before-js:not(.siteorigin-panels-css-container) .siteorigin-panels-stretch[data-stretch-type="full-stretched"],';
+			$cls_css .= 'body.siteorigin-panels-before-js:not(.siteorigin-panels-css-container) .siteorigin-panels-stretch[data-stretch-type="full-width-stretch"],';
+			$cls_css .= '[data-vc-full-width="true"][data-vc-stretch-content="true"]:not([data-vc-full-width-init="true"]){';
+			$cls_css .= 'width:var(--fbs-cw,100vw)!important;max-width:var(--fbs-cw,100vw)!important;';
+			$cls_css .= 'margin-left:calc(50% - (var(--fbs-cw,100vw) / 2))!important;margin-right:calc(50% - (var(--fbs-cw,100vw) / 2))!important;';
+			$cls_css .= 'padding-left:0!important;padding-right:0!important;box-sizing:border-box!important}';
+			$cls_css .= 'body.siteorigin-panels-before-js:not(.siteorigin-panels-css-container) .siteorigin-panels-stretch[data-stretch-type="full"]{';
+			$cls_css .= 'margin-left:calc(50% - (var(--fbs-cw,100vw) / 2))!important;margin-right:calc(50% - (var(--fbs-cw,100vw) / 2))!important;';
+			$cls_css .= 'padding-left:calc((var(--fbs-cw,100vw) - 100%) / 2)!important;padding-right:calc((var(--fbs-cw,100vw) - 100%) / 2)!important;box-sizing:border-box!important}';
+
+			if ( $injected_svg_dims ) {
+				$cls_css          .= ':where([data-fbs-svg]){height:auto}';
+				$injected_svg_dims = false;
+			}
+
+			$cls_head_snippets .= '<style id="fbsseop-cls-stabilizer">' . $cls_css . "</style>\n";
+		} elseif ( $injected_svg_dims ) {
+			$cls_head_snippets .= "<style id=\"fbsseop-svg-cls\">:where([data-fbs-svg]){height:auto}</style>\n";
+		}
+
+		if ( '' !== $cls_head_snippets ) {
+			$head_part = $this->inject_early_into_head( $head_part, $cls_head_snippets );
+		}
+
+		return $head_part . $body_part;
+	}
+
+	/**
+	 * Detect the true above-the-fold LCP hero image (whether a CSS background-image or hero <img>),
+	 * inject an early <link rel="preload" as="image" fetchpriority="high"> in <head>, and sanitize
+	 * misplaced fetchpriority="high" attributes on offscreen/lazy-loaded images.
+	 *
+	 * @since 2.2.0
+	 * @param string $html           Full HTML document.
+	 * @param string $manual_lcp_url Optional admin-configured hero image URL override.
+	 * @return string
+	 */
+	private function apply_lcp_preload_and_priority( $html, $manual_lcp_url = '' ) {
+		$body_pos = stripos( $html, '<body' );
+		if ( false === $body_pos ) {
+			return $html;
+		}
+
+		$head_part          = substr( $html, 0, $body_pos );
+		$body_part          = substr( $html, $body_pos );
+		$already_has_preload = (bool) preg_match( '/<link\b[^>]*rel=[\'"]preload[\'"][^>]*as=[\'"]image[\'"][^>]*>/i', $head_part );
+
+		$lcp_type   = '';
+		$lcp_url    = '';
+		$lcp_srcset = '';
+		$lcp_sizes  = '';
+
+		// 1. Check optional manual URL override (only if referenced on this page or front page).
+		if ( '' !== $manual_lcp_url ) {
+			$clean_manual = (string) strtok( $manual_lcp_url, '?#' );
+			if ( false !== strpos( $html, $clean_manual ) || is_front_page() ) {
+				$lcp_type = 'manual';
+				$lcp_url  = $manual_lcp_url;
+			}
+		}
+
+		// 2. Auto-detect above-the-fold CSS hero background-image vs above-the-fold hero <img>.
+		if ( '' === $lcp_url ) {
+			$bg_candidate  = $this->detect_above_fold_hero_background( $head_part, $body_part );
+			$img_candidate = $this->detect_above_fold_hero_img( $body_part );
+
+			if ( null !== $bg_candidate && null !== $img_candidate ) {
+				if ( $bg_candidate['offset'] <= $img_candidate['offset'] ) {
+					$lcp_type = 'bg';
+					$lcp_url  = $bg_candidate['url'];
+				} else {
+					$lcp_type   = 'img';
+					$lcp_url    = $img_candidate['url'];
+					$lcp_srcset = $img_candidate['srcset'];
+					$lcp_sizes  = $img_candidate['sizes'];
+				}
+			} elseif ( null !== $bg_candidate ) {
+				$lcp_type = 'bg';
+				$lcp_url  = $bg_candidate['url'];
+			} elseif ( null !== $img_candidate ) {
+				$lcp_type   = 'img';
+				$lcp_url    = $img_candidate['url'];
+				$lcp_srcset = $img_candidate['srcset'];
+				$lcp_sizes  = $img_candidate['sizes'];
+			}
+		}
+
+		// 3. Inject early <link rel="preload" as="image" ... fetchpriority="high"> into <head>.
+		if ( '' !== $lcp_url && ! $already_has_preload ) {
+			$preload_attrs = 'rel="preload" as="image" href="' . esc_url( $lcp_url ) . '"';
+			if ( '' !== $lcp_srcset ) {
+				$preload_attrs .= ' imagesrcset="' . esc_attr( $lcp_srcset ) . '"';
+				if ( '' !== $lcp_sizes ) {
+					$preload_attrs .= ' imagesizes="' . esc_attr( $lcp_sizes ) . '"';
+				}
+			}
+			$preload_attrs .= ' fetchpriority="high"';
+
+			$preload_tag = '<link ' . $preload_attrs . ">\n";
+			$head_part   = $this->inject_early_into_head( $head_part, $preload_tag );
+		}
+
+		// 4. Clean up contradictory loading="lazy" + fetchpriority="high" and below-the-fold priority theft.
+		$clean_lcp_url = '' !== $lcp_url ? (string) strtok( $lcp_url, '?#' ) : '';
+		$body_part     = (string) preg_replace_callback(
+			'/<img\b[^>]*>/i',
+			static function ( $m ) use ( $lcp_type, $clean_lcp_url ) {
+				$img = $m[0];
+				$src = preg_match( '/\bsrc\s*=\s*([\'"])([^\'"]+)\1/i', $img, $sm ) ? (string) strtok( $sm[2], '?#' ) : '';
+
+				if ( 'img' === $lcp_type && '' !== $clean_lcp_url && $src === $clean_lcp_url ) {
+					// Ensure winning hero <img> is never lazy-loaded and carries fetchpriority="high".
+					$img = (string) preg_replace( '/\s+loading=([\'"])lazy\1/i', '', $img );
+					if ( false === stripos( $img, 'fetchpriority=' ) ) {
+						$img = str_replace( '<img', '<img fetchpriority="high"', $img );
+					}
+					return $img;
+				}
+
+				// If hero LCP is a CSS background-image, or if an <img> has loading="lazy", strip fetchpriority="high" so it cannot steal bandwidth.
+				if ( 'bg' === $lcp_type || false !== stripos( $img, 'loading="lazy"' ) || false !== stripos( $img, "loading='lazy'" ) ) {
+					$img = (string) preg_replace( '/\s+fetchpriority=([\'"])high\1/i', '', $img );
+				}
+
+				return $img;
+			},
+			$body_part
+		);
+
+		return $head_part . $body_part;
+	}
+
+	/**
+	 * Detect an above-the-fold Hero CSS background-image URL from inline <style> blocks or top-of-body inline styles.
+	 *
+	 * @since 2.2.0
+	 * @param string $head_part HTML <head> section.
+	 * @param string $body_part HTML <body> section.
+	 * @return array{url: string, offset: int}|null
+	 */
+	private function detect_above_fold_hero_background( $head_part, $body_part ) {
+		$top_body = substr( $body_part, 0, 16384 );
+
+		// Case A: Inline style="...background(-image): url(...)..." on an element near the top of <body>.
+		if ( preg_match( '/style\s*=\s*([\'"])[^\'"]*background(?:-image)?\s*:[^\'"]*url\(\s*[\'"]?([^\'")\s]+\.(?:jpe?g|png|webp|avif)(?:\?[^\'")\s]*)?)[\'"]?\s*\)/i', $top_body, $bm, PREG_OFFSET_CAPTURE ) ) {
+			$bg_url = html_entity_decode( trim( $bm[2][0] ), ENT_QUOTES, 'UTF-8' );
+			if ( ! $this->is_non_lcp_ui_graphic( $bg_url ) ) {
+				return array(
+					'url'    => $bg_url,
+					'offset' => (int) $bm[0][1],
+				);
+			}
+		}
+
+		// Case B: <style> block in <head> or top of <body> targeting a hero/banner/cover selector present in top_body.
+		$style_search_zone = $head_part . substr( $top_body, 0, 6144 );
+		if ( preg_match_all( '/<style\b([^>]*)>(.*?)<\/style>/is', $style_search_zone, $style_blocks, PREG_SET_ORDER ) ) {
+			$hero_keywords = array( 'hero', 'banner', 'masthead', 'jumbotron', 'wp-block-cover', 'first-section', 'top-section' );
+
+			foreach ( $style_blocks as $block ) {
+				$style_attrs = strtolower( $block[1] );
+				$css_body    = $block[2];
+
+				if ( false === stripos( $css_body, 'background' ) || false === stripos( $css_body, 'url(' ) ) {
+					continue;
+				}
+
+				$is_hero_style_id = false;
+				foreach ( $hero_keywords as $kw ) {
+					if ( false !== strpos( $style_attrs, $kw ) ) {
+						$is_hero_style_id = true;
+						break;
+					}
+				}
+
+				if ( preg_match_all( '/([^{};]+)\{[^}]*background(?:-image)?\s*:[^;}]*url\(\s*[\'"]?([^\'")\s]+\.(?:jpe?g|png|webp|avif)(?:\?[^\'")\s]*)?)[\'"]?\s*\)/is', $css_body, $rules, PREG_SET_ORDER ) ) {
+					foreach ( $rules as $rule ) {
+						$selector = trim( $rule[1] );
+						$img_url  = html_entity_decode( trim( $rule[2] ), ENT_QUOTES, 'UTF-8' );
+
+						if ( $this->is_non_lcp_ui_graphic( $img_url ) ) {
+							continue;
+						}
+
+						// Verify selector or style ID corresponds to an element actually inside the top viewport chunk of <body>.
+						$body_offset = $this->find_selector_offset_in_top_body( $selector, $style_attrs, $top_body, $is_hero_style_id );
+						if ( null !== $body_offset ) {
+							return array(
+								'url'    => $img_url,
+								'offset' => $body_offset,
+							);
+						}
+					}
+				}
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * Locate the approximate byte offset in the top 16 KB of <body> for a hero CSS rule's class or ID token.
+	 *
+	 * @since 2.2.0
+	 * @param string $selector         CSS selector string.
+	 * @param string $style_attrs      Lowercased <style> tag attributes.
+	 * @param string $top_body         First 16 KB of <body>.
+	 * @param bool   $is_hero_style_id Whether the <style> id itself contains a hero keyword.
+	 * @return int|null
+	 */
+	private function find_selector_offset_in_top_body( $selector, $style_attrs, $top_body, $is_hero_style_id ) {
+		// Extract class or ID tokens from the CSS selector.
+		if ( preg_match_all( '/([.#])([a-zA-Z0-9_-]{4,})/', $selector, $tokens, PREG_SET_ORDER ) ) {
+			foreach ( $tokens as $tok ) {
+				$name = $tok[2];
+				$pos  = stripos( $top_body, $name );
+				if ( false !== $pos ) {
+					// Accept if it's a hero-named selector/style or appears in the very first hero section (< 8 KB of <body>).
+					if ( $is_hero_style_id || $pos < 8192 ) {
+						return (int) $pos;
+					}
+				}
+			}
+		}
+
+		if ( $is_hero_style_id && preg_match( '/\bid=[\'"]([a-z0-9_-]+?)(?:-fbs-inline-css|-inline-css)[\'"]/i', $style_attrs, $idm ) ) {
+			$pos = stripos( $top_body, $idm[1] );
+			if ( false !== $pos ) {
+				return (int) $pos;
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * Detect the first substantial raster <img> inside the top viewport chunk of <body> (skipping logos/icons/SVGs).
+	 *
+	 * @since 2.2.0
+	 * @param string $body_part HTML <body> section.
+	 * @return array{url: string, srcset: string, sizes: string, offset: int}|null
+	 */
+	private function detect_above_fold_hero_img( $body_part ) {
+		$top_body = substr( $body_part, 0, 12288 );
+		if ( ! preg_match_all( '/<img\b[^>]*>/i', $top_body, $imgs, PREG_OFFSET_CAPTURE ) ) {
+			return null;
+		}
+
+		foreach ( $imgs[0] as $match ) {
+			$img    = $match[0];
+			$offset = (int) $match[1];
+
+			if ( ! preg_match( '/\bsrc\s*=\s*([\'"])([^\'"]+)\1/i', $img, $sm ) ) {
+				continue;
+			}
+
+			$src    = html_entity_decode( trim( $sm[2] ), ENT_QUOTES, 'UTF-8' );
+			$width  = preg_match( '/\bwidth\s*=\s*([\'"]?)(\d+)\1/i', $img, $wm ) ? (int) $wm[2] : 0;
+			$height = preg_match( '/\bheight\s*=\s*([\'"]?)(\d+)\1/i', $img, $hm ) ? (int) $hm[2] : 0;
+
+			if ( $this->is_non_lcp_ui_graphic( $src, $img, $width, $height ) ) {
+				continue;
+			}
+
+			$srcset = preg_match( '/\bsrcset\s*=\s*([\'"])([^\'"]+)\1/i', $img, $ssm ) ? trim( $ssm[2] ) : '';
+			$sizes  = preg_match( '/\bsizes\s*=\s*([\'"])([^\'"]+)\1/i', $img, $szm ) ? trim( $szm[2] ) : '';
+
+			return array(
+				'url'    => $src,
+				'srcset' => $srcset,
+				'sizes'  => $sizes,
+				'offset' => $offset,
+			);
+		}
+
+		return null;
+	}
+
+	/**
+	 * Inject a resource hint or critical style/script snippet early inside <head> (immediately after <meta charset> or <head>).
+	 *
+	 * @since 2.2.0
+	 * @param string $head_part HTML <head> substring.
+	 * @param string $snippet   HTML snippet to inject.
+	 * @return string
+	 */
+	private function inject_early_into_head( $head_part, $snippet ) {
+		if ( preg_match( '/<meta\b[^>]*charset[^>]*>\s*/i', $head_part, $cm, PREG_OFFSET_CAPTURE ) ) {
+			$insert_at = (int) $cm[0][1] + strlen( $cm[0][0] );
+			return substr( $head_part, 0, $insert_at ) . "\n" . $snippet . substr( $head_part, $insert_at );
+		}
+
+		if ( preg_match( '/<head\b[^>]*>\s*/i', $head_part, $hm, PREG_OFFSET_CAPTURE ) ) {
+			$insert_at = (int) $hm[0][1] + strlen( $hm[0][0] );
+			return substr( $head_part, 0, $insert_at ) . "\n" . $snippet . substr( $head_part, $insert_at );
+		}
+
+		return str_ireplace( '</head>', $snippet . '</head>', $head_part );
+	}
+
+	/**
+	 * Delay both external and inline third-party analytics/pixel bootstrap scripts (GTM, GA4, Clarity,
+	 * Meta Pixel, Hotjar, LinkedIn, TikTok, and invisible reCAPTCHA v3) across the full HTML document,
+	 * then inject the lightweight interaction + post-load fallback loader before </body>.
+	 *
+	 * @since 2.2.0
+	 * @param string $html Full HTML document.
+	 * @return string
+	 */
+	private function apply_document_third_party_js_delay( $html ) {
+		if ( $this->is_transactional_page() ) {
+			return $html;
+		}
+
+		$patterns         = $this->get_delayed_tracker_patterns();
+		$has_v2_recaptcha = ( false !== stripos( $html, 'class="g-recaptcha' ) || false !== stripos( $html, "class='g-recaptcha" ) );
+		$delayed_any      = $this->has_delayed_scripts;
+
+		$html = (string) preg_replace_callback(
+			'/<script\b([^>]*)>(.*?)<\/script>/is',
+			static function ( $m ) use ( $patterns, $has_v2_recaptcha, &$delayed_any ) {
+				$full_tag = $m[0];
+				$attrs    = $m[1];
+				$body     = $m[2];
+
+				// Skip already-delayed scripts, non-executable JSON/template blocks, and FBS internal scripts.
+				if (
+					false !== stripos( $attrs, 'fbsseop/delayed' ) ||
+					false !== stripos( $attrs, 'id="fbsseop-' ) ||
+					false !== stripos( $attrs, "id='fbsseop-" )
+				) {
+					return $full_tag;
+				}
+
+				if ( preg_match( '/\btype\s*=\s*([\'"])([^\'"]+)\1/i', $attrs, $tm ) ) {
+					$mime = strtolower( trim( $tm[2] ) );
+					if ( '' !== $mime && ! in_array( $mime, array( 'text/javascript', 'application/javascript' ), true ) ) {
+						return $full_tag;
+					}
+				}
+
+				// Case 1: External <script src="...">.
+				if ( preg_match( '/\bsrc\s*=\s*([\'"])([^\'"]+)\1/i', $attrs, $sm ) ) {
+					$src     = $sm[2];
+					$matched = false;
+
+					foreach ( $patterns as $pat ) {
+						if ( '' !== $pat && false !== stripos( $src, $pat ) ) {
+							$matched = true;
+							break;
+						}
+					}
+
+					// Invisible Google reCAPTCHA v3 (?render=...) can safely wait for first user interaction.
+					if ( ! $matched && ! $has_v2_recaptcha && false !== stripos( $src, 'google.com/recaptcha/api.js' ) && false !== stripos( $src, 'render=' ) ) {
+						$matched = true;
+					}
+
+					if ( ! $matched ) {
+						return $full_tag;
+					}
+
+					$clean_attrs = (string) preg_replace( '/\s+type=([\'"])[^\'"]*\1/i', '', $attrs );
+					$clean_attrs = (string) preg_replace( '/\bsrc=([\'"])/i', 'type="fbsseop/delayed" data-fbsseop-src=$1', $clean_attrs, 1 );
+					$delayed_any = true;
+
+					return '<script' . $clean_attrs . '>' . $body . '</script>';
+				}
+
+				// Case 2: Inline tracker bootstrap snippet (e.g. GTM4WP gtm.js loader, Clarity tag, Meta fbevents.js, Hotjar).
+				if ( '' === trim( $body ) || strlen( $body ) > 8192 ) {
+					return $full_tag;
+				}
+
+				$inline_loader_markers = array(
+					'googletagmanager.com/gtm.js',
+					'googletagmanager.com/gtag/js',
+					'google-analytics.com/analytics.js',
+					'connect.facebook.net/',
+					'clarity.ms/tag/',
+					'static.hotjar.com/',
+					'snap.licdn.com/',
+					'analytics.tiktok.com/',
+				);
+
+				$matched_inline = false;
+				foreach ( $inline_loader_markers as $marker ) {
+					if ( false !== stripos( $body, $marker ) ) {
+						$matched_inline = true;
+						break;
+					}
+				}
+
+				if ( ! $matched_inline ) {
+					return $full_tag;
+				}
+
+				$clean_attrs = (string) preg_replace( '/\s+type=([\'"])[^\'"]*\1/i', '', $attrs );
+				$delayed_any = true;
+
+				return '<script type="fbsseop/delayed"' . $clean_attrs . '>' . $body . '</script>';
+			},
+			$html
+		);
+
+		$this->has_delayed_scripts = $delayed_any;
+
+		if ( $delayed_any && false === strpos( $html, 'fbsseop-delay-js-loader' ) ) {
+			$loader_js  = '<script id="fbsseop-delay-js-loader">';
+			$loader_js .= '(function(){var d=false,e=["pointerdown","keydown","touchstart","scroll","mousemove"];';
+			$loader_js .= 'function l(){if(d)return;d=true;e.forEach(function(v){window.removeEventListener(v,l,{passive:true})});';
+			$loader_js .= 'document.querySelectorAll(\'script[type="fbsseop/delayed"]\').forEach(function(s){var n=document.createElement("script");';
+			$loader_js .= 'Array.prototype.forEach.call(s.attributes,function(a){if(a.name==="type")return;if(a.name==="data-fbsseop-src"){n.src=a.value;n.async=true}else{n.setAttribute(a.name,a.value)}});';
+			$loader_js .= 'if(!s.hasAttribute("data-fbsseop-src")){n.text=s.textContent}s.parentNode.replaceChild(n,s)})}';
+			$loader_js .= 'e.forEach(function(v){window.addEventListener(v,l,{passive:true,once:true})});';
+			$loader_js .= 'if(document.readyState==="complete"){setTimeout(l,4500)}else{window.addEventListener("load",function(){setTimeout(l,4500)},{once:true});setTimeout(l,8000)}})();';
+			$loader_js .= "</script>\n";
+
+			if ( false !== stripos( $html, '</body>' ) ) {
+				$html = str_ireplace( '</body>', $loader_js . '</body>', $html );
+			} else {
+				$html .= $loader_js;
+			}
+		}
+
+		return $html;
+	}
+
+	/**
+	 * Determine whether the current HTTP request is eligible for anonymous guest HTML disk page caching.
+	 *
+	 * @since 2.2.0
+	 * @return bool
+	 */
+	private function is_guest_cache_eligible_request() {
+		// Auto-bypass when a dedicated full-page caching plugin is already active.
+		if (
+			defined( 'LSCWP_V' ) ||
+			defined( 'WP_ROCKET_VERSION' ) ||
+			defined( 'W3TC' ) ||
+			function_exists( 'sg_cachepress_purge_cache' ) ||
+			class_exists( 'WpFastestCache' )
+		) {
+			return false;
+		}
+
+		$method = isset( $_SERVER['REQUEST_METHOD'] ) ? strtoupper( sanitize_text_field( wp_unslash( $_SERVER['REQUEST_METHOD'] ) ) ) : '';
+		if ( 'GET' !== $method ) {
+			return false;
+		}
+
+		if (
+			( defined( 'DOING_AJAX' ) && DOING_AJAX ) ||
+			( defined( 'DOING_CRON' ) && DOING_CRON ) ||
+			( defined( 'XMLRPC_REQUEST' ) && XMLRPC_REQUEST ) ||
+			( defined( 'REST_REQUEST' ) && REST_REQUEST ) ||
+			( defined( 'WP_CLI' ) && WP_CLI )
+		) {
+			return false;
+		}
+
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Used strictly for read-only URI exclusion matching and MD5 key generation.
+		$request_uri = isset( $_SERVER['REQUEST_URI'] ) ? (string) wp_unslash( $_SERVER['REQUEST_URI'] ) : '';
+		if ( '' === $request_uri ) {
+			return false;
+		}
+
+		$uri_lc   = strtolower( $request_uri );
+		$excluded = array( '/wp-admin', 'wp-login.php', '/wp-json', 'xmlrpc.php', '/feed/', 'sitemap', '/cart', '/checkout', '/my-account' );
+		foreach ( $excluded as $ex ) {
+			if ( false !== strpos( $uri_lc, $ex ) ) {
+				return false;
+			}
+		}
+
+		// Allow pure marketing campaign parameters (utm_*, gclid, fbclid, msclkid) to hit cache; bypass all other query strings.
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only query key check for cache eligibility.
+		if ( ! empty( $_GET ) ) {
+			$allowed_marketing_keys = array(
+				'utm_source',
+				'utm_medium',
+				'utm_campaign',
+				'utm_term',
+				'utm_content',
+				'utm_id',
+				'gclid',
+				'fbclid',
+				'msclkid',
+			);
+			// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			foreach ( array_keys( $_GET ) as $qkey ) {
+				if ( ! in_array( strtolower( (string) $qkey ), $allowed_marketing_keys, true ) ) {
+					return false;
+				}
+			}
+		}
+
+		// Bypass if logged-in, password-protected post, comment author, or active eCommerce cart cookies exist.
+		if ( ! empty( $_COOKIE ) && is_array( $_COOKIE ) ) {
+			$cookie_prefixes = array(
+				'wordpress_logged_in_',
+				'wp-postpass_',
+				'comment_author_',
+				'woocommerce_items_in_cart',
+				'woocommerce_cart_hash',
+				'wp_woocommerce_session_',
+				'edd_items_in_cart',
+			);
+			foreach ( array_keys( $_COOKIE ) as $ckey ) {
+				$ckey_str = (string) $ckey;
+				foreach ( $cookie_prefixes as $prefix ) {
+					if ( 0 === strpos( $ckey_str, $prefix ) ) {
+						return false;
+					}
+				}
+			}
+		}
+
+		return true;
+	}
+
+	/**
+	 * Compute the deterministic static disk cache file path for the current request URL.
+	 *
+	 * @since 2.2.0
+	 * @return string
+	 */
+	private function get_guest_page_cache_filepath() {
+		$host   = isset( $_SERVER['HTTP_HOST'] ) ? strtolower( sanitize_text_field( wp_unslash( $_SERVER['HTTP_HOST'] ) ) ) : 'localhost';
+		$scheme = is_ssl() ? 'https' : 'http';
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Stripped to path component and hashed via md5.
+		$raw_uri = isset( $_SERVER['REQUEST_URI'] ) ? (string) wp_unslash( $_SERVER['REQUEST_URI'] ) : '/';
+		$path    = (string) strtok( $raw_uri, '?#' );
+		if ( '' === $path ) {
+			$path = '/';
+		}
+
+		$salt = FBS_Secure_Optimize_Controller::get_cache_salt();
+		$hash = md5( $salt . '|' . $scheme . '://' . $host . $path );
+
+		return trailingslashit( WP_CONTENT_DIR ) . 'cache/fbs-optimize/pages/' . $hash . '.html';
+	}
+
+	/**
+	 * Serve a valid non-expired static HTML file from disk before WordPress runs heavy theme/plugin queries.
+	 *
+	 * @since 2.2.0
 	 * @return void
 	 */
-	public function print_delayed_scripts_loader() {
-		if ( ! $this->has_delayed_scripts ) {
+	private function maybe_serve_guest_page_cache() {
+		if ( headers_sent() || ! $this->is_guest_cache_eligible_request() ) {
 			return;
 		}
 
-		$loader_js = '(function(){var d=false,e=["pointerdown","keydown","touchstart","scroll","mousemove"];function l(){if(d)return;d=true;e.forEach(function(v){window.removeEventListener(v,l,{passive:true})});document.querySelectorAll(\'script[type="fbsseop/delayed"]\').forEach(function(s){var n=document.createElement("script");Array.prototype.forEach.call(s.attributes,function(a){if(a.name==="type")return;if(a.name==="data-fbsseop-src"){n.src=a.value;n.async=true}else{n.setAttribute(a.name,a.value)}});s.parentNode.replaceChild(n,s)})}e.forEach(function(v){window.addEventListener(v,l,{passive:true,once:true})});setTimeout(l,3500)})();';
+		$file = $this->get_guest_page_cache_filepath();
+		if ( ! is_file( $file ) || ! is_readable( $file ) ) {
+			return;
+		}
 
-		wp_print_inline_script_tag(
-			$loader_js,
-			array( 'id' => 'fbsseop-delay-js-loader' )
-		);
+		/**
+		 * Filters the guest HTML disk cache Time-To-Live (TTL) in seconds.
+		 *
+		 * @since 2.2.0
+		 * @param int $ttl Default 21600 seconds (6 hours).
+		 */
+		$ttl   = (int) apply_filters( 'fbsseop_page_cache_ttl', 6 * HOUR_IN_SECONDS );
+		$mtime = (int) filemtime( $file );
+		if ( $mtime <= 0 || ( time() - $mtime ) > $ttl ) {
+			return;
+		}
+
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Serving verified local HTML page cache file.
+		$cached_html = @file_get_contents( $file ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+		if ( ! is_string( $cached_html ) || '' === $cached_html ) {
+			return;
+		}
+
+		// Replay configured HTTP Security Headers when serving cached HTML early.
+		if ( FBS_Secure_Optimize_Controller::is_module_enabled( 'security_headers' ) && class_exists( 'FBS_Secure_Optimize_Security_Headers' ) ) {
+			$headers_mod = FBS_Secure_Optimize_Security_Headers::get_instance();
+			if ( method_exists( $headers_mod, 'send_security_headers' ) ) {
+				$headers_mod->send_security_headers();
+			}
+		}
+
+		header( 'Content-Type: text/html; charset=UTF-8' );
+		header( 'X-FBS-Cache: HIT' );
+
+		// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Full pre-rendered HTML document served from verified internal disk cache.
+		echo $cached_html;
+		exit;
+	}
+
+	/**
+	 * Persist the optimized HTML output buffer to disk for subsequent anonymous guest visits.
+	 *
+	 * @since 2.2.0
+	 * @param string $html Final optimized HTML document.
+	 * @return void
+	 */
+	private function maybe_store_guest_page_cache( $html ) {
+		if ( ! $this->is_guest_cache_eligible_request() ) {
+			return;
+		}
+
+		if ( is_user_logged_in() || is_404() || is_search() || is_feed() || $this->is_transactional_page() ) {
+			return;
+		}
+
+		if ( function_exists( 'http_response_code' ) && 200 !== (int) http_response_code() ) {
+			return;
+		}
+
+		if ( false === stripos( $html, '</html>' ) ) {
+			return;
+		}
+
+		$pages_dir = trailingslashit( WP_CONTENT_DIR ) . 'cache/fbs-optimize/pages';
+		if ( ! is_dir( $pages_dir ) && ! wp_mkdir_p( $pages_dir ) ) {
+			return;
+		}
+
+		$this->ensure_cache_index_guard( $pages_dir, true );
+
+		$file    = $this->get_guest_page_cache_filepath();
+		$stamped = $html . "\n<!-- Cached & Optimized by FBS Secure Optimize -->";
+
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- Writing verified local HTML page cache file.
+		@file_put_contents( $file, $stamped, LOCK_EX ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+	}
+
+	/**
+	 * Place a silent index.php (and optional .htaccess for non-public HTML cache directories) inside cache folders.
+	 *
+	 * @since 2.2.0
+	 * @param string $dir            Target cache directory.
+	 * @param bool   $deny_direct_ht Whether to block direct HTTP access via .htaccess (true for HTML pages, false for public CSS).
+	 * @return void
+	 */
+	private function ensure_cache_index_guard( $dir, $deny_direct_ht = false ) {
+		$index_file = trailingslashit( $dir ) . 'index.php';
+		if ( ! is_file( $index_file ) ) {
+			// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+			@file_put_contents( $index_file, "<?php\n// Silence is golden.\n" ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+		}
+
+		if ( $deny_direct_ht ) {
+			$ht_file = trailingslashit( $dir ) . '.htaccess';
+			if ( ! is_file( $ht_file ) ) {
+				$rules = "<IfModule mod_authz_core.c>\n\tRequire all denied\n</IfModule>\n<IfModule !mod_authz_core.c>\n\tOrder deny,allow\n\tDeny from all\n</IfModule>\n";
+				// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+				@file_put_contents( $ht_file, $rules ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+			}
+		}
 	}
 
 	/**

@@ -4,7 +4,7 @@ Tags: performance, security, malware-scanner, security-headers, database-cleanup
 Requires at least: 5.8
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 2.1.1
+Stable tag: 2.2.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -21,18 +21,21 @@ Most sites don't need bloated, all-or-nothing plugins that slow down `wp-admin` 
 
 = 6 Independent Modules Included Free =
 
-**1. Asset & Core Web Vitals Optimizer (with 1-Click Universal Cache Purge)**
+**1. Asset & Core Web Vitals Optimizer (with 1-Click Universal Cache Purge & Guest Page Cache)**
 Boost Lighthouse Performance, Largest Contentful Paint (LCP), Cumulative Layout Shift (CLS), and Total Blocking Time (TBT) without jQuery bloat or fragile script bundling:
-* **Non-Blocking Google Fonts & Preconnect:** Converts render-blocking Google Fonts stylesheets to asynchronous `media="print"` swap with `<noscript>` fallback, enforces `display=swap`, and injects `preconnect` hints for `fonts.googleapis.com` and `fonts.gstatic.com`.
-* **Auto-Inline Small Local CSS (`<= 8 KB`):** Automatically inlines tiny render-blocking theme and plugin CSS files into `<head>` while safely rewriting relative `url(...)` paths and caching minified output.
-* **Zero-CLS Missing Image `width` & `height` Injection:** Automatically detects local `<img>` tags missing explicit dimensions and injects cached `width` and `height` attributes to prevent layout shifts.
-* **LCP-Safe Native Lazy Loading:** Adds native `loading="lazy"` and `decoding="async"` to offscreen images while stripping lazy-loading and applying `fetchpriority="high"` on your first above-the-fold hero image.
-* **Delay Third-Party Analytics & Pixels (TBT/INP):** Optional 1-click toggle to delay heavy third-party trackers (GTM, GA4, Meta Pixel, Microsoft Clarity, Hotjar, LinkedIn, TikTok) until first user interaction or a 3.5s fallback—automatically bypassed on WooCommerce cart, checkout, and account pages.
-* **Top Admin Bar & Dashboard 1-Click "Purge Cache":** Instantly clears FBS inlined CSS & CLS dimension caches, WordPress Object Cache (Redis/Memcached), PHP OPcache, and triggers compatible cache flushes across LiteSpeed Cache, WP Rocket, W3 Total Cache, WP Fastest Cache, WP Super Cache, Autoptimize, SiteGround, Breeze, and WP Engine.
+* **Auto-Preload Above-the-Fold LCP Image & Hero CSS Background:** Automatically detects your top hero banner—including CSS `background-image: url(...)` hero sections from page builders and themes—and injects early `<link rel="preload" as="image" fetchpriority="high">` in `<head>`, while stripping misplaced `fetchpriority="high"` from offscreen `loading="lazy"` images.
+* **Zero-CLS Full-Width Builder Rows & Inline SVG Stabilizer:** Pre-calculates exact viewport geometry before First Paint to eliminate large layout shifts (`0.70+` CLS) caused by JS-stretched full-bleed rows (SiteOrigin Page Builder, WPBakery) and un-sized inline `<svg viewBox="...">` icons.
+* **Zero-CLS Missing Image `width` & `height` Injection (Full-Page):** Automatically detects local raster and `.svg` `<img>` tags across headers, content, widgets, and footers missing explicit dimensions and injects cached `width` and `height` attributes.
+* **Hoist & De-Block Chained CSS `@import` Google Fonts:** Extracts render-blocking `@import` Google Fonts hidden inside theme `style.css` files into parallel non-blocking `preconnect` + async swap links and serves a cached de-blocked stylesheet.
+* **Non-Blocking Google Fonts & Icon Stylesheets:** Converts render-blocking Google Fonts, Font Awesome, Elementor Icons, Ionicons, Line Awesome, and Magnific Popup stylesheets to asynchronous `media="print"` swap with `<noscript>` fallback.
+* **Auto-Inline Small Local CSS (`<= 8 KB`) & Strip `0`-Byte CSS:** Inlines tiny render-blocking CSS files into `<head>` while rewriting relative `url(...)` paths and removing empty `0`-byte plugin stylesheets.
+* **Smart Post-Render Unused Plugin CSS/JS & reCAPTCHA Unloader:** Inspects the complete rendered HTML document (including headers, popups, widgets, and footers) and safely strips unused Contact Form 7, orphaned Google reCAPTCHA v3, Smash Balloon Instagram Feed, Slick/Carousel, WPForms, TablePress, and unused block inline CSS on pages where those elements do not exist.
+* **Delay External & Inline Third-Party Trackers & reCAPTCHA v3 (TBT/INP):** Delays external and inline bootstrap trackers (GTM, GA4, Microsoft Clarity, Meta Pixel, Hotjar, LinkedIn, TikTok, and invisible reCAPTCHA v3) until first user interaction or post-load idle—automatically bypassed on WooCommerce cart, checkout, and account pages.
+* **Ultra-Light Guest HTML Disk Page Cache:** Optional 1-click static disk HTML page cache (`X-FBS-Cache: HIT`) for logged-out visitors with marketing UTM/GCLID cache-hit support, automatic post/comment/menu invalidation, and automatic bypass when LiteSpeed Cache or WP Rocket is active.
+* **Top Admin Bar & Dashboard 1-Click "Purge Cache":** Instantly clears FBS inlined/de-blocked CSS, CLS dimension caches, guest disk page cache, WordPress Object Cache (Redis/Memcached), PHP OPcache, and triggers compatible cache flushes across LiteSpeed Cache, WP Rocket, W3 Total Cache, WP Fastest Cache, WP Super Cache, Autoptimize, SiteGround, Breeze, and WP Engine.
 * **Iframe & Video Lazy Loading:** Defers embedded maps and video players until visitors scroll near them.
-* **Safe Non-Critical JS Deferring:** Adds `defer` to frontend scripts while automatically excluding `jQuery` core and sensitive checkout/account flows.
-* **Core Bloat Removal:** Strip inline emoji scripts/styles, disable frontend Dashicons for logged-out visitors, dequeue unused oEmbed scripts, and clean `<head>` RSD, WLW, and shortlink tags.
-* **Heartbeat API Throttling:** Throttles `admin-ajax.php` polling to 60 seconds to prevent CPU spikes and `502` timeouts on shared or VPS hosting.
+* **Safe Non-Critical JS Deferring:** Adds `defer` to frontend scripts while automatically protecting `jQuery`, WooCommerce checkout flows, and scripts with synchronous inline dependencies.
+* **Core Bloat Removal & Heartbeat Control:** Strip inline emoji scripts/styles, disable frontend Dashicons for guests, dequeue unused oEmbed scripts, clean `<head>` discovery tags, and throttle Heartbeat API to 60 seconds.
 
 **2. Database & Autoload Cleaner**
 Keep MySQL lean for sub-200ms Server Time to First Byte (TTFB):
@@ -143,6 +146,16 @@ Uninstalling the plugin through the **Plugins** screen cleanly removes its saved
 
 == Changelog ==
 
+= 2.2.0 =
+* New: Auto-Preload Above-the-Fold LCP Image & Hero CSS Background (detects both hero `<img>` banners and page-builder CSS `background-image` heroes, injects early `<link rel="preload" as="image" fetchpriority="high">`, skips header logos/SVGs, and removes misplaced `fetchpriority="high"` from offscreen lazy images, plus optional manual URL override).
+* New: Zero-CLS Full-Width Builder Rows & Inline SVG Stabilizer (eliminates `0.70+` layout shifts from JS-stretched full-bleed rows in SiteOrigin Page Builder & WPBakery before First Paint, and injects intrinsic `viewBox` dimensions on un-sized inline `<svg>` icons).
+* New: Hoist & De-Block Chained CSS `@import` Google Fonts (extracts blocking `@import` Google Fonts inside theme `style.css` files into non-blocking `preconnect` + swap links and serves a cached de-blocked stylesheet).
+* New: Non-Blocking Icon & Decorative Stylesheets (converts Font Awesome, Elementor Icons, Ionicons, Line Awesome, and Magnific Popup CSS to async `media="print"` swap).
+* New: Smart Post-Render Unused Plugin CSS/JS & reCAPTCHA Unloader (inspects complete rendered HTML and safely strips unused Contact Form 7, orphaned Google reCAPTCHA v3, Smash Balloon Instagram Feed, Slick/Carousel, WPForms, TablePress, and unused block social-links CSS on pages where absent).
+* New: Upgraded Third-Party JS Delay to capture both external `<script src>` and inline tracker bootstrap snippets (GTM4WP, Microsoft Clarity, Meta Pixel, Hotjar) plus invisible reCAPTCHA v3.
+* New: Optional Ultra-Light Guest HTML Disk Page Cache (`X-FBS-Cache: HIT`) with marketing parameter (`utm_*`, `gclid`, `fbclid`) cache-hit support, automatic content invalidation, and 1-Click "Apply Max PageSpeed Preset" button.
+* Fix: Eliminated wasted render-blocking HTTP requests on empty `0`-byte local plugin stylesheets and protected `wp_add_inline_script(..., 'after')` handles during JS deferring.
+
 = 2.1.1 =
 * Fix: Eliminated false-positive `OS Command Execution (shell_exec/system)` alerts in the 6-Layer Malware Scanner on legitimate Composer vendor libraries (such as `Monolog\Handler\ProcessHandler` used by FluentSMTP / Google API Client, `Symfony\Component\Process`, and `Composer\Util\ProcessExecutor`) while preserving full detection if those files are tampered with or contain superglobal input (`$_GET`, `$_POST`, `$_REQUEST`, `$_COOKIE`).
 * Dev: Added the `fbsseop_scanner_is_safe_match` filter for custom scanner false-positive exclusions.
@@ -173,6 +186,9 @@ Uninstalling the plugin through the **Plugins** screen cleanly removes its saved
 * Initial release on WordPress.org.
 
 == Upgrade Notice ==
+
+= 2.2.0 =
+Major Free Core Web Vitals upgrade! Adds Auto-Preload for Hero CSS Background & LCP Images, Zero-CLS Full-Width Builder & SVG Stabilizer, CSS @import Google Fonts De-Blocker, Smart Unused Plugin/reCAPTCHA Unloader, Inline Tracker Delay, and Optional Guest HTML Disk Cache.
 
 = 2.1.1 =
 Eliminates false-positive malware scanner warnings on legitimate Composer vendor libraries (e.g. Monolog ProcessHandler in FluentSMTP) without reducing real threat detection.
