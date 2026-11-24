@@ -4,7 +4,7 @@ Tags: performance, security, malware-scanner, security-headers, database-cleanup
 Requires at least: 5.8
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 2.2.0
+Stable tag: 2.2.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -146,6 +146,11 @@ Uninstalling the plugin through the **Plugins** screen cleanly removes its saved
 
 == Changelog ==
 
+= 2.2.1 =
+* Fix: Prevented a one-time blank screen on `wp-admin/admin-post.php` when saving settings immediately after a plugin update on LiteSpeed LSAPI / PHP-FPM servers by skipping unnecessary `opcache_reset()` calls during settings saves and deferring manual-purge OPcache resets until after HTTP response/redirect completion (`register_shutdown_function`).
+* Fix: Scoped `disable_wp_emojis()` strictly to the frontend (`! is_admin()`) and replaced raw Unicode emojis on Pro feature cards with crisp Dashicons badges so broken Twemoji `<img>` icons never appear inside `wp-admin`.
+* Tweak: Added output buffering around third-party cache purge hooks, automatic safe redirect fallback, and seasonal Black Friday 40% OFF Pro spotlight inside plugin screens.
+
 = 2.2.0 =
 * New: Auto-Preload Above-the-Fold LCP Image & Hero CSS Background (detects both hero `<img>` banners and page-builder CSS `background-image` heroes, injects `<link rel="preload" as="image" fetchpriority="high">` after `<meta name="viewport">`, skips header logos/SVGs, and demotes offscreen `loading="lazy"` images to `fetchpriority="low"`, plus optional manual URL override).
 * New: Zero-CLS Full-Width Builder Rows & Inline SVG Stabilizer (measures exact post-viewport `--fbs-cw` geometry immediately after `<body ...>` to eliminate `0.70+` layout shifts from JS-stretched full-bleed rows in SiteOrigin Page Builder & WPBakery before First Paint, and injects intrinsic `viewBox` dimensions on un-sized inline `<svg>` icons).
@@ -187,6 +192,9 @@ Uninstalling the plugin through the **Plugins** screen cleanly removes its saved
 * Initial release on WordPress.org.
 
 == Upgrade Notice ==
+
+= 2.2.1 =
+Fixes a one-time blank screen on admin-post.php when saving settings right after updating on LiteSpeed / PHP-FPM servers by deferring OPcache resets to post-response shutdown.
 
 = 2.2.0 =
 Major Free Core Web Vitals upgrade! Adds Auto-Preload for Hero CSS Background & LCP Images, Zero-CLS Full-Width Builder & SVG Stabilizer, CSS @import Google Fonts De-Blocker, Smart Unused Plugin/reCAPTCHA Unloader, Inline Tracker Delay, and Optional Guest HTML Disk Cache.

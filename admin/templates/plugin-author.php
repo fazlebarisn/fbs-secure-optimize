@@ -403,7 +403,7 @@ $fbsseop_author_img = FBS_SECURE_OPTIMIZE_PLUGIN_URL . 'assets/img/fazle-bari-pr
 				<span class="dashicons dashicons-wordpress-alt"></span>
 				<?php esc_html_e( 'WP.org Profile ↗', 'fbs-secure-optimize' ); ?>
 			</a>
-			<a href="https://fbsfusion.com/" target="_blank" rel="noopener noreferrer" class="fbsseop-author-btn fbsseop-author-btn--emerald">
+			<a href="<?php echo esc_url( FBS_Secure_Optimize_Controller::utm_url( '', 'author-profile', 'author-hero' ) ); ?>" target="_blank" rel="noopener noreferrer" class="fbsseop-author-btn fbsseop-author-btn--emerald">
 				<?php esc_html_e( 'Visit FBSFusion.com ↗', 'fbs-secure-optimize' ); ?>
 			</a>
 		</div>
@@ -435,7 +435,7 @@ $fbsseop_author_img = FBS_SECURE_OPTIMIZE_PLUGIN_URL . 'assets/img/fazle-bari-pr
 				</div>
 				<div class="fbsseop-author-meta__item">
 					<span class="dashicons dashicons-admin-site-alt3"></span>
-					<a href="https://fbsfusion.com/" target="_blank" rel="noopener noreferrer">fbsfusion.com</a>
+					<a href="<?php echo esc_url( FBS_Secure_Optimize_Controller::utm_url( '', 'author-profile', 'author-sidebar' ) ); ?>" target="_blank" rel="noopener noreferrer">fbsfusion.com</a>
 				</div>
 				<div class="fbsseop-author-meta__item">
 					<span class="dashicons dashicons-wordpress"></span>
@@ -524,7 +524,7 @@ $fbsseop_author_img = FBS_SECURE_OPTIMIZE_PLUGIN_URL . 'assets/img/fazle-bari-pr
 					<a href="<?php echo esc_url( admin_url( 'admin.php?page=fbs-secure-optimize-plugins' ) ); ?>" class="fbsseop-author-btn fbsseop-author-btn--outline">
 						<?php esc_html_e( 'Explore Our Plugins', 'fbs-secure-optimize' ); ?>
 					</a>
-					<a href="https://fbsfusion.com/hire-us/" target="_blank" rel="noopener noreferrer" class="fbsseop-author-btn fbsseop-author-btn--indigo">
+					<a href="<?php echo esc_url( FBS_Secure_Optimize_Controller::utm_url( 'hire-us/', 'studio-audit', 'author-cta' ) ); ?>" target="_blank" rel="noopener noreferrer" class="fbsseop-author-btn fbsseop-author-btn--indigo">
 						<?php esc_html_e( 'Hire FBS Fusion ↗', 'fbs-secure-optimize' ); ?>
 					</a>
 				</div>

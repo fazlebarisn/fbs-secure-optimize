@@ -345,23 +345,22 @@ class FBS_Secure_Optimize_Admin {
 		}
 
 		update_option( 'fbsseop_settings', $current );
-		FBS_Secure_Optimize_Controller::purge_all_caches();
+		FBS_Secure_Optimize_Controller::purge_all_caches( false );
 
 		$redirect_tab = ( isset( $this->tabs[ $section_tab ] ) && $this->is_tab_visible( $section_tab, $current['modules'] ) )
 			? $section_tab
 			: 'overview';
 
-		wp_safe_redirect(
-			add_query_arg(
-				array(
-					'page'  => 'fbs-secure-optimize',
-					'tab'   => $redirect_tab,
-					'saved' => '1',
-				),
-				admin_url( 'admin.php' )
-			)
+		$target_url = add_query_arg(
+			array(
+				'page'  => 'fbs-secure-optimize',
+				'tab'   => $redirect_tab,
+				'saved' => '1',
+			),
+			admin_url( 'admin.php' )
 		);
-		exit;
+
+		FBS_Secure_Optimize_Controller::safe_redirect_or_fallback( $target_url );
 	}
 
 	/**
@@ -387,7 +386,7 @@ class FBS_Secure_Optimize_Admin {
 
 		$current['modules'][ $module ] = $enabled;
 		update_option( 'fbsseop_settings', $current );
-		FBS_Secure_Optimize_Controller::purge_all_caches();
+		FBS_Secure_Optimize_Controller::purge_all_caches( false );
 
 		$active_count = array_sum( array_map( 'intval', $current['modules'] ) );
 
@@ -451,7 +450,7 @@ class FBS_Secure_Optimize_Admin {
 			wp_send_json_error( array( 'message' => __( 'Permission denied.', 'fbs-secure-optimize' ) ) );
 		}
 
-		$cleared = FBS_Secure_Optimize_Controller::purge_all_caches();
+		$cleared = FBS_Secure_Optimize_Controller::purge_all_caches( true );
 
 		wp_send_json_success(
 			array(
@@ -773,6 +772,20 @@ class FBS_Secure_Optimize_Admin {
 				</button>
 			</div>
 		</form>
+
+		<?php if ( ! FBS_Secure_Optimize_Controller::is_pro_active() && FBS_Secure_Optimize_Controller::is_bfcm_promo_active() ) : ?>
+			<div class="fbsseop-bfcm-banner">
+				<div class="fbsseop-bfcm-banner__content">
+					<span class="fbsseop-bfcm-pill"><?php esc_html_e( 'BLACK FRIDAY & CYBER MONDAY • 40% OFF', 'fbs-secure-optimize' ); ?></span>
+					<h3><?php esc_html_e( 'Unlock Priority-0 WAF, 429 Bot Limiter & 1-Click Malware Clean — Just $35.40/yr or $71.40 Lifetime!', 'fbs-secure-optimize' ); ?></h3>
+					<p><?php esc_html_e( 'Save 40% on all 1-Site, 5-Site & 100-Site Annual and One-Time Lifetime licenses (regularly $59/yr or $119 Lifetime). Discount auto-applies at checkout.', 'fbs-secure-optimize' ); ?></p>
+				</div>
+				<a href="<?php echo esc_url( FBS_Secure_Optimize_Controller::utm_url( 'black-friday/', 'bfcm', 'overview-banner', 'fbs-secure-optimize-pro' ) ); ?>" target="_blank" rel="noopener noreferrer" class="fbsseop-btn fbsseop-btn--emerald fbsseop-btn--lg">
+					<span class="dashicons dashicons-tag"></span>
+					<span><?php esc_html_e( 'Claim 40% OFF Black Friday Deal ↗', 'fbs-secure-optimize' ); ?></span>
+				</a>
+			</div>
+		<?php endif; ?>
 		<?php
 	}
 
@@ -1300,14 +1313,27 @@ class FBS_Secure_Optimize_Admin {
 			</div>
 
 			<?php if ( ! $is_pro ) : ?>
+				<?php $scanner_bfcm = FBS_Secure_Optimize_Controller::is_bfcm_promo_active(); ?>
 				<div class="fbsseop-pro-callout">
 					<div>
-						<strong><?php esc_html_e( 'Want 1-Click Malware Deletion, Auto-Quarantine Uploads & Real-Time Admin Privilege Disarming?', 'fbs-secure-optimize' ); ?></strong>
+						<strong>
+							<?php
+							echo $scanner_bfcm
+								? esc_html__( 'Black Friday 40% OFF: Get 1-Click Malware Deletion, Priority-0 WAF & Admin Guard ($35.40/yr or $71.40 Lifetime)', 'fbs-secure-optimize' )
+								: esc_html__( 'Want 1-Click Malware Deletion, Auto-Quarantine Uploads & Real-Time Admin Privilege Disarming?', 'fbs-secure-optimize' );
+							?>
+						</strong>
 						<span><?php esc_html_e( 'Upgrade to FBS Secure Optimize Pro or request a Done-For-You Malware Eradication from FBS Fusion.', 'fbs-secure-optimize' ); ?></span>
 					</div>
-					<a href="<?php echo esc_url( admin_url( 'admin.php?page=fbs-secure-optimize&tab=firewall' ) ); ?>" class="fbsseop-btn fbsseop-btn--emerald">
-						<?php esc_html_e( 'Explore Pro Features →', 'fbs-secure-optimize' ); ?>
-					</a>
+					<?php if ( $scanner_bfcm ) : ?>
+						<a href="<?php echo esc_url( FBS_Secure_Optimize_Controller::utm_url( 'black-friday/', 'bfcm', 'scanner-callout', 'fbs-secure-optimize-pro' ) ); ?>" target="_blank" rel="noopener noreferrer" class="fbsseop-btn fbsseop-btn--emerald">
+							<?php esc_html_e( 'Claim 40% OFF Black Friday Deal ↗', 'fbs-secure-optimize' ); ?>
+						</a>
+					<?php else : ?>
+						<a href="<?php echo esc_url( admin_url( 'admin.php?page=fbs-secure-optimize&tab=firewall' ) ); ?>" class="fbsseop-btn fbsseop-btn--emerald">
+							<?php esc_html_e( 'Explore Pro Features →', 'fbs-secure-optimize' ); ?>
+						</a>
+					<?php endif; ?>
 				</div>
 			<?php endif; ?>
 
@@ -1344,8 +1370,67 @@ class FBS_Secure_Optimize_Admin {
 			do_action( 'fbsseop_render_pro_firewall_tab' );
 			return;
 		}
+
+		$is_bfcm   = FBS_Secure_Optimize_Controller::is_bfcm_promo_active();
+		$pro_cta   = $is_bfcm
+			? FBS_Secure_Optimize_Controller::utm_url( 'black-friday/', 'bfcm', 'pro-firewall-tab', 'fbs-secure-optimize-pro' )
+			: FBS_Secure_Optimize_Controller::utm_url( 'plugins/fbs-secure-optimize/', 'pro-upgrade', 'pro-firewall-tab' );
+		$audit_cta = FBS_Secure_Optimize_Controller::utm_url( 'hire-us/', 'studio-audit', 'pro-firewall-tab' );
+
+		$pro_cards = array(
+			array(
+				'icon'  => 'dashicons-shield',
+				'tag'   => 'PRO WAF',
+				'title' => __( 'Early-Boot Web Application Firewall (WAF)', 'fbs-secure-optimize' ),
+				'desc'  => __( 'Intercepts SQL Injection (SQLi), Cross-Site Scripting (XSS), directory traversal, malicious bots, and blocked IPs at priority 0—with safe Learning Mode.', 'fbs-secure-optimize' ),
+			),
+			array(
+				'icon'  => 'dashicons-performance',
+				'tag'   => 'ANTI-DDOS',
+				'title' => __( '429 Anti-Bot Flood Rate Limiter', 'fbs-secure-optimize' ),
+				'desc'  => __( 'Stops aggressive scraper bots and DDoS request floods from causing 502 Bad Gateway crashes with sliding-window 429 rate limiting.', 'fbs-secure-optimize' ),
+			),
+			array(
+				'icon'  => 'dashicons-admin-users',
+				'tag'   => 'USER GUARD',
+				'title' => __( 'Real-Time User & Capability Integrity Guard', 'fbs-secure-optimize' ),
+				'desc'  => __( 'Locks an Approved Admin Whitelist and instantly disarms unauthorized usermeta capability escalation while destroying rogue login sessions.', 'fbs-secure-optimize' ),
+			),
+			array(
+				'icon'  => 'dashicons-trash',
+				'tag'   => 'CLEANUP',
+				'title' => __( '1-Click Malware Eradication & Auto-Quarantine', 'fbs-secure-optimize' ),
+				'desc'  => __( 'Delete backdoor PHP files, malicious database snippets, and rogue users directly from the 6-Layer Scanner + daily scheduled email alerts.', 'fbs-secure-optimize' ),
+			),
+			array(
+				'icon'  => 'dashicons-lock',
+				'tag'   => 'GRADE A+',
+				'title' => __( 'Custom Content-Security-Policy (CSP) Builder', 'fbs-secure-optimize' ),
+				'desc'  => __( 'Test CSP rules safely in Report-Only mode before enforcing Grade A+ SecurityHeaders.com protection without breaking Google Fonts or Stripe.', 'fbs-secure-optimize' ),
+			),
+			array(
+				'icon'  => 'dashicons-sos',
+				'tag'   => 'STUDIO',
+				'title' => __( 'Need Hands-On Speed or Malware Rescue?', 'fbs-secure-optimize' ),
+				'desc'  => __( 'Hire Fazle Bari & the FBS Fusion engineering studio for guaranteed 95–100/100 Lighthouse optimization and deep server malware cleanup.', 'fbs-secure-optimize' ),
+			),
+		);
 		?>
 		<div class="fbsseop-pro-showcase">
+			<?php if ( $is_bfcm ) : ?>
+				<div class="fbsseop-bfcm-banner" style="margin-top:0;margin-bottom:28px;">
+					<div class="fbsseop-bfcm-banner__content">
+						<span class="fbsseop-bfcm-pill"><?php esc_html_e( 'BLACK FRIDAY & CYBER MONDAY • 40% OFF', 'fbs-secure-optimize' ); ?></span>
+						<h3><?php esc_html_e( 'Save 40% on FBS Secure Optimize Pro — Just $35.40/yr or $71.40 One-Time Lifetime!', 'fbs-secure-optimize' ); ?></h3>
+						<p><?php esc_html_e( 'Compare 1-Site, 5-Site & 100-Site Annual and Lifetime licenses (regularly $59/yr or $119 Lifetime). 40% discount auto-applies at checkout • 30-day money-back guarantee.', 'fbs-secure-optimize' ); ?></p>
+					</div>
+					<a href="<?php echo esc_url( $pro_cta ); ?>" target="_blank" rel="noopener noreferrer" class="fbsseop-btn fbsseop-btn--emerald fbsseop-btn--lg">
+						<span class="dashicons dashicons-tag"></span>
+						<span><?php esc_html_e( 'Claim 40% OFF Black Friday Deal ↗', 'fbs-secure-optimize' ); ?></span>
+					</a>
+				</div>
+			<?php endif; ?>
+
 			<div class="fbsseop-pro-showcase__head">
 				<span class="fbsseop-badge fbsseop-badge--pro"><?php esc_html_e( 'FBS SECURE OPTIMIZE PRO', 'fbs-secure-optimize' ); ?></span>
 				<h2><?php esc_html_e( 'Upgrade to Active Firewall, Bot Rate Limiting & Real-Time Admin Privilege Guard', 'fbs-secure-optimize' ); ?></h2>
@@ -1353,38 +1438,34 @@ class FBS_Secure_Optimize_Admin {
 			</div>
 
 			<div class="fbsseop-modules-grid">
-				<div class="fbsseop-module-card is-enabled">
-					<h3>🛡️ <?php esc_html_e( 'Early-Boot Web Application Firewall (WAF)', 'fbs-secure-optimize' ); ?></h3>
-					<p><?php esc_html_e( 'Intercepts SQL Injection (SQLi), Cross-Site Scripting (XSS), directory traversal, malicious bots, and blocked IPs at priority 0—with safe Learning Mode.', 'fbs-secure-optimize' ); ?></p>
-				</div>
-				<div class="fbsseop-module-card is-enabled">
-					<h3>⚡ <?php esc_html_e( '429 Anti-Bot Flood Rate Limiter', 'fbs-secure-optimize' ); ?></h3>
-					<p><?php esc_html_e( 'Stops aggressive scraper bots and DDoS request floods from causing 502 Bad Gateway crashes with sliding-window 429 rate limiting.', 'fbs-secure-optimize' ); ?></p>
-				</div>
-				<div class="fbsseop-module-card is-enabled">
-					<h3>👤 <?php esc_html_e( 'Real-Time User & Capability Integrity Guard', 'fbs-secure-optimize' ); ?></h3>
-					<p><?php esc_html_e( 'Locks an Approved Admin Whitelist and instantly disarms unauthorized usermeta capability escalation while destroying rogue login sessions.', 'fbs-secure-optimize' ); ?></p>
-				</div>
-				<div class="fbsseop-module-card is-enabled">
-					<h3>🧹 <?php esc_html_e( '1-Click Malware Eradication & Auto-Quarantine', 'fbs-secure-optimize' ); ?></h3>
-					<p><?php esc_html_e( 'Delete backdoor PHP files, malicious database snippets, and rogue users directly from the 6-Layer Scanner + daily scheduled email alerts.', 'fbs-secure-optimize' ); ?></p>
-				</div>
-				<div class="fbsseop-module-card is-enabled">
-					<h3>🔒 <?php esc_html_e( 'Custom Content-Security-Policy (CSP) Builder', 'fbs-secure-optimize' ); ?></h3>
-					<p><?php esc_html_e( 'Test CSP rules safely in Report-Only mode before enforcing Grade A+ SecurityHeaders.com protection without breaking Google Fonts or Stripe.', 'fbs-secure-optimize' ); ?></p>
-				</div>
-				<div class="fbsseop-module-card is-enabled">
-					<h3>🚀 <?php esc_html_e( 'Need Hands-On Speed or Malware Rescue?', 'fbs-secure-optimize' ); ?></h3>
-					<p><?php esc_html_e( 'Hire Fazle Bari & the FBS Fusion engineering studio for guaranteed 95–100/100 Lighthouse optimization and deep server malware cleanup.', 'fbs-secure-optimize' ); ?></p>
-				</div>
+				<?php foreach ( $pro_cards as $pcard ) : ?>
+					<div class="fbsseop-module-card is-enabled">
+						<div class="fbsseop-module-card__top">
+							<div class="fbsseop-module-card__icon">
+								<span class="dashicons <?php echo esc_attr( $pcard['icon'] ); ?>"></span>
+							</div>
+							<span class="fbsseop-tag"><?php echo esc_html( $pcard['tag'] ); ?></span>
+						</div>
+						<h3><?php echo esc_html( $pcard['title'] ); ?></h3>
+						<p><?php echo esc_html( $pcard['desc'] ); ?></p>
+					</div>
+				<?php endforeach; ?>
 			</div>
 
 			<div class="fbsseop-pro-showcase__cta">
-				<a href="https://fbsfusion.com/plugins/" target="_blank" rel="noopener noreferrer" class="fbsseop-btn fbsseop-btn--emerald fbsseop-btn--lg">
-					<?php esc_html_e( 'Get FBS Secure Optimize Pro ↗', 'fbs-secure-optimize' ); ?>
+				<a href="<?php echo esc_url( $pro_cta ); ?>" target="_blank" rel="noopener noreferrer" class="fbsseop-btn fbsseop-btn--emerald fbsseop-btn--lg">
+					<span class="dashicons dashicons-superhero-alt"></span>
+					<span>
+						<?php
+						echo $is_bfcm
+							? esc_html__( 'Get 40% OFF Black Friday Pro ($35.40/yr • $71.40 LTD) ↗', 'fbs-secure-optimize' )
+							: esc_html__( 'Get FBS Secure Optimize Pro ($59/yr or $119 Lifetime) ↗', 'fbs-secure-optimize' );
+						?>
+					</span>
 				</a>
-				<a href="https://fbsfusion.com/hire-us/" target="_blank" rel="noopener noreferrer" class="fbsseop-btn fbsseop-btn--primary fbsseop-btn--lg">
-					<?php esc_html_e( 'Request Free Engineering Audit at FBSFusion.com ↗', 'fbs-secure-optimize' ); ?>
+				<a href="<?php echo esc_url( $audit_cta ); ?>" target="_blank" rel="noopener noreferrer" class="fbsseop-btn fbsseop-btn--primary fbsseop-btn--lg">
+					<span class="dashicons dashicons-businessman"></span>
+					<span><?php esc_html_e( 'Request Free Engineering Audit at FBSFusion.com ↗', 'fbs-secure-optimize' ); ?></span>
 				</a>
 			</div>
 		</div>

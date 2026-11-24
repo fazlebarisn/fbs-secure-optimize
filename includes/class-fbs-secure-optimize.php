@@ -105,9 +105,9 @@ class FBS_Secure_Optimize_Controller {
 		add_action( 'admin_bar_menu', array( $this, 'register_admin_bar_menu' ), 99 );
 		add_action( 'admin_post_fbsseop_purge_cache', array( $this, 'handle_admin_bar_purge_cache' ) );
 		add_action( 'admin_notices', array( $this, 'maybe_render_purge_admin_notice' ) );
-		add_action( 'switch_theme', array( __CLASS__, 'purge_all_caches' ) );
-		add_action( 'customize_save_after', array( __CLASS__, 'purge_all_caches' ) );
-		add_action( 'upgrader_process_complete', array( __CLASS__, 'purge_all_caches' ) );
+		add_action( 'switch_theme', array( __CLASS__, 'purge_all_caches_without_opcache' ) );
+		add_action( 'customize_save_after', array( __CLASS__, 'purge_all_caches_without_opcache' ) );
+		add_action( 'upgrader_process_complete', array( __CLASS__, 'purge_all_caches_without_opcache' ) );
 		add_action( 'save_post', array( __CLASS__, 'maybe_purge_page_cache_on_post_change' ) );
 		add_action( 'deleted_post', array( __CLASS__, 'purge_disk_page_cache' ) );
 		add_action( 'wp_update_nav_menu', array( __CLASS__, 'purge_disk_page_cache' ) );
@@ -161,7 +161,7 @@ class FBS_Secure_Optimize_Controller {
 			array(
 				'id'     => 'fbsseop-toolbar-purge-all',
 				'parent' => 'fbsseop-toolbar',
-				'title'  => esc_html__( '⚡ Purge All Caches Now', 'fbs-secure-optimize' ),
+				'title'  => esc_html__( 'Purge All Caches Now', 'fbs-secure-optimize' ),
 				'href'   => $purge_url,
 			)
 		);
@@ -209,7 +209,7 @@ class FBS_Secure_Optimize_Controller {
 
 		check_admin_referer( 'fbsseop_purge_cache_action' );
 
-		self::purge_all_caches();
+		self::purge_all_caches( true );
 
 		$referer = wp_get_referer();
 		if ( ! $referer ) {
@@ -219,7 +219,27 @@ class FBS_Secure_Optimize_Controller {
 		$referer = remove_query_arg( array( 'fbsseop_purged', '_wpnonce' ), $referer );
 		$target  = add_query_arg( 'fbsseop_purged', '1', $referer );
 
-		wp_safe_redirect( $target );
+		self::safe_redirect_or_fallback( $target );
+	}
+
+	/**
+	 * Perform a safe admin redirect with an automatic HTML/JS fallback if headers were already sent.
+	 *
+	 * Prevents blank white screens on admin-post.php if any server or third-party plugin emitted output.
+	 *
+	 * @since 2.2.1
+	 * @param string $url Validated admin destination URL.
+	 * @return void
+	 */
+	public static function safe_redirect_or_fallback( $url ) {
+		if ( ! headers_sent() ) {
+			wp_safe_redirect( $url );
+			exit;
+		}
+
+		$safe_url = esc_url( wp_validate_redirect( $url, admin_url( 'admin.php?page=fbs-secure-optimize' ) ) );
+		echo '<script>window.location.replace(' . wp_json_encode( $safe_url ) . ');</script>';
+		echo '<noscript><meta http-equiv="refresh" content="0;url=' . esc_attr( $safe_url ) . '"></noscript>';
 		exit;
 	}
 
@@ -281,14 +301,63 @@ class FBS_Secure_Optimize_Controller {
 		array_unshift( $links, $settings_link );
 
 		if ( ! self::is_pro_active() ) {
+			$is_bfcm = self::is_bfcm_promo_active();
+			$pro_url = $is_bfcm
+				? self::utm_url( 'black-friday/', 'bfcm', 'plugins-list', 'fbs-secure-optimize-pro' )
+				: self::utm_url( 'plugins/fbs-secure-optimize/', 'pro-upgrade', 'plugins-list' );
+
 			$links[] = sprintf(
 				'<a href="%s" target="_blank" rel="noopener noreferrer" style="color:#059669;font-weight:700;">%s</a>',
-				esc_url( 'https://fbsfusion.com/plugins/' ),
-				esc_html__( 'Get Pro', 'fbs-secure-optimize' )
+				esc_url( $pro_url ),
+				$is_bfcm
+					? esc_html__( '40% OFF Black Friday', 'fbs-secure-optimize' )
+					: esc_html__( 'Get Pro', 'fbs-secure-optimize' )
 			);
 		}
 
 		return $links;
+	}
+
+	/**
+	 * Build an FBS Fusion URL tagged with clean UTM attribution parameters.
+	 *
+	 * @since 2.2.1
+	 * @param string $path     Relative path on fbsfusion.com (e.g. 'black-friday/' or 'plugins/fbs-secure-optimize/').
+	 * @param string $campaign Campaign slug (e.g. 'bfcm', 'pro-upgrade', 'studio-audit').
+	 * @param string $content  Placement identifier (e.g. 'pro-firewall-tab', 'overview-banner').
+	 * @param string $anchor   Optional hash fragment without leading '#'.
+	 * @return string
+	 */
+	public static function utm_url( $path = 'plugins/fbs-secure-optimize/', $campaign = 'pro-upgrade', $content = 'dashboard', $anchor = '' ) {
+		$clean_path = ltrim( (string) $path, '/' );
+		$base_url   = 'https://fbsfusion.com/' . $clean_path;
+
+		$url = add_query_arg(
+			array(
+				'utm_source'   => 'fbs-secure-optimize',
+				'utm_medium'   => 'wp-admin',
+				'utm_campaign' => sanitize_key( $campaign ),
+				'utm_content'  => sanitize_key( $content ),
+			),
+			$base_url
+		);
+
+		if ( '' !== $anchor ) {
+			$url .= '#' . ltrim( sanitize_text_field( $anchor ), '#' );
+		}
+
+		return $url;
+	}
+
+	/**
+	 * Determine whether the annual Black Friday / Cyber Monday promotional window (Nov 12 – Dec 2) is active.
+	 *
+	 * @since 2.2.1
+	 * @return bool
+	 */
+	public static function is_bfcm_promo_active() {
+		$md = (int) gmdate( 'md' );
+		return ( $md >= 1112 && $md <= 1202 );
 	}
 
 	/**
@@ -355,6 +424,10 @@ class FBS_Secure_Optimize_Controller {
 			true
 		);
 
+		$js_pro_url = self::is_bfcm_promo_active()
+			? self::utm_url( 'black-friday/', 'bfcm', 'scanner-results', 'fbs-secure-optimize-pro' )
+			: self::utm_url( 'plugins/fbs-secure-optimize/', 'pro-upgrade', 'scanner-results' );
+
 		wp_localize_script(
 			'fbsseop-admin',
 			'fbsseopAdmin',
@@ -362,7 +435,7 @@ class FBS_Secure_Optimize_Controller {
 				'ajaxUrl' => admin_url( 'admin-ajax.php' ),
 				'nonce'   => wp_create_nonce( 'fbsseop_admin_nonce' ),
 				'isPro'   => self::is_pro_active(),
-				'proUrl'  => 'https://fbsfusion.com/plugins/',
+				'proUrl'  => $js_pro_url,
 				'strings' => array(
 					'confirmCleanup' => __( 'Run database cleanup now? Selected revisions, drafts, spam, and expired transients will be permanently removed.', 'fbs-secure-optimize' ),
 					'cleaning'       => __( 'Running cleanup...', 'fbs-secure-optimize' ),
@@ -724,14 +797,28 @@ class FBS_Secure_Optimize_Controller {
 	}
 
 	/**
-	 * Purge all FBS Secure Optimize asset/CLS/page caches, WP Object Cache, PHP OPcache,
+	 * Hook callback wrapper that purges all asset/page caches without resetting PHP OPcache mid-request.
+	 *
+	 * @since 2.2.1
+	 * @return void
+	 */
+	public static function purge_all_caches_without_opcache() {
+		self::purge_all_caches( false );
+	}
+
+	/**
+	 * Purge all FBS Secure Optimize asset/CLS/page caches, WP Object Cache, optional PHP OPcache,
 	 * and trigger compatible host/third-party page cache flushes.
 	 *
 	 * @since 2.1.0
+	 * @param bool $reset_opcache Whether to schedule a post-response PHP OPcache reset (default false on settings save).
 	 * @return array<int, string> List of cache layers cleared.
 	 */
-	public static function purge_all_caches() {
+	public static function purge_all_caches( $reset_opcache = false ) {
 		$cleared = array();
+
+		// Buffer any stray output from third-party cache plugins so admin-post.php redirects never break.
+		ob_start();
 
 		// 1. Rotate FBS cache salt & clear static disk CSS / Guest HTML Page Cache.
 		$old_salt = get_option( 'fbsseop_cache_salt', 'v1' );
@@ -751,11 +838,20 @@ class FBS_Secure_Optimize_Controller {
 			$cleared[] = __( 'WP Object Cache', 'fbs-secure-optimize' );
 		}
 
-		// 3. PHP OPcache (when allowed by server configuration).
-		if ( function_exists( 'opcache_reset' ) ) {
+		// 3. PHP OPcache (deferred to shutdown after response/redirect headers are sent to prevent LSAPI/FPM mid-request crashes).
+		if ( $reset_opcache && function_exists( 'opcache_reset' ) ) {
 			$restrict_api = (string) ini_get( 'opcache.restrict_api' );
 			if ( '' === $restrict_api || 0 === strpos( __FILE__, $restrict_api ) ) {
-				opcache_reset();
+				register_shutdown_function(
+					static function () {
+						if ( function_exists( 'fastcgi_finish_request' ) ) {
+							@fastcgi_finish_request(); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+						} elseif ( function_exists( 'litespeed_finish_request' ) ) {
+							@litespeed_finish_request(); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+						}
+						@opcache_reset(); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+					}
+				);
 				$cleared[] = __( 'PHP OPcache', 'fbs-secure-optimize' );
 			}
 		}
@@ -815,6 +911,10 @@ class FBS_Secure_Optimize_Controller {
 		 * @param array<int, string> $cleared Names of cleared cache layers.
 		 */
 		do_action( 'fbsseop_cache_purged', $cleared );
+
+		if ( ob_get_level() > 0 ) {
+			ob_end_clean();
+		}
 
 		return $cleared;
 	}

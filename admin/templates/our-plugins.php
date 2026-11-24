@@ -139,9 +139,28 @@ defined( 'ABSPATH' ) || exit;
 
     <!-- Header -->
     <div class="fbs-plugins-header">
-        <h1>All Our Plugins</h1>
-        <p>Explore our premium suite of WordPress and WooCommerce utilities. Built with focus on security, speed, and sales growth.</p>
+        <h1><?php esc_html_e( 'All Our Plugins', 'fbs-secure-optimize' ); ?></h1>
+        <p><?php esc_html_e( 'Explore our modular suite of WordPress and WooCommerce utilities engineered for security, Core Web Vitals speed, and store growth.', 'fbs-secure-optimize' ); ?></p>
     </div>
+
+    <?php if ( class_exists( 'FBS_Secure_Optimize_Controller' ) && FBS_Secure_Optimize_Controller::is_bfcm_promo_active() ) : ?>
+        <div style="margin-bottom:28px;background:linear-gradient(135deg,#090d16 0%,#1e1b4b 55%,#064e3b 100%);border:1px solid rgba(52,211,153,0.4);border-radius:16px;padding:24px 28px;color:#ffffff;display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;box-shadow:0 12px 28px rgba(15,23,42,0.14);">
+            <div style="max-width:720px;">
+                <span style="display:inline-block;padding:4px 11px;border-radius:999px;background:rgba(16,185,129,0.2);border:1px solid rgba(52,211,153,0.5);color:#34d399;font-size:11px;font-weight:800;letter-spacing:0.05em;text-transform:uppercase;margin-bottom:8px;">
+                    <?php esc_html_e( 'BLACK FRIDAY & CYBER MONDAY • 40% OFF ALL PRO PLUGINS', 'fbs-secure-optimize' ); ?>
+                </span>
+                <h2 style="margin:0 0 6px;font-size:20px;font-weight:800;color:#ffffff;">
+                    <?php esc_html_e( 'Save 40% on FBS Secure Optimize Pro, FBS StockMind Pro & Product FAQ Pro!', 'fbs-secure-optimize' ); ?>
+                </h2>
+                <p style="margin:0;font-size:13.5px;color:#cbd5e1;">
+                    <?php esc_html_e( 'Annual & One-Time Lifetime licenses starting from $9/yr • 40% discount auto-applies at checkout.', 'fbs-secure-optimize' ); ?>
+                </p>
+            </div>
+            <a href="<?php echo esc_url( FBS_Secure_Optimize_Controller::utm_url( 'black-friday/', 'bfcm', 'our-plugins-page' ) ); ?>" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:8px;padding:12px 22px;border-radius:9px;background:#10b981;color:#052e16;font-size:14px;font-weight:700;text-decoration:none;">
+                <?php esc_html_e( 'Explore All 40% OFF Black Friday Deals ↗', 'fbs-secure-optimize' ); ?>
+            </a>
+        </div>
+    <?php endif; ?>
 
     <!-- Grid -->
     <div class="fbs-plugins-grid">
