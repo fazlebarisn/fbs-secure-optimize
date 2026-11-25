@@ -41,5 +41,13 @@ if ( is_array( $fbsseop_uploads ) && empty( $fbsseop_uploads['error'] ) && ! emp
 }
 
 global $wpdb;
+// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Remove all plugin-prefixed transients on uninstall.
+$wpdb->query(
+	$wpdb->prepare(
+		"DELETE FROM {$wpdb->options} WHERE option_name LIKE %s OR option_name LIKE %s",
+		$wpdb->esc_like( '_transient_fbsseop_' ) . '%',
+		$wpdb->esc_like( '_transient_timeout_fbsseop_' ) . '%'
+	)
+);
 // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange -- Uninstall cleanup of custom table.
 $wpdb->query( "DROP TABLE IF EXISTS {$wpdb->prefix}fbsseop_login_attempts" );

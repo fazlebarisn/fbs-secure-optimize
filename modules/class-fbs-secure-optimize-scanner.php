@@ -70,6 +70,11 @@ class FBS_Secure_Optimize_Scanner {
 	private function __construct() {
 		add_action( 'wp_ajax_fbsseop_run_scan', array( $this, 'ajax_run_scan' ) );
 		add_action( 'wp_ajax_fbsseop_preview_file', array( $this, 'ajax_preview_file' ) );
+		add_action( 'wp_ajax_fbsseop_view_db_code', array( 'FBS_Secure_Optimize_Scanner_Forensics', 'ajax_view_db_code' ) );
+		add_action( 'wp_ajax_fbsseop_remediate_snippet', array( 'FBS_Secure_Optimize_Scanner_Forensics', 'ajax_remediate_snippet' ) );
+		add_action( 'wp_ajax_fbsseop_force_delete_user', array( 'FBS_Secure_Optimize_Scanner_Forensics', 'ajax_force_delete_user' ) );
+		add_action( 'wp_ajax_fbsseop_revoke_app_password', array( 'FBS_Secure_Optimize_Scanner_Forensics', 'ajax_revoke_app_password' ) );
+		add_action( 'wp_ajax_fbsseop_post_cleanup_purge', array( 'FBS_Secure_Optimize_Scanner_Forensics', 'ajax_post_cleanup_purge' ) );
 	}
 
 	/**
@@ -208,18 +213,54 @@ class FBS_Secure_Optimize_Scanner {
 			}
 		}
 
-		// 5. Heuristic Signature Scan on Plugins & Themes.
-		$signatures    = self::get_heuristic_signatures();
-		$scanned_count = 0;
+		// 5. Heuristic Signature Scan on Plugins & Themes (with Official WP.org Checksum Verification).
+		$signatures           = self::get_heuristic_signatures();
+		$scanned_count        = 0;
+		$verified_clean_count = 0;
 		foreach ( array( WP_CONTENT_DIR . '/plugins', WP_CONTENT_DIR . '/themes' ) as $scan_dir ) {
 			if ( is_dir( $scan_dir ) ) {
-				$findings = array_merge( $findings, $this->scan_directory_heuristics( $scan_dir, $signatures, $scanned_count ) );
+				$findings = array_merge( $findings, $this->scan_directory_heuristics( $scan_dir, $signatures, $scanned_count, $verified_clean_count ) );
 			}
 		}
 
-		// 6. Database Backdoor & Hidden Administrator Audit.
-		$db_threats   = $this->scan_database_for_backdoors();
-		$hidden_audit = self::detect_hidden_users();
+		// 5b. Active & Parent Theme Official Checksum & Rootkit/Spam Template Audit.
+		$theme_findings = FBS_Secure_Optimize_Scanner_Forensics::audit_active_and_parent_themes();
+		if ( ! empty( $theme_findings ) ) {
+			$existing_files = array();
+			foreach ( $findings as $f_item ) {
+				if ( ! empty( $f_item['file'] ) ) {
+					$existing_files[ $f_item['file'] ] = true;
+				}
+			}
+			foreach ( $theme_findings as $tf_item ) {
+				if ( empty( $existing_files[ $tf_item['file'] ] ) ) {
+					$findings[]                          = $tf_item;
+					$existing_files[ $tf_item['file'] ] = true;
+				}
+			}
+		}
+
+		// 6. Deep Database Code Snippets, CPTs, Options & WP-Cron Persistence Audit.
+		$deep_db         = FBS_Secure_Optimize_Scanner_Forensics::scan_deep_database();
+		$db_threats      = $deep_db['threats'];
+		$active_snippets = $deep_db['active_snippets'];
+
+		// 7. Hidden/Rogue Administrator, 6-Hook Reflection & Application Passwords Audit.
+		$hidden_audit                      = self::detect_hidden_users();
+		$hook_app_audit                    = FBS_Secure_Optimize_Scanner_Forensics::audit_user_hooks_and_app_passwords();
+		$suspicious_hooks                  = $hook_app_audit['suspicious_hooks'];
+		$app_passwords                     = $hook_app_audit['app_passwords'];
+		$hidden_audit['suspicious_hooks']  = $suspicious_hooks;
+
+		$critical_hooks = 0;
+		foreach ( $suspicious_hooks as $shook ) {
+			if ( ! empty( $shook['is_critical'] ) ) {
+				$critical_hooks++;
+			}
+		}
+
+		// 8. Front-End Live DOM & Googlebot Cloaked SEO Spam Loopback Scanner.
+		$frontend_threats = FBS_Secure_Optimize_Scanner_Forensics::scan_frontend_cloaking_and_spam();
 
 		/**
 		 * Allows FBS Secure Optimize Pro to append User Guard privilege-escalation violations or auto-quarantine results.
@@ -229,25 +270,35 @@ class FBS_Secure_Optimize_Scanner {
 		 */
 		$user_violations = apply_filters( 'fbsseop_scanner_user_violations', array() );
 
-		$total_issues = count( $findings ) + count( $db_threats ) + count( $user_violations ) + ( ! empty( $hidden_audit['hidden_users'] ) ? count( $hidden_audit['hidden_users'] ) : 0 );
+		$total_issues = count( $findings )
+			+ count( $db_threats )
+			+ count( $frontend_threats )
+			+ count( $user_violations )
+			+ ( ! empty( $hidden_audit['hidden_users'] ) ? count( $hidden_audit['hidden_users'] ) : 0 )
+			+ $critical_hooks;
 
 		$summary = array(
-			'scanned_at'    => current_time( 'mysql' ),
-			'scanned_files' => $scanned_count,
-			'total_issues'  => $total_issues,
+			'scanned_at'           => current_time( 'mysql' ),
+			'scanned_files'        => $scanned_count,
+			'verified_clean_files' => $verified_clean_count,
+			'total_issues'         => $total_issues,
 		);
 		update_option( 'fbsseop_last_scan_summary', $summary, false );
 
 		return array(
-			'scanned_at'      => $summary['scanned_at'],
-			'scanned_files'   => $scanned_count,
-			'total_issues'    => $total_issues,
-			'findings'        => $findings,
-			'mu_plugins'      => $mu_plugins,
-			'db_threats'      => $db_threats,
-			'hidden_audit'    => $hidden_audit,
-			'user_violations' => $user_violations,
-			'is_pro'          => FBS_Secure_Optimize_Controller::is_pro_active(),
+			'scanned_at'           => $summary['scanned_at'],
+			'scanned_files'        => $scanned_count,
+			'verified_clean_files' => $verified_clean_count,
+			'total_issues'         => $total_issues,
+			'findings'             => $findings,
+			'mu_plugins'           => $mu_plugins,
+			'db_threats'           => $db_threats,
+			'active_snippets'      => $active_snippets,
+			'frontend_threats'     => $frontend_threats,
+			'hidden_audit'         => $hidden_audit,
+			'app_passwords'        => $app_passwords,
+			'user_violations'      => $user_violations,
+			'is_pro'               => FBS_Secure_Optimize_Controller::is_pro_active(),
 		);
 	}
 
@@ -576,18 +627,20 @@ class FBS_Secure_Optimize_Scanner {
 	}
 
 	/**
-	 * Recursively scan plugins and themes for backdoor signatures.
+	 * Recursively scan plugins and themes for backdoor signatures, verifying matched
+	 * WordPress.org plugin files against official cryptographic checksums to eliminate vendor false positives.
 	 *
 	 * @since 2.0.0
-	 * @param string                $dir           Directory path.
-	 * @param array<string, string> $signatures    Heuristic regex rules.
-	 * @param int                   $scanned_count Counter passed by reference.
+	 * @param string                $dir                  Directory path.
+	 * @param array<string, string> $signatures           Heuristic regex rules.
+	 * @param int                   $scanned_count        Counter passed by reference.
+	 * @param int                   $verified_clean_count Verified official WP.org vendor files counter passed by reference.
 	 * @return array<int, array<string, mixed>>
 	 */
-	private function scan_directory_heuristics( $dir, $signatures, &$scanned_count ) {
+	private function scan_directory_heuristics( $dir, $signatures, &$scanned_count, &$verified_clean_count = 0 ) {
 		$infected = array();
 
-		if ( $scanned_count > 3500 || ! is_readable( $dir ) ) {
+		if ( $scanned_count > 12000 || ! is_readable( $dir ) ) {
 			return $infected;
 		}
 
@@ -614,7 +667,7 @@ class FBS_Secure_Optimize_Scanner {
 			}
 
 			if ( is_dir( $path ) ) {
-				$infected = array_merge( $infected, $this->scan_directory_heuristics( $path, $signatures, $scanned_count ) );
+				$infected = array_merge( $infected, $this->scan_directory_heuristics( $path, $signatures, $scanned_count, $verified_clean_count ) );
 			} elseif ( is_file( $path ) && is_readable( $path ) ) {
 				$ext = strtolower( pathinfo( $path, PATHINFO_EXTENSION ) );
 				if ( in_array( $ext, array( 'php', 'phtml', 'php5', 'phar' ), true ) ) {
@@ -630,6 +683,11 @@ class FBS_Secure_Optimize_Scanner {
 							if ( preg_match( $pattern, $content, $matches, PREG_OFFSET_CAPTURE ) ) {
 								if ( self::is_known_safe_library_match( $normalized, $label, $content ) ) {
 									continue;
+								}
+
+								if ( false !== strpos( $normalized, '/plugins/' ) && FBS_Secure_Optimize_Scanner_Forensics::is_verified_official_wporg_plugin_file( $path ) ) {
+									$verified_clean_count++;
+									break;
 								}
 
 								$offset  = isset( $matches[0][1] ) ? (int) $matches[0][1] : 0;
@@ -712,60 +770,9 @@ class FBS_Secure_Optimize_Scanner {
 	}
 
 	/**
-	 * Inspect database options and Code Snippets tables for injected PHP backdoors.
-	 *
-	 * @since 2.0.0
-	 * @return array<int, array<string, mixed>>
-	 */
-	private function scan_database_for_backdoors() {
-		global $wpdb;
-		$threats = array();
-
-		$eval_like = '%ev' . 'al(base64%';
-		$gz_like   = '%ev' . 'al(gzinflate%';
-
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Security audit of wp_options.
-		$option_rows = $wpdb->get_results(
-			$wpdb->prepare(
-				"SELECT option_id, option_name, SUBSTRING(option_value, 1, 500) AS preview
-				 FROM {$wpdb->options}
-				 WHERE option_name NOT LIKE %s
-				   AND option_name NOT LIKE %s
-				   AND option_name NOT LIKE %s
-				   AND (
-				       option_value LIKE %s
-				       OR option_value LIKE %s
-				       OR option_value LIKE %s
-				   )
-				 LIMIT 40",
-				$wpdb->esc_like( '_transient_' ) . '%',
-				$wpdb->esc_like( '_site_transient_' ) . '%',
-				$wpdb->esc_like( 'fbsseop_' ) . '%',
-				'%pre_user_query%',
-				$eval_like,
-				$gz_like
-			)
-		);
-
-		if ( is_array( $option_rows ) ) {
-			foreach ( $option_rows as $opt ) {
-				$threats[] = array(
-					'table'    => $wpdb->options,
-					'row_id'   => (int) $opt->option_id,
-					'name'     => (string) $opt->option_name,
-					'severity' => 'HIGH',
-					'reason'   => __( 'Suspicious backdoor signature in wp_options', 'fbs-secure-optimize' ),
-					'preview'  => (string) $opt->preview,
-				);
-			}
-		}
-
-		return $threats;
-	}
-
-	/**
-	 * Anti-Hidden-Admin Detector: compares raw SQL elevated usermeta against WP_User_Query
-	 * and inspects active pre_user_query hooks via Reflection.
+	 * Anti-Hidden-Admin & Rogue-User Anomaly Detector: compares raw SQL elevated usermeta against
+	 * get_users() / WP_User_Query, flags empty/invalid emails, default backdoor logins, and invalid
+	 * registration timestamps, and inspects active pre_user_query hooks via Reflection.
 	 *
 	 * @since 2.0.0
 	 * @return array<string, mixed>
@@ -773,7 +780,8 @@ class FBS_Secure_Optimize_Scanner {
 	public static function detect_hidden_users() {
 		global $wpdb, $wp_filter;
 
-		$cap_key = $wpdb->prefix . 'capabilities';
+		$cap_key    = $wpdb->prefix . 'capabilities';
+		$current_id = get_current_user_id();
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Direct SQL comparison to uncover hidden pre_user_query accounts.
 		$raw_rows = $wpdb->get_results(
@@ -801,10 +809,21 @@ class FBS_Secure_Optimize_Scanner {
 						'user_email'      => (string) $row->user_email,
 						'user_registered' => (string) $row->user_registered,
 						'caps'            => array_keys( array_filter( $caps ) ),
+						'is_current'      => ( (int) $row->ID === $current_id ),
 					);
 				}
 			}
 		}
+
+		$get_users_ids = array_map(
+			'intval',
+			(array) get_users(
+				array(
+					'role'   => 'administrator',
+					'fields' => 'ID',
+				)
+			)
+		);
 
 		$user_query  = new WP_User_Query(
 			array(
@@ -822,14 +841,54 @@ class FBS_Secure_Optimize_Scanner {
 		);
 		$visible_ids = array_map( 'intval', (array) $all_query->get_results() );
 
+		$suspicious_logins = array(
+			'wp',
+			'admin_backup',
+			'wp_support',
+			'support_user',
+			'wordpress',
+			'system',
+			'testadmin',
+			'sysadmin',
+			'wp_admin',
+			'backup_admin',
+		);
+
 		$hidden_users = array();
 		foreach ( $raw_admin_map as $uid => $uinfo ) {
+			$reasons        = array();
 			$has_admin_role = in_array( 'administrator', $uinfo['caps'], true );
-			if ( ! in_array( $uid, $visible_ids, true ) || ( $has_admin_role && ! in_array( $uid, $queried_ids, true ) ) ) {
-				$uinfo['hidden_type'] = __( 'Hidden from WP_User_Query via pre_user_query filter', 'fbs-secure-optimize' );
-				$hidden_users[ $uid ] = $uinfo;
-			} elseif ( ! $has_admin_role ) {
-				$uinfo['hidden_type'] = __( 'Stealth capability injection (elevated capabilities without administrator role)', 'fbs-secure-optimize' );
+			$email_trimmed  = trim( $uinfo['user_email'] );
+			$login_lc       = strtolower( trim( $uinfo['user_login'] ) );
+			$reg_str        = trim( $uinfo['user_registered'] );
+			$reg_ts         = '' !== $reg_str ? strtotime( $reg_str ) : false;
+
+			if ( ! in_array( $uid, $visible_ids, true ) || ( $has_admin_role && ( ! in_array( $uid, $queried_ids, true ) || ! in_array( $uid, $get_users_ids, true ) ) ) ) {
+				$reasons[] = __( 'Hidden from WP_User_Query / get_users() via pre_user_query filter', 'fbs-secure-optimize' );
+			}
+
+			if ( ! $has_admin_role ) {
+				$reasons[] = __( 'Stealth capability injection (elevated capabilities without administrator role)', 'fbs-secure-optimize' );
+			}
+
+			if ( '' === $email_trimmed || ! is_email( $email_trimmed ) ) {
+				$reasons[] = __( 'Rogue admin anomaly: empty or invalid email address', 'fbs-secure-optimize' );
+			}
+
+			if ( in_array( $login_lc, $suspicious_logins, true ) && ! $uinfo['is_current'] ) {
+				$reasons[] = sprintf(
+					/* translators: %s: Suspicious administrator login name. */
+					__( 'Suspicious backdoor login name ("%s")', 'fbs-secure-optimize' ),
+					$uinfo['user_login']
+				);
+			}
+
+			if ( '' === $reg_str || '0000-00-00 00:00:00' === $reg_str || false === $reg_ts || $reg_ts > ( time() + DAY_IN_SECONDS ) ) {
+				$reasons[] = __( 'Invalid or forged user_registered timestamp', 'fbs-secure-optimize' );
+			}
+
+			if ( ! empty( $reasons ) ) {
+				$uinfo['hidden_type'] = implode( ' • ', $reasons );
 				$hidden_users[ $uid ] = $uinfo;
 			}
 		}
@@ -864,7 +923,7 @@ class FBS_Secure_Optimize_Scanner {
 	 * @param mixed $callable Hooked function, method, or closure.
 	 * @return array<string, mixed>
 	 */
-	private static function describe_callable( $callable ) {
+	public static function describe_callable( $callable ) {
 		$info = array(
 			'label' => 'Callback',
 			'file'  => '',

@@ -4,7 +4,7 @@ Tags: performance, security, malware-scanner, security-headers, database-cleanup
 Requires at least: 5.8
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 2.2.1
+Stable tag: 2.3.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -67,29 +67,34 @@ Close the most common entry points used in automated site compromises:
 * **Lock Theme & Plugin File Editors:** Blocks arbitrary PHP code editing inside `wp-admin` via capability mapping (`map_meta_cap`).
 * **High-Risk Plugin Detector:** Alerts you if risky file-manager or database-admin plugins are left active in production, with 1-click deactivation.
 
-**6. 6-Layer Malware, Core Checksum & Hidden-Admin Scanner**
-Built from real-world forensic incident response to uncover threats traditional scanners miss:
-* **Layer 1 — Root Directory PHP Audit:** Flags unauthorized `.php` drop-ins sitting in your site root (`ABSPATH`).
-* **Layer 2 — Official Core MD5 Checksums:** Verifies every file inside `wp-admin/` and `wp-includes/` against official `api.wordpress.org` cryptographic MD5 hashes.
+**6. Deep Malware, Database Rootkit, Cloaking & Hidden-Admin Scanner (with 1-Click Direct-DB Remediation)**
+Built from real-world forensic incident response to uncover stealth database rootkits and cloaked spam traditional filesystem scanners miss:
+* **Layer 1 — Root Directory PHP Audit:** Flags unauthorized `.php` drop-ins sitting in your site root (`ABSPATH`) while content-verifying legitimate WAF bootstraps (`wordfence-waf.php`, `aios-bootstrap.php`, `malcare-waf.php`).
+* **Layer 2 — Official Core, Plugin & Theme Checksums:** Verifies WordPress Core files, installed WordPress.org plugins (`downloads.wordpress.org/plugin-checksums/`), and official themes (`themes.svn.wordpress.org`) against cryptographic hashes—eliminating false positives on vendor files (such as Elementor's bundled Twig test suites) while flagging any tampered file.
 * **Layer 3 — Zero-Tolerance `uploads/` Shell Scan:** Detects disguised PHP webshells inside `wp-content/uploads/`.
-* **Layer 4 — `mu-plugins` Persistence Audit:** Inspects Must-Use plugins where stealth malware often hides from the standard Plugins screen.
-* **Layer 5 — Heuristic Signature & `wp_options` DB Scan:** Scans plugins, themes, and database options for obfuscated `eval(base64_decode(...))`, `gzinflate`, shell execution, and injected script payloads, complete with a **Safe Read-Only Code Snippet Preview** modal.
-* **Layer 6 — Stealth `pre_user_query` Hidden-Admin Detector:** Compares high-level `WP_User_Query` results against raw database `capabilities` usermeta rows to expose rogue administrator accounts hidden by malicious hooks.
+* **Layer 4 — `mu-plugins` Persistence Audit:** Inspects Must-Use plugins where stealth malware hides from the standard Plugins screen.
+* **Layer 5 — Deep Database Code Snippets, CPTs & WP-Cron Scanner:** Directly queries `wp_snippets` / `ms_snippets` (*Code Snippets* — bypassing self-hiding `admin_footer` CSS/JS rootkits), *Header Footer Code Manager* (`hfcm_scripts`), *XYZ PHP Code*, Elementor Custom Code (`elementor_snippet`), *WPCode*, *Woody Snippets*, injected `post`/`page` content, header/footer `wp_options`, and scheduled `cron` persistence hooks—plus lists a complete **Active Database Code Snippets Inventory** for 100% visibility.
+* **Layer 6 — 6-Hook Reflection, Rogue-Admin Anomaly & Application Passwords Audit:** Uses PHP `Reflection` across `pre_user_query`, `views_users`, `users_list_table_query_args`, `load-user-edit.php`, `load-users.php`, and `delete_user` to pinpoint exact `file:line` or `eval()'d code` database hooks; cross-checks raw SQL `usermeta` capabilities against `get_users()` / `WP_User_Query` (catching hidden admins, empty/invalid emails, and default backdoor logins); and audits active REST API **Application Passwords** with 1-click revocation.
+* **Front-End Live DOM & Googlebot Cloaked SEO Spam Scanner:** Performs dual HTTP loopback checks (Standard Visitor vs. Googlebot User-Agent + Google Referer) to catch off-screen hidden links (`left: -9999px`, `font-size: 0`) and conditional search-engine cloaking.
+* **Safe 1-Click Direct-DB Remediation Included Free:** View full database snippet payloads, deactivate or delete malicious snippets directly via `$wpdb`, force-delete tamper-protected rogue admin users directly in MySQL (reassigning authored posts safely), revoke Application Passwords, and purge all caches while invalidating other user sessions in one click.
 
 = Unlock Active Defense with FBS Secure Optimize Pro =
 
-Need real-time attack blocking and 1-click threat eradication? [FBS Secure Optimize Pro](https://fbsfusion.com/plugins/) extends the free plugin with 5 additional independent modules:
+Need real-time attack blocking and 1-click filesystem shell eradication? [FBS Secure Optimize Pro](https://fbsfusion.com/plugins/) extends the free plugin with 5 additional independent modules:
 * **Early-Boot Web Application Firewall (WAF):** Blocks SQL Injection (SQLi), Cross-Site Scripting (XSS), Directory Traversal, Null-Byte exploits, and bad-bot user-agents at priority `0` (includes safe **Learning Mode**).
 * **429 Anti-Bot Flood Rate Limiter:** Sliding-window per-IP request throttling (`HTTP 429 Too Many Requests`) to prevent scraper floods from triggering `502 Bad Gateway` crashes.
 * **Real-Time Admin Capability Guard:** Locks an **Approved Administrator Whitelist** and automatically disarms unauthorized privilege escalation while destroying rogue sessions.
-* **1-Click Malware & Rogue-User Eradication:** Delete flagged backdoor files, malicious database rows, and stealth admin accounts directly from the 6-Layer Scanner.
+* **1-Click Filesystem Malware Eradication & Auto-Quarantine:** Delete flagged backdoor PHP files directly from the Scanner + automated daily scan email alerts.
 * **Custom CSP Header Builder & Scheduled Daily Scans:** Test `Content-Security-Policy` directives in `Report-Only` mode before enforcing `Grade A+` headers, plus automated daily scan email alerts.
 
 = External Services =
 
-When an administrator manually clicks **Run 6-Layer Deep Scan** inside `wp-admin` (or enables scheduled scans in Pro), the plugin connects to the official public **WordPress.org Core Checksums API** (`https://api.wordpress.org/core/checksums/1.0/`) to fetch official MD5 file hashes for your installed core version and locale.
-* **Data sent:** Only your WordPress version string and locale (for example, `version=7.1&locale=en_US`), solely when a scan runs.
-* **Privacy:** Zero personal data, visitor IPs, user accounts, or site content is ever transmitted. Governed by the [WordPress.org Privacy Policy](https://wordpress.org/about/privacy/).
+When an administrator manually clicks **Run 6-Layer Deep Scan** inside `wp-admin` (or enables scheduled scans in Pro), the plugin connects to official public **WordPress.org APIs** solely to verify cryptographic file integrity:
+* **WordPress.org Core Checksums API** (`https://api.wordpress.org/core/checksums/1.0/`): Fetches official MD5 hashes for your installed WordPress version.
+* **WordPress.org Plugin Checksums CDN** (`https://downloads.wordpress.org/plugin-checksums/`): Fetches official MD5/SHA-256 hashes when a plugin file matches a heuristic rule so unmodified vendor libraries are verified clean without false positives.
+* **WordPress.org Themes API & SVN** (`https://api.wordpress.org/themes/info/1.2/` and `https://themes.svn.wordpress.org/`): Verifies critical active/parent theme templates (`functions.php`, `header.php`, `footer.php`) when hosted on WordPress.org.
+* **Data sent:** Only the WordPress core version, or the slug and version of the specific WordPress.org plugin/theme being verified during an admin-initiated scan.
+* **Privacy:** Zero personal data, visitor IPs, user accounts, or site content is ever transmitted externally. Governed by the [WordPress.org Privacy Policy](https://wordpress.org/about/privacy/).
 
 == Installation ==
 
@@ -146,6 +151,13 @@ Uninstalling the plugin through the **Plugins** screen cleanly removes its saved
 
 == Changelog ==
 
+= 2.3.0 =
+* New: Deep Database Code & Snippet Injection Scanner — directly inspects `wp_snippets` & `ms_snippets` (*Code Snippets* plugin, bypassing self-hiding `admin_footer` CSS/JS rootkits), *Header Footer Code Manager* (`hfcm_scripts`), *XYZ PHP Code*, Elementor Custom Code (`elementor_snippet`), *WPCode*, *Woody Snippets*, injected `post`/`page` content, header/footer `wp_options`, and scheduled `WP-Cron` persistence hooks, plus displays a full **Active Database Code Snippets Inventory** for 100% visibility.
+* New: 6-Hook User-Concealment Reflection & Application Passwords Audit — reflects callbacks across `pre_user_query`, `views_users`, `users_list_table_query_args`, `load-user-edit.php`, `load-users.php`, and `delete_user` (flagging `eval()'d code` / database hooks as `CRITICAL`), detects rogue admins with empty/invalid emails or default backdoor usernames, and audits active REST API `_application_passwords` with 1-click revocation.
+* New: Front-End Live DOM & Googlebot Cloaked SEO Spam Scanner — performs dual HTTP loopback requests (Visitor vs. Googlebot User-Agent + Google Referer) to detect off-screen hidden spam links (`left: -9999px`, `font-size: 0`) and conditional search-engine cloaking.
+* New: Official WordPress.org Plugin & Theme Checksum Verification — verifies heuristic matches inside `wp-content/plugins/` against official `downloads.wordpress.org/plugin-checksums/` MD5/SHA-256 hashes (eliminating vendor false positives such as Elementor's Twig `IntegrationTestCase.php`) and audits active/parent theme critical templates (`functions.php`, `header.php`, `footer.php`).
+* New: Safe 1-Click Direct-DB Remediation in Free Edition — view full database code payloads, deactivate or delete malicious snippets directly via `$wpdb`, force-delete tamper-protected rogue admin users directly in MySQL (reassigning authored posts and destroying sessions), revoke Application Passwords, and purge all caches while invalidating all other user sessions in 1 click.
+
 = 2.2.1 =
 * Fix: Prevented a one-time blank screen on `wp-admin/admin-post.php` when saving settings immediately after a plugin update on LiteSpeed LSAPI / PHP-FPM servers by skipping unnecessary `opcache_reset()` calls during settings saves and deferring manual-purge OPcache resets until after HTTP response/redirect completion (`register_shutdown_function`).
 * Fix: Scoped `disable_wp_emojis()` strictly to the frontend (`! is_admin()`) and replaced raw Unicode emojis on Pro feature cards with crisp Dashicons badges so broken Twemoji `<img>` icons never appear inside `wp-admin`.
@@ -192,6 +204,9 @@ Uninstalling the plugin through the **Plugins** screen cleanly removes its saved
 * Initial release on WordPress.org.
 
 == Upgrade Notice ==
+
+= 2.3.0 =
+Major Malware Scanner forensic upgrade! Adds Deep Database Code Snippets/CPT/WP-Cron rootkit detection, 6-Hook User Reflection, Application Passwords audit, Googlebot cloaked SEO spam loopback checks, Official WP.org Plugin/Theme checksum verification (zero vendor false positives), and Free 1-Click Direct-DB Remediation.
 
 = 2.2.1 =
 Fixes a one-time blank screen on admin-post.php when saving settings right after updating on LiteSpeed / PHP-FPM servers by deferring OPcache resets to post-response shutdown.

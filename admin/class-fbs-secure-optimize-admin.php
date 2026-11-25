@@ -654,10 +654,10 @@ class FBS_Secure_Optimize_Admin {
 				'cfg_tab' => 'security',
 			),
 			'malware_scanner'  => array(
-				'title'   => __( '6-Layer Malware & Admin Scanner', 'fbs-secure-optimize' ),
+				'title'   => __( '6-Layer Malware & Rootkit Scanner', 'fbs-secure-optimize' ),
 				'badge'   => __( 'Forensics', 'fbs-secure-optimize' ),
 				'icon'    => 'dashicons-shield-alt',
-				'desc'    => __( 'Verify official WP.org MD5 checksums, detect root/uploads PHP shells, DB backdoors, and hidden admins.', 'fbs-secure-optimize' ),
+				'desc'    => __( 'Verify official WP.org Core/Plugin/Theme checksums, audit wp_snippets/Elementor/WPCode/WP-Cron DB backdoors, detect hidden admins & Googlebot SEO spam cloaking, and remediate in 1 click.', 'fbs-secure-optimize' ),
 				'cfg_tab' => 'scanner',
 			),
 		);
@@ -1281,9 +1281,9 @@ class FBS_Secure_Optimize_Admin {
 		<div class="fbsseop-panel">
 			<div class="fbsseop-scanner-hero">
 				<div>
-					<h2><?php esc_html_e( '6-Layer Malware, Core Checksum & Hidden-Admin Scanner', 'fbs-secure-optimize' ); ?></h2>
+					<h2><?php esc_html_e( 'Deep Malware, Database Rootkit, Cloaking & Hidden-Admin Scanner', 'fbs-secure-optimize' ); ?></h2>
 					<p>
-						<?php esc_html_e( 'Inspects unknown root PHP files, official WordPress.org MD5 checksums, zero-tolerance wp-content/uploads/ PHP shells, mu-plugins, plugin/theme backdoor signatures, wp_options injections, and hidden pre_user_query administrator accounts.', 'fbs-secure-optimize' ); ?>
+						<?php esc_html_e( 'Audits unknown root PHP files, official WordPress.org Core/Plugin/Theme cryptographic checksums (zero vendor false positives), wp-content/uploads/ shells, mu-plugins, database code snippets (Code Snippets wp_snippets, Elementor, WPCode, HFCM, XYZ PHP & WP-Cron), 6 user-concealment hooks via Reflection, Application Passwords, and live Visitor vs. Googlebot cloaked SEO spam.', 'fbs-secure-optimize' ); ?>
 					</p>
 					<?php if ( ! empty( $last_scan['scanned_at'] ) ) : ?>
 						<p class="fbsseop-scan-meta">
@@ -1295,18 +1295,30 @@ class FBS_Secure_Optimize_Admin {
 								(int) $last_scan['scanned_files'],
 								(int) $last_scan['total_issues']
 							);
+							if ( ! empty( $last_scan['verified_clean_files'] ) ) {
+								echo ' • ';
+								printf(
+									/* translators: %d: Number of official WP.org vendor files verified clean. */
+									esc_html__( '%d vendor file(s) checksum-verified clean', 'fbs-secure-optimize' ),
+									(int) $last_scan['verified_clean_files']
+								);
+							}
 							?>
 						</p>
 					<?php endif; ?>
 				</div>
 
-				<div>
+				<div class="fbsseop-scanner-actions">
 					<?php if ( ! $scanner_enabled ) : ?>
 						<span class="fbsseop-pill-warn"><?php esc_html_e( 'Enable Malware Scanner in Control Center first', 'fbs-secure-optimize' ); ?></span>
 					<?php else : ?>
 						<button type="button" id="fbsseop-run-scan-btn" class="fbsseop-btn fbsseop-btn--primary fbsseop-btn--lg">
 							<span class="dashicons dashicons-shield-alt"></span>
 							<span><?php esc_html_e( 'Run 6-Layer Deep Scan', 'fbs-secure-optimize' ); ?></span>
+						</button>
+						<button type="button" id="fbsseop-post-cleanup-btn" class="fbsseop-btn fbsseop-btn--lg" title="<?php esc_attr_e( 'Flush all page/object/OPcache caches and force-logout all other user sessions while keeping your session active.', 'fbs-secure-optimize' ); ?>">
+							<span class="dashicons dashicons-privacy"></span>
+							<span><?php esc_html_e( 'Purge Caches & Invalidate Other Sessions', 'fbs-secure-optimize' ); ?></span>
 						</button>
 					<?php endif; ?>
 				</div>
@@ -1319,11 +1331,11 @@ class FBS_Secure_Optimize_Admin {
 						<strong>
 							<?php
 							echo $scanner_bfcm
-								? esc_html__( 'Black Friday 40% OFF: Get 1-Click Malware Deletion, Priority-0 WAF & Admin Guard ($35.40/yr or $71.40 Lifetime)', 'fbs-secure-optimize' )
-								: esc_html__( 'Want 1-Click Malware Deletion, Auto-Quarantine Uploads & Real-Time Admin Privilege Disarming?', 'fbs-secure-optimize' );
+								? esc_html__( 'Black Friday 40% OFF: Add Priority-0 WAF, 429 Bot Limiter, Admin Whitelist Guard & 1-Click File Deletion ($35.40/yr or $71.40 Lifetime)', 'fbs-secure-optimize' )
+								: esc_html__( 'Direct-DB Snippet, Rogue-User & App-Password Remediation Included Free — Want Priority-0 WAF & Real-Time Admin Guard?', 'fbs-secure-optimize' );
 							?>
 						</strong>
-						<span><?php esc_html_e( 'Upgrade to FBS Secure Optimize Pro or request a Done-For-You Malware Eradication from FBS Fusion.', 'fbs-secure-optimize' ); ?></span>
+						<span><?php esc_html_e( 'Upgrade to FBS Secure Optimize Pro for real-time attack blocking, 1-click filesystem shell deletion, and daily scheduled scan alerts.', 'fbs-secure-optimize' ); ?></span>
 					</div>
 					<?php if ( $scanner_bfcm ) : ?>
 						<a href="<?php echo esc_url( FBS_Secure_Optimize_Controller::utm_url( 'black-friday/', 'bfcm', 'scanner-callout', 'fbs-secure-optimize-pro' ) ); ?>" target="_blank" rel="noopener noreferrer" class="fbsseop-btn fbsseop-btn--emerald">
@@ -1343,7 +1355,7 @@ class FBS_Secure_Optimize_Admin {
 			<div id="fbsseop-preview-modal" class="fbsseop-modal" style="display:none;">
 				<div class="fbsseop-modal__card">
 					<div class="fbsseop-modal__head">
-						<strong id="fbsseop-preview-title"><?php esc_html_e( 'File Snippet Preview', 'fbs-secure-optimize' ); ?></strong>
+						<strong id="fbsseop-preview-title"><?php esc_html_e( 'Forensic Code Preview', 'fbs-secure-optimize' ); ?></strong>
 						<button type="button" id="fbsseop-close-modal" class="fbsseop-btn fbsseop-btn--sm"><?php esc_html_e( 'Close ✕', 'fbs-secure-optimize' ); ?></button>
 					</div>
 					<pre id="fbsseop-preview-code" class="fbsseop-code-box"></pre>
