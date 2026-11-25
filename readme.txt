@@ -206,7 +206,7 @@ Uninstalling the plugin through the **Plugins** screen cleanly removes its saved
 == Upgrade Notice ==
 
 = 2.3.0 =
-Major Malware Scanner forensic upgrade! Adds Deep Database Code Snippets/CPT/WP-Cron rootkit detection, 6-Hook User Reflection, Application Passwords audit, Googlebot cloaked SEO spam loopback checks, Official WP.org Plugin/Theme checksum verification (zero vendor false positives), and Free 1-Click Direct-DB Remediation.
+Major Malware Scanner upgrade! Adds Deep DB Code Snippets/CPT/WP-Cron rootkit detection, 6-Hook Reflection, App Passwords audit, Googlebot cloaked spam checks, Official WP.org checksum verification, and Free 1-Click DB Cleanup.
 
 = 2.2.1 =
 Fixes a one-time blank screen on admin-post.php when saving settings right after updating on LiteSpeed / PHP-FPM servers by deferring OPcache resets to post-response shutdown.

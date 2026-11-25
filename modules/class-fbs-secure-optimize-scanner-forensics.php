@@ -250,10 +250,16 @@ class FBS_Secure_Optimize_Scanner_Forensics {
 				continue;
 			}
 
-			$source_type = ( $snip_table === $wpdb->base_prefix . 'ms_snippets' ) ? 'ms_snippets' : 'wp_snippets';
+			$is_ms_snip  = ( $snip_table === $wpdb->base_prefix . 'ms_snippets' ) && ( $wpdb->base_prefix . 'ms_snippets' !== $wpdb->prefix . 'snippets' );
+			$source_type = $is_ms_snip ? 'ms_snippets' : 'wp_snippets';
 
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Verified exact snippet table name.
-			$rows = $wpdb->get_results( "SELECT id, name, description, code, tags, scope, active, modified FROM `{$snip_table}` ORDER BY id DESC LIMIT 500" );
+			if ( $is_ms_snip ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Direct security audit of multisite snippets table.
+				$rows = $wpdb->get_results( "SELECT id, name, description, code, tags, scope, active, modified FROM {$wpdb->base_prefix}ms_snippets ORDER BY id DESC LIMIT 500" );
+			} else {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Direct security audit of site snippets table.
+				$rows = $wpdb->get_results( "SELECT id, name, description, code, tags, scope, active, modified FROM {$wpdb->prefix}snippets ORDER BY id DESC LIMIT 500" );
+			}
 			if ( ! is_array( $rows ) ) {
 				continue;
 			}
@@ -304,8 +310,8 @@ class FBS_Secure_Optimize_Scanner_Forensics {
 		// 2. Header Footer Code Manager ({prefix}hfcm_scripts).
 		$hfcm_table = $wpdb->prefix . 'hfcm_scripts';
 		if ( self::table_exists( $hfcm_table ) ) {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-			$hfcm_rows = $wpdb->get_results( "SELECT script_id, name, snippet, snippet_type, location, status, last_modified_date FROM `{$hfcm_table}` ORDER BY script_id DESC LIMIT 300" );
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Direct security audit of HFCM snippets table.
+			$hfcm_rows = $wpdb->get_results( "SELECT script_id, name, snippet, snippet_type, location, status, last_modified_date FROM {$wpdb->prefix}hfcm_scripts ORDER BY script_id DESC LIMIT 300" );
 			if ( is_array( $hfcm_rows ) ) {
 				foreach ( $hfcm_rows as $hrow ) {
 					$hid       = (int) $hrow->script_id;
@@ -351,8 +357,8 @@ class FBS_Secure_Optimize_Scanner_Forensics {
 		// 3. XYZ PHP Code ({prefix}xyz_ips_short_code).
 		$xyz_table = $wpdb->prefix . 'xyz_ips_short_code';
 		if ( self::table_exists( $xyz_table ) ) {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-			$xyz_rows = $wpdb->get_results( "SELECT id, title, content, status FROM `{$xyz_table}` ORDER BY id DESC LIMIT 300" );
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Direct security audit of XYZ PHP snippets table.
+			$xyz_rows = $wpdb->get_results( "SELECT id, title, content, status FROM {$wpdb->prefix}xyz_ips_short_code ORDER BY id DESC LIMIT 300" );
 			if ( is_array( $xyz_rows ) ) {
 				foreach ( $xyz_rows as $xrow ) {
 					$xid       = (int) $xrow->id;
@@ -605,8 +611,14 @@ class FBS_Secure_Optimize_Scanner_Forensics {
 	}
 
 	/**
-	 * Audit scheduled WP-Cron hooks for anonymous closures, database/eval'd callbacks,
-	 * dangerous execution functions, or suspicious unattached hooks.
+	 * Audit scheduled WP-Cron hooks strictly for real malware persistence:
+	 * - Direct dangerous PHP execution callbacks (eval, assert, shell_exec, system, base64_decode, etc.)
+	 * - Database/eval()'d code, Code Snippets, or wp-content/uploads/ callbacks
+	 * - Malicious payloads passed inside scheduled WP-Cron event arguments
+	 * - Unverified Closure/MU-Plugin callbacks containing backdoor/rootkit signatures
+	 *
+	 * Does NOT flag normal unattached plugin hooks (many legitimate plugins like WP Rocket and Rank Math
+	 * only register cron listeners inside wp_doing_cron()).
 	 *
 	 * @since 2.3.0
 	 * @return array<int, array<string, mixed>>
@@ -637,20 +649,6 @@ class FBS_Secure_Optimize_Scanner_Forensics {
 			'fbsseop_pro_daily_scan_cron',
 		);
 
-		$benign_orphan_prefixes = array(
-			'wp_',
-			'woocommerce_',
-			'wc_',
-			'action_scheduler_',
-			'wpseo_',
-			'elementor/',
-			'litespeed_',
-			'wordfence_',
-			'updraft_',
-			'jetpack_',
-			'googlesitekit_',
-		);
-
 		$seen_hooks = array();
 		$findings   = array();
 		$dangerous  = array( 'eval', 'assert', 'system', 'shell_exec', 'passthru', 'exec', 'popen', 'proc_open', 'base64_decode', 'create_function' );
@@ -667,40 +665,41 @@ class FBS_Secure_Optimize_Scanner_Forensics {
 				}
 				$seen_hooks[ $hook_str ] = true;
 
-				$has_listeners = isset( $wp_filter[ $hook_str ] ) && ( $wp_filter[ $hook_str ] instanceof WP_Hook ) && ! empty( $wp_filter[ $hook_str ]->callbacks );
-
-				if ( ! $has_listeners ) {
-					$is_known_prefix = false;
-					foreach ( $benign_orphan_prefixes as $pfx ) {
-						if ( 0 === strpos( strtolower( $hook_str ), $pfx ) ) {
-							$is_known_prefix = true;
-							break;
+				// 1. Inspect scheduled event arguments for serialized/injected code or remote backdoor payloads.
+				if ( is_array( $events ) ) {
+					$serialized_args = wp_json_encode( $events );
+					if ( is_string( $serialized_args ) && '' !== $serialized_args ) {
+						$arg_eval = self::evaluate_code_payload( $serialized_args );
+						if ( ! empty( $arg_eval['matched'] ) ) {
+							$findings[] = array(
+								'source'      => 'wp_cron',
+								'table'       => 'wp_options (cron)',
+								'row_id'      => 0,
+								'hook_name'   => $hook_str,
+								'name'        => 'WP-Cron Hook: ' . $hook_str,
+								'severity'    => 'CRITICAL',
+								'is_active'   => true,
+								'reason'      => 'Malicious payload in WP-Cron arguments: ' . implode( ' + ', $arg_eval['matched'] ),
+								'preview'     => substr( $serialized_args, 0, 420 ),
+								'can_disable' => false,
+								'can_delete'  => true,
+							);
+							continue;
 						}
 					}
+				}
 
-					if ( ! $is_known_prefix ) {
-						$findings[] = array(
-							'source'      => 'wp_cron',
-							'table'       => 'wp_options (cron)',
-							'row_id'      => 0,
-							'hook_name'   => $hook_str,
-							'name'        => 'WP-Cron Hook: ' . $hook_str,
-							'severity'    => 'MEDIUM',
-							'is_active'   => true,
-							'reason'      => __( 'Scheduled WP-Cron event has no registered PHP callback (orphaned or conditionally cloaked cron hook)', 'fbs-secure-optimize' ),
-							'preview'     => 'Next run: ' . gmdate( 'Y-m-d H:i:s', (int) $timestamp ) . ' UTC | Hook: ' . $hook_str,
-							'can_disable' => false,
-							'can_delete'  => true,
-						);
-					}
+				$has_listeners = isset( $wp_filter[ $hook_str ] ) && ( $wp_filter[ $hook_str ] instanceof WP_Hook ) && ! empty( $wp_filter[ $hook_str ]->callbacks );
+				if ( ! $has_listeners ) {
 					continue;
 				}
 
 				foreach ( $wp_filter[ $hook_str ]->callbacks as $priority => $cbs ) {
 					foreach ( $cbs as $cb_item ) {
-						$fn   = $cb_item['function'];
-						$info = FBS_Secure_Optimize_Scanner::describe_callable( $fn );
-						$file = strtolower( $info['file'] );
+						$fn       = $cb_item['function'];
+						$info     = FBS_Secure_Optimize_Scanner::describe_callable( $fn );
+						$rel_file = str_replace( '\\', '/', (string) $info['file'] );
+						$file     = strtolower( $rel_file );
 
 						if ( is_string( $fn ) && in_array( strtolower( $fn ), $dangerous, true ) ) {
 							$findings[] = array(
@@ -716,12 +715,16 @@ class FBS_Secure_Optimize_Scanner_Forensics {
 								'can_disable' => false,
 								'can_delete'  => true,
 							);
-						} elseif (
+							continue;
+						}
+
+						$is_db_or_uploads = (
 							false !== strpos( $file, "eval()'d code" ) ||
 							false !== strpos( $file, 'code-snippets' ) ||
-							false !== strpos( $file, 'wp-content/uploads' ) ||
-							$fn instanceof Closure
-						) {
+							false !== strpos( $file, 'wp-content/uploads' )
+						);
+
+						if ( $is_db_or_uploads ) {
 							$sev        = ( false !== strpos( $file, "eval()'d code" ) || false !== strpos( $file, 'wp-content/uploads' ) ) ? 'CRITICAL' : 'HIGH';
 							$findings[] = array(
 								'source'      => 'wp_cron',
@@ -731,11 +734,40 @@ class FBS_Secure_Optimize_Scanner_Forensics {
 								'name'        => 'WP-Cron Hook: ' . $hook_str,
 								'severity'    => $sev,
 								'is_active'   => true,
-								'reason'      => 'Suspicious WP-Cron callback (' . $info['label'] . ')',
-								'preview'     => 'Source: ' . $info['file'] . ':' . $info['line'] . ' (Priority ' . (int) $priority . ')',
+								'reason'      => 'Database / uploads WP-Cron persistence callback (' . $info['label'] . ')',
+								'preview'     => 'Source: ' . $rel_file . ':' . $info['line'] . ' (Priority ' . (int) $priority . ')',
 								'can_disable' => false,
 								'can_delete'  => true,
 							);
+							continue;
+						}
+
+						if ( $fn instanceof Closure ) {
+							if ( 0 === strpos( $file, 'wp-content/plugins/' ) && self::is_verified_official_wporg_plugin_file( ABSPATH . $rel_file ) ) {
+								continue;
+							}
+
+							$closure_src = self::get_callable_source_slice( $fn );
+							$closure_res = self::evaluate_code_payload( $closure_src );
+							$is_mu_cron  = ( 0 === strpos( $file, 'wp-content/mu-plugins/' ) );
+
+							if ( ! empty( $closure_res['matched'] ) || $is_mu_cron ) {
+								$findings[] = array(
+									'source'      => 'wp_cron',
+									'table'       => 'wp_options (cron)',
+									'row_id'      => 0,
+									'hook_name'   => $hook_str,
+									'name'        => 'WP-Cron Hook: ' . $hook_str,
+									'severity'    => ! empty( $closure_res['matched'] ) ? $closure_res['severity'] : 'HIGH',
+									'is_active'   => true,
+									'reason'      => ! empty( $closure_res['matched'] )
+										? 'Malicious WP-Cron Closure (' . implode( ' + ', $closure_res['matched'] ) . ')'
+										: 'Anonymous WP-Cron Closure inside mu-plugins (' . $info['label'] . ')',
+									'preview'     => 'Source: ' . $rel_file . ':' . $info['line'] . ' (Priority ' . (int) $priority . ')',
+									'can_disable' => false,
+									'can_delete'  => true,
+								);
+							}
 						}
 					}
 				}
@@ -1452,8 +1484,13 @@ class FBS_Secure_Optimize_Scanner_Forensics {
 		if ( ( 'wp_snippets' === $source || 'ms_snippets' === $source ) && $row_id > 0 ) {
 			$table = ( 'ms_snippets' === $source ) ? $wpdb->base_prefix . 'ms_snippets' : $wpdb->prefix . 'snippets';
 			if ( self::table_exists( $table ) ) {
-				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-				$row = $wpdb->get_row( $wpdb->prepare( "SELECT id, name, scope, active, code FROM `{$table}` WHERE id = %d", $row_id ) );
+				if ( 'ms_snippets' === $source ) {
+					// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+					$row = $wpdb->get_row( $wpdb->prepare( "SELECT id, name, scope, active, code FROM {$wpdb->base_prefix}ms_snippets WHERE id = %d", $row_id ) );
+				} else {
+					// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+					$row = $wpdb->get_row( $wpdb->prepare( "SELECT id, name, scope, active, code FROM {$wpdb->prefix}snippets WHERE id = %d", $row_id ) );
+				}
 				if ( $row ) {
 					$title   = sprintf( '%s #%d — %s (%s)', $table, (int) $row->id, (string) $row->name, ! empty( $row->active ) ? 'ACTIVE' : 'INACTIVE' );
 					$content = (string) $row->code;
@@ -1462,8 +1499,8 @@ class FBS_Secure_Optimize_Scanner_Forensics {
 		} elseif ( 'hfcm_scripts' === $source && $row_id > 0 ) {
 			$table = $wpdb->prefix . 'hfcm_scripts';
 			if ( self::table_exists( $table ) ) {
-				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-				$row = $wpdb->get_row( $wpdb->prepare( "SELECT script_id, name, status, snippet FROM `{$table}` WHERE script_id = %d", $row_id ) );
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+				$row = $wpdb->get_row( $wpdb->prepare( "SELECT script_id, name, status, snippet FROM {$wpdb->prefix}hfcm_scripts WHERE script_id = %d", $row_id ) );
 				if ( $row ) {
 					$title   = sprintf( 'HFCM #%d — %s (%s)', (int) $row->script_id, (string) $row->name, (string) $row->status );
 					$content = (string) $row->snippet;
@@ -1472,8 +1509,8 @@ class FBS_Secure_Optimize_Scanner_Forensics {
 		} elseif ( 'xyz_ips' === $source && $row_id > 0 ) {
 			$table = $wpdb->prefix . 'xyz_ips_short_code';
 			if ( self::table_exists( $table ) ) {
-				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-				$row = $wpdb->get_row( $wpdb->prepare( "SELECT id, title, content FROM `{$table}` WHERE id = %d", $row_id ) );
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+				$row = $wpdb->get_row( $wpdb->prepare( "SELECT id, title, content FROM {$wpdb->prefix}xyz_ips_short_code WHERE id = %d", $row_id ) );
 				if ( $row ) {
 					$title   = sprintf( 'XYZ PHP #%d — %s', (int) $row->id, (string) $row->title );
 					$content = (string) $row->content;
