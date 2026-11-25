@@ -496,15 +496,32 @@
 				html += '</tbody></table></div>';
 			}
 
-			// 6f. Active Database Code Snippets Inventory (100% Visibility Against UI-Hiding Rootkits)
+			// 6f. Collapsed Active Database Code Snippets Inventory (Read-Only View Full Code)
 			if (d.active_snippets && d.active_snippets.length > 0) {
-				html += '<h3 class="fbsseop-scan-section-title"><span class="dashicons dashicons-editor-code"></span><span>Active Database-Executed Code Snippets Inventory (' + d.active_snippets.length + ')</span></h3>';
+				var flaggedCount = 0;
+				$.each(d.active_snippets, function (_, sItem) {
+					if (sItem.is_flagged) {
+						flaggedCount++;
+					}
+				});
+
+				var summaryIcon = flaggedCount === 0 ? 'dashicons-yes-alt is-clean' : 'dashicons-editor-code';
+				var summaryText = flaggedCount === 0
+					? d.active_snippets.length + ' Active Database Snippet(s) Inspected & Verified Clean'
+					: d.active_snippets.length + ' Active Database Snippet(s) in MySQL (' + flaggedCount + ' flagged above)';
+
+				html += '<details class="fbsseop-audit-drawer">';
+				html += '<summary class="fbsseop-audit-drawer__summary">';
+				html += '<span class="fbsseop-audit-drawer__left"><span class="dashicons ' + summaryIcon + '"></span><strong>' + escHtml(summaryText) + '</strong></span>';
+				html += '<span class="fbsseop-audit-drawer__Action">Click to View Forensic Inventory ▾</span>';
+				html += '</summary>';
+				html += '<div class="fbsseop-audit-drawer__body">';
 				html += '<p style="margin:0 0 10px;font-size:12.5px;color:#475569;">Queried directly via raw SQL so self-hiding admin table rootkits (such as <code>SnCache</code> CSS/JS row hiders) cannot conceal active PHP/HTML snippets.</p>';
-				html += '<div class="fbsseop-table-wrap"><table class="fbsseop-scan-table"><thead><tr><th>Status</th><th>Source Table</th><th>ID & Snippet Name</th><th>Scope / Size</th><th>Direct-DB Actions</th></tr></thead><tbody>';
+				html += '<div class="fbsseop-table-wrap" style="margin-bottom:0;"><table class="fbsseop-scan-table"><thead><tr><th>Status</th><th>Source Table</th><th>ID & Snippet Name</th><th>Scope / Size</th><th>Inspect</th></tr></thead><tbody>';
 				$.each(d.active_snippets, function (_, sn) {
 					var stBadge = sn.is_flagged
 						? '<span class="fbsseop-sev fbsseop-sev--critical">FLAGGED</span>'
-						: '<span class="fbsseop-sev fbsseop-sev--ok">ACTIVE</span>';
+						: '<span class="fbsseop-sev fbsseop-sev--ok">CLEAN</span>';
 					html += '<tr>';
 					html += '<td>' + stBadge + '</td>';
 					html += '<td><code>' + escHtml(sn.table) + '</code></td>';
@@ -512,15 +529,9 @@
 					html += '<td>' + escHtml(sn.scope) + ' (' + escHtml(sn.code_len) + ' B)</td>';
 					html += '<td class="fbsseop-td-actions"><div class="fbsseop-row-actions">';
 					html += '<button type="button" class="fbsseop-btn fbsseop-btn--sm fbsseop-view-db-code-btn" data-source="' + escHtml(sn.source) + '" data-rowid="' + escHtml(sn.row_id) + '">View Full Code</button>';
-					if (sn.can_disable) {
-						html += '<button type="button" class="fbsseop-btn fbsseop-btn--sm fbsseop-btn--warn fbsseop-remediate-snippet-btn" data-mode="deactivate" data-source="' + escHtml(sn.source) + '" data-rowid="' + escHtml(sn.row_id) + '">Deactivate</button>';
-					}
-					if (sn.can_delete) {
-						html += '<button type="button" class="fbsseop-btn fbsseop-btn--sm fbsseop-btn--danger fbsseop-remediate-snippet-btn" data-mode="delete" data-source="' + escHtml(sn.source) + '" data-rowid="' + escHtml(sn.row_id) + '">Delete</button>';
-					}
 					html += '</div></td></tr>';
 				});
-				html += '</tbody></table></div>';
+				html += '</tbody></table></div></div></details>';
 			}
 
 			// 6g. Active REST API Application Passwords Audit

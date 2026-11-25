@@ -966,6 +966,71 @@
 	flex-wrap: wrap;
 }
 
+/* Collapsed Forensic Inventory Accordion */
+.fbsseop-audit-drawer {
+	margin: 18px 0;
+	border: 1px solid #cbd5e1;
+	border-radius: 12px;
+	background: #f8fafc;
+	overflow: hidden;
+}
+
+.fbsseop-audit-drawer__summary {
+	list-style: none;
+	cursor: pointer;
+	padding: 13px 16px;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	flex-wrap: wrap;
+	font-size: 13.5px;
+	color: #0f172a;
+	user-select: none;
+	transition: background 0.15s ease;
+}
+
+.fbsseop-audit-drawer__summary::-webkit-details-marker {
+	display: none;
+}
+
+.fbsseop-audit-drawer__summary:hover {
+	background: #f1f5f9;
+}
+
+.fbsseop-audit-drawer__left {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.fbsseop-audit-drawer__left .dashicons {
+	color: #4f46e5;
+	font-size: 19px;
+	width: 19px;
+	height: 19px;
+}
+
+.fbsseop-audit-drawer__left .dashicons.is-clean {
+	color: #059669;
+}
+
+.fbsseop-audit-drawer__Action {
+	font-size: 12px;
+	font-weight: 700;
+	color: #4f46e5;
+}
+
+.fbsseop-audit-drawer[open] .fbsseop-audit-drawer__summary {
+	border-bottom: 1px solid #e2e8f0;
+	background: #ffffff;
+}
+
+.fbsseop-audit-drawer__body {
+	padding: 14px 16px 16px;
+	background: #ffffff;
+}
+
 @media (max-width: 1100px) {
 	.fbsseop-scan-stages {
 		grid-template-columns: repeat(3, 1fr);
