@@ -821,6 +821,7 @@ class FBS_Secure_Optimize_Controller {
 	 * @return array<int, string> List of cache layers cleared.
 	 */
 	public static function purge_all_caches( $reset_opcache = false ) {
+		unset( $reset_opcache );
 		$cleared = array();
 
 		// Buffer any stray output from third-party cache plugins so admin-post.php redirects never break.
@@ -844,25 +845,11 @@ class FBS_Secure_Optimize_Controller {
 			$cleared[] = __( 'WP Object Cache', 'fbs-secure-optimize' );
 		}
 
-		// 3. PHP OPcache (deferred to shutdown after response/redirect headers are sent to prevent LSAPI/FPM mid-request crashes).
-		if ( $reset_opcache && function_exists( 'opcache_reset' ) ) {
-			$restrict_api = (string) ini_get( 'opcache.restrict_api' );
-			if ( '' === $restrict_api || 0 === strpos( __FILE__, $restrict_api ) ) {
-				register_shutdown_function(
-					static function () {
-						if ( function_exists( 'fastcgi_finish_request' ) ) {
-							@fastcgi_finish_request(); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
-						} elseif ( function_exists( 'litespeed_finish_request' ) ) {
-							@litespeed_finish_request(); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
-						}
-						@opcache_reset(); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
-					}
-				);
-				$cleared[] = __( 'PHP OPcache', 'fbs-secure-optimize' );
-			}
-		}
+		// Note: Do not call opcache_reset() here. Wiping shared server-wide PHP bytecode OPcache
+		// causes worker lock contention, 429 rate-limit blocks, and IP blackholing on 20i/StackCP,
+		// LiteSpeed LSAPI, and shared PHP-FPM hosts.
 
-		// 4. Compatible third-party & managed host page cache hooks (zero-conflict bridge).
+		// 3. Compatible third-party & managed host page cache hooks (zero-conflict bridge).
 		if ( has_action( 'litespeed_purge_all' ) ) {
 			// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- Official LiteSpeed Cache API hook.
 			do_action( 'litespeed_purge_all' );

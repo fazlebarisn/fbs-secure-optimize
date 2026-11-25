@@ -269,6 +269,11 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 			);
 		}
 
+		// 2b. Upgrade text @font-face rules from FOIT (font-display: auto/block) to font-display: swap.
+		if ( ! empty( $opts['non_blocking_google_fonts'] ) ) {
+			$html = $this->apply_font_display_swap_to_inline_styles( $html );
+		}
+
 		// 3. Above-the-fold LCP hero image / CSS background-image preloader & fetchpriority sanitizer.
 		if ( ! empty( $opts['preload_lcp_image'] ) ) {
 			$manual_lcp_url = isset( $opts['lcp_preload_url'] ) ? trim( (string) $opts['lcp_preload_url'] ) : '';
@@ -672,7 +677,7 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 			$clean_url = 'https:' . $clean_url;
 		}
 
-		if ( false === stripos( $clean_url, 'display=' ) ) {
+		if ( false === stripos( $clean_url, 'display=' ) || preg_match( '/[?&]display=(?:auto|block)\b/i', $clean_url ) ) {
 			$clean_url = add_query_arg( 'display', 'swap', $clean_url );
 		}
 
@@ -716,6 +721,63 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 		}
 
 		return $this->build_non_blocking_google_font_html( $href, $handle . '-css' );
+	}
+
+	/**
+	 * Upgrade text @font-face declarations in inline <style> blocks and Google Fonts URLs
+	 * from FOIT (`font-display: auto` or `block`) to `font-display: swap`.
+	 *
+	 * Preserves `font-display: block` on icon fonts (Font Awesome, eicons, Dashicons, etc.)
+	 * so icon glyphs never flash unstyled fallback characters.
+	 *
+	 * @since 2.3.1
+	 * @param string $html Full HTML document.
+	 * @return string
+	 */
+	private function apply_font_display_swap_to_inline_styles( $html ) {
+		// 1. Ensure any Google Fonts URL in the document uses display=swap instead of display=auto/block.
+		if ( false !== stripos( $html, 'fonts.googleapis.com/css' ) ) {
+			$html = (string) preg_replace(
+				'#(fonts\.googleapis\.com/css2?\?[^"\'\s>]*?\bdisplay=)(?:auto|block)\b#i',
+				'$1swap',
+				$html
+			);
+		}
+
+		if ( false === stripos( $html, '@font-face' ) ) {
+			return $html;
+		}
+
+		// 2. Rewrite text @font-face rules inside inline <style> blocks to use font-display: swap.
+		$html = (string) preg_replace_callback(
+			'/@font-face\s*\{([^}]*)\}/is',
+			static function ( $m ) {
+				$body = $m[1];
+				// Skip icon fonts where font-display: block is intentional.
+				if ( preg_match( '/font-family\s*:[^;]*(?:awesome|eicons|ekiticons|dashicons|icomoon|flaticon|genericons|woocommerce|star)/i', $body ) ) {
+					return $m[0];
+				}
+
+				if ( preg_match( '/\bfont-display\s*:\s*(?:auto|block)\b/i', $body ) ) {
+					$body = (string) preg_replace( '/\bfont-display\s*:\s*(?:auto|block)\b/i', 'font-display: swap', $body );
+					return '@font-face {' . $body . '}';
+				}
+
+				if ( false === stripos( $body, 'font-display' ) ) {
+					$body = rtrim( $body );
+					if ( '' !== $body && ';' !== substr( $body, -1 ) ) {
+						$body .= ';';
+					}
+					$body .= 'font-display: swap;';
+					return '@font-face {' . $body . '}';
+				}
+
+				return $m[0];
+			},
+			$html
+		);
+
+		return $html;
 	}
 
 	/**
@@ -781,9 +843,9 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 		 * Filters the maximum file size (in bytes) eligible for automatic CSS inlining.
 		 *
 		 * @since 2.1.0
-		 * @param int $max_bytes Default 8192 bytes (8 KB).
+		 * @param int $max_bytes Default 16384 bytes (16 KB).
 		 */
-		$max_bytes = (int) apply_filters( 'fbsseop_inline_css_max_bytes', 8192 );
+		$max_bytes = (int) apply_filters( 'fbsseop_inline_css_max_bytes', 16384 );
 		if ( $file_size < 0 || $file_size > $max_bytes ) {
 			return $tag;
 		}
@@ -1739,7 +1801,8 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 	}
 
 	/**
-	 * Detect an above-the-fold Hero CSS background-image URL from inline <style> blocks or top-of-body inline styles.
+	 * Detect an above-the-fold Hero CSS background-image URL from inline styles, inline <style> blocks,
+	 * or local external page-builder / theme stylesheets.
 	 *
 	 * @since 2.2.0
 	 * @param string $head_part HTML <head> section.
@@ -1747,7 +1810,7 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 	 * @return array{url: string, offset: int}|null
 	 */
 	private function detect_above_fold_hero_background( $head_part, $body_part ) {
-		$top_body = substr( $body_part, 0, 16384 );
+		$top_body = substr( $body_part, 0, 32768 );
 
 		// Case A: Inline style="...background(-image): url(...)..." on an element near the top of <body>.
 		if ( preg_match( '/style\s*=\s*([\'"])[^\'"]*background(?:-image)?\s*:[^\'"]*url\(\s*[\'"]?([^\'")\s]+\.(?:jpe?g|png|webp|avif)(?:\?[^\'")\s]*)?)[\'"]?\s*\)/i', $top_body, $bm, PREG_OFFSET_CAPTURE ) ) {
@@ -1766,13 +1829,7 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 			$hero_keywords = array( 'hero', 'banner', 'masthead', 'jumbotron', 'wp-block-cover', 'first-section', 'top-section' );
 
 			foreach ( $style_blocks as $block ) {
-				$style_attrs = strtolower( $block[1] );
-				$css_body    = $block[2];
-
-				if ( false === stripos( $css_body, 'background' ) || false === stripos( $css_body, 'url(' ) ) {
-					continue;
-				}
-
+				$style_attrs      = strtolower( $block[1] );
 				$is_hero_style_id = false;
 				foreach ( $hero_keywords as $kw ) {
 					if ( false !== strpos( $style_attrs, $kw ) ) {
@@ -1781,23 +1838,109 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 					}
 				}
 
-				if ( preg_match_all( '/([^{};]+)\{[^}]*background(?:-image)?\s*:[^;}]*url\(\s*[\'"]?([^\'")\s]+\.(?:jpe?g|png|webp|avif)(?:\?[^\'")\s]*)?)[\'"]?\s*\)/is', $css_body, $rules, PREG_SET_ORDER ) ) {
-					foreach ( $rules as $rule ) {
-						$selector = trim( $rule[1] );
-						$img_url  = html_entity_decode( trim( $rule[2] ), ENT_QUOTES, 'UTF-8' );
+				$found = $this->match_hero_bg_in_css( $block[2], $style_attrs, $top_body, $is_hero_style_id );
+				if ( null !== $found ) {
+					return $found;
+				}
+			}
+		}
 
-						if ( $this->is_non_lcp_ui_graphic( $img_url ) ) {
+		// Case C: Local external <link rel="stylesheet"> files (e.g. Elementor post-*.css, Divi, Bricks, theme CSS).
+		if ( preg_match_all( '/<link\b[^>]*rel\s*=\s*[\'"]stylesheet[\'"][^>]*>/i', $head_part, $link_tags ) ) {
+			$prioritized = array();
+			$fallback    = array();
+
+			foreach ( $link_tags[0] as $link_tag ) {
+				// Skip non-blocking print/async icon & font sheets.
+				if ( preg_match( '/\bmedia\s*=\s*[\'"]print[\'"]/i', $link_tag ) ) {
+					continue;
+				}
+				if ( ! preg_match( '/\bhref\s*=\s*([\'"])([^\'"]+)\1/i', $link_tag, $hm ) ) {
+					continue;
+				}
+
+				$clean_href = (string) strtok( html_entity_decode( trim( $hm[2] ), ENT_QUOTES, 'UTF-8' ), '?#' );
+				if ( preg_match( '/(?:fontawesome|dashicons|eicons|ekiticons|admin-bar|wp-block-library|fonts\.googleapis)/i', $clean_href ) ) {
+					continue;
+				}
+
+				$local_path = $this->resolve_local_asset_path( $clean_href, '.css' );
+				if ( '' === $local_path ) {
+					continue;
+				}
+
+				$entry = array(
+					'path' => $local_path,
+					'href' => $clean_href,
+				);
+
+				if ( preg_match( '/\/(?:elementor\/css\/post-|bb-plugin\/cache\/|et-cache\/|bricks\/css\/|oxygen\/|uploads\/)/i', $clean_href ) ) {
+					$prioritized[] = $entry;
+				} else {
+					$fallback[] = $entry;
+				}
+			}
+
+			$candidates = array_slice( array_merge( $prioritized, $fallback ), 0, 4 );
+			if ( ! empty( $candidates ) ) {
+				$salt      = FBS_Secure_Optimize_Controller::get_cache_salt();
+				$cache_key = 'fbsseop_lcp_css_' . md5( $salt . '|' . wp_json_encode( $candidates ) );
+				$css_rules = get_transient( $cache_key );
+
+				if ( ! is_array( $css_rules ) ) {
+					$css_rules  = array();
+					$bytes_read = 0;
+
+					foreach ( $candidates as $entry ) {
+						if ( $bytes_read >= 307200 ) {
+							break;
+						}
+
+						$fsize = (int) @filesize( $entry['path'] ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+						if ( $fsize <= 0 || $fsize > 204800 ) {
 							continue;
 						}
 
-						// Verify selector or style ID corresponds to an element actually inside the top viewport chunk of <body>.
-						$body_offset = $this->find_selector_offset_in_top_body( $selector, $style_attrs, $top_body, $is_hero_style_id );
-						if ( null !== $body_offset ) {
-							return array(
-								'url'    => $img_url,
-								'offset' => $body_offset,
-							);
+						// phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Verified local CSS file inside ABSPATH.
+						$css_body = @file_get_contents( $entry['path'] ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+						if ( ! is_string( $css_body ) || '' === $css_body ) {
+							continue;
 						}
+
+						$bytes_read += $fsize;
+
+						if ( false === stripos( $css_body, 'background' ) || false === stripos( $css_body, 'url(' ) ) {
+							continue;
+						}
+
+						$base_dir_url = trailingslashit( dirname( $entry['href'] ) );
+						if ( preg_match_all( '/([^{};]+)\{[^}]*background(?:-image)?\s*:[^;}]*url\(\s*[\'"]?([^\'")\s]+\.(?:jpe?g|png|webp|avif)(?:\?[^\'")\s]*)?)[\'"]?\s*\)/is', $css_body, $rules, PREG_SET_ORDER ) ) {
+							foreach ( $rules as $rule ) {
+								$img_url = html_entity_decode( trim( $rule[2] ), ENT_QUOTES, 'UTF-8' );
+								if ( '' !== $base_dir_url && 0 !== strpos( $img_url, 'http://' ) && 0 !== strpos( $img_url, 'https://' ) && 0 !== strpos( $img_url, '//' ) && 0 !== strpos( $img_url, 'data:' ) ) {
+									$img_url = ( 0 === strpos( $img_url, '/' ) ) ? home_url( $img_url ) : $base_dir_url . ltrim( $img_url, './' );
+								}
+								if ( $this->is_non_lcp_ui_graphic( $img_url ) ) {
+									continue;
+								}
+								$css_rules[] = array(
+									'selector' => trim( $rule[1] ),
+									'url'      => $img_url,
+								);
+							}
+						}
+					}
+
+					set_transient( $cache_key, $css_rules, 6 * HOUR_IN_SECONDS );
+				}
+
+				foreach ( $css_rules as $rule_item ) {
+					$body_offset = $this->find_selector_offset_in_top_body( $rule_item['selector'], '', $top_body, false );
+					if ( null !== $body_offset ) {
+						return array(
+							'url'    => $rule_item['url'],
+							'offset' => $body_offset,
+						);
 					}
 				}
 			}
@@ -1807,25 +1950,89 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 	}
 
 	/**
-	 * Locate the approximate byte offset in the top 16 KB of <body> for a hero CSS rule's class or ID token.
+	 * Scan a CSS string for the first above-the-fold hero background-image rule matching top_body.
+	 *
+	 * @since 2.3.1
+	 * @param string $css_body         Raw CSS content.
+	 * @param string $style_attrs      Lowercased <style> tag attributes (empty for external files).
+	 * @param string $top_body         First 32 KB of <body>.
+	 * @param bool   $is_hero_style_id Whether the <style> id itself contains a hero keyword.
+	 * @param string $base_dir_url     Optional base directory URL for resolving relative CSS url() paths.
+	 * @return array{url: string, offset: int}|null
+	 */
+	private function match_hero_bg_in_css( $css_body, $style_attrs, $top_body, $is_hero_style_id, $base_dir_url = '' ) {
+		if ( false === stripos( $css_body, 'background' ) || false === stripos( $css_body, 'url(' ) ) {
+			return null;
+		}
+
+		if ( preg_match_all( '/([^{};]+)\{[^}]*background(?:-image)?\s*:[^;}]*url\(\s*[\'"]?([^\'")\s]+\.(?:jpe?g|png|webp|avif)(?:\?[^\'")\s]*)?)[\'"]?\s*\)/is', $css_body, $rules, PREG_SET_ORDER ) ) {
+			foreach ( $rules as $rule ) {
+				$selector = trim( $rule[1] );
+				$img_url  = html_entity_decode( trim( $rule[2] ), ENT_QUOTES, 'UTF-8' );
+
+				if ( '' !== $base_dir_url && 0 !== strpos( $img_url, 'http://' ) && 0 !== strpos( $img_url, 'https://' ) && 0 !== strpos( $img_url, '//' ) && 0 !== strpos( $img_url, 'data:' ) ) {
+					$img_url = ( 0 === strpos( $img_url, '/' ) ) ? home_url( $img_url ) : $base_dir_url . ltrim( $img_url, './' );
+				}
+
+				if ( $this->is_non_lcp_ui_graphic( $img_url ) ) {
+					continue;
+				}
+
+				$body_offset = $this->find_selector_offset_in_top_body( $selector, $style_attrs, $top_body, $is_hero_style_id );
+				if ( null !== $body_offset ) {
+					return array(
+						'url'    => $img_url,
+						'offset' => $body_offset,
+					);
+				}
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * Locate the approximate byte offset in the top 32 KB of <body> for a hero CSS rule's class or ID token.
 	 *
 	 * @since 2.2.0
 	 * @param string $selector         CSS selector string.
 	 * @param string $style_attrs      Lowercased <style> tag attributes.
-	 * @param string $top_body         First 16 KB of <body>.
+	 * @param string $top_body         First 32 KB of <body>.
 	 * @param bool   $is_hero_style_id Whether the <style> id itself contains a hero keyword.
 	 * @return int|null
 	 */
 	private function find_selector_offset_in_top_body( $selector, $style_attrs, $top_body, $is_hero_style_id ) {
-		// Extract class or ID tokens from the CSS selector.
-		if ( preg_match_all( '/([.#])([a-zA-Z0-9_-]{4,})/', $selector, $tokens, PREG_SET_ORDER ) ) {
-			foreach ( $tokens as $tok ) {
-				$name = $tok[2];
-				$pos  = stripos( $top_body, $name );
-				if ( false !== $pos ) {
-					// Accept if it's a hero-named selector/style or appears in the very first hero section (< 8 KB of <body>).
-					if ( $is_hero_style_id || $pos < 8192 ) {
-						return (int) $pos;
+		// Check each comma-separated selector; strip :not(...) / :is(...) / :where(...) pseudo-classes
+		// and check non-generic tokens from deepest (most specific) to shallowest.
+		$parts          = explode( ',', $selector );
+		$generic_tokens = array(
+			'elementor-element',
+			'elementor-widget',
+			'elementor-widget-wrap',
+			'elementor-section',
+			'elementor-container',
+			'elementor-column',
+			'wp-block-group',
+			'wp-block-cover',
+		);
+
+		foreach ( $parts as $part ) {
+			$clean_part = (string) preg_replace( '/:(?:not|is|where|has)\([^)]*\)/i', '', $part );
+			if ( preg_match_all( '/([.#])([a-zA-Z0-9_-]{4,})/', $clean_part, $tokens, PREG_SET_ORDER ) ) {
+				$specific = array();
+				foreach ( $tokens as $tok ) {
+					if ( ! in_array( strtolower( $tok[2] ), $generic_tokens, true ) ) {
+						$specific[] = $tok[2];
+					}
+				}
+
+				$candidates = ! empty( $specific ) ? array_reverse( $specific ) : array( $tokens[ count( $tokens ) - 1 ][2] );
+				foreach ( $candidates as $target ) {
+					$pos = stripos( $top_body, $target );
+					if ( false !== $pos ) {
+						if ( $is_hero_style_id || $pos < 16384 ) {
+							return (int) $pos;
+						}
 					}
 				}
 			}
@@ -2108,9 +2315,32 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 
 			// Synchronous inline script check: abort if it references jQuery, $(, or $.
 			if ( '' !== trim( $body ) && preg_match( '/\bjQuery\b|\$\s*[\(\.]/', $body ) ) {
+				$clean_inline = trim( (string) preg_replace( '#//[^\r\n]*#', '', $body ) );
+				if ( preg_match( '/^jQuery\.uiBackCompat\s*=\s*(?:true|false)\s*;?$/i', $clean_inline ) ) {
+					continue;
+				}
 				return $html;
 			}
 		}
+
+		// Safely wrap any synchronous `jQuery.uiBackCompat = ...;` inline script so it runs after deferred jQuery loads.
+		$html = (string) preg_replace_callback(
+			'/<script\b([^>]*)>(.*?)<\/script>/is',
+			static function ( $m ) {
+				$body = $m[2];
+				if ( false === stripos( $body, 'uiBackCompat' ) ) {
+					return $m[0];
+				}
+				$clean_inline = trim( (string) preg_replace( '#//[^\r\n]*#', '', $body ) );
+				if ( preg_match( '/^jQuery\.uiBackCompat\s*=\s*(true|false)\s*;?$/i', $clean_inline, $bm ) ) {
+					$val     = strtolower( $bm[1] );
+					$wrapped = 'if(window.jQuery){jQuery.uiBackCompat=' . $val . ';}else{document.addEventListener("DOMContentLoaded",function(){if(window.jQuery){jQuery.uiBackCompat=' . $val . ';}});}';
+					return '<script' . $m[1] . '>' . $wrapped . '</script>';
+				}
+				return $m[0];
+			},
+			$html
+		);
 
 		// Verified 100% safe: add defer to jquery-core and jquery-migrate tags.
 		$html = (string) preg_replace_callback(
@@ -2154,7 +2384,8 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 			defined( 'WP_ROCKET_VERSION' ) ||
 			defined( 'W3TC' ) ||
 			function_exists( 'sg_cachepress_purge_cache' ) ||
-			class_exists( 'WpFastestCache' )
+			class_exists( 'WpFastestCache' ) ||
+			class_exists( 'StackCache' )
 		) {
 			return false;
 		}
