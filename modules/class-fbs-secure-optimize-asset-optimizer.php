@@ -1254,10 +1254,32 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 	 * @return string
 	 */
 	public function defer_non_critical_scripts( $tag, $handle ) {
-		if ( $this->should_bypass_frontend() ) {
+		if ( $this->should_bypass_frontend() || $this->is_transactional_page() ) {
 			return $tag;
 		}
 
+		if ( false !== stripos( $tag, ' defer' ) || false !== stripos( $tag, ' async' ) || false === stripos( $tag, ' src=' ) ) {
+			return $tag;
+		}
+
+		if ( ! $this->is_script_handle_safe_to_defer( $handle ) ) {
+			return $tag;
+		}
+
+		return str_replace( ' src=', ' defer src=', $tag );
+	}
+
+	/**
+	 * Determine whether a registered script handle and all scripts that depend on it can be safely deferred.
+	 *
+	 * Prevents dependency order inversions where a child script with a synchronous `wp_add_inline_script(..., 'after')`
+	 * block executes during HTML parsing before its deferred parent dependency (e.g. `wp-private-apis` -> `wp-api-fetch` -> `wc-blocks`).
+	 *
+	 * @since 3.0.0
+	 * @param string $handle Registered script handle.
+	 * @return bool
+	 */
+	private function is_script_handle_safe_to_defer( $handle ) {
 		$excluded_handles = array(
 			'jquery',
 			'jquery-core',
@@ -1266,7 +1288,15 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 			'wp-hooks',
 			'wp-i18n',
 			'wp-api-fetch',
+			'react',
+			'react-dom',
+			'react-jsx-runtime',
+			'lodash',
+			'underscore',
+			'backbone',
+			'moment',
 			'wc-checkout',
+			'wc-cart',
 			'wc-cart-fragments',
 			'wc-add-to-cart',
 		);
@@ -1277,26 +1307,92 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 		 * @since 2.0.0
 		 * @param array<int, string> $excluded_handles Script handles to skip.
 		 */
-		$excluded_handles = apply_filters( 'fbsseop_defer_excluded_handles', $excluded_handles );
+		$excluded_handles = (array) apply_filters( 'fbsseop_defer_excluded_handles', $excluded_handles );
 
-		if ( in_array( $handle, $excluded_handles, true ) ) {
-			return $tag;
+		if ( $this->is_handle_intrinsically_synchronous( $handle, $excluded_handles ) ) {
+			return false;
 		}
 
-		// Protect handles that attach synchronous wp_add_inline_script(..., 'after') blocks.
+		// Ensure no enqueued synchronous script depends (directly or transitively) on $handle.
+		$wp_scripts = wp_scripts();
+		if ( $wp_scripts instanceof WP_Scripts && ! empty( $wp_scripts->queue ) ) {
+			foreach ( $wp_scripts->queue as $queued_handle ) {
+				if ( $queued_handle === $handle ) {
+					continue;
+				}
+				if (
+					$this->is_handle_intrinsically_synchronous( $queued_handle, $excluded_handles ) &&
+					$this->script_depends_on( $queued_handle, $handle, $wp_scripts )
+				) {
+					return false;
+				}
+			}
+		}
+
+		return true;
+	}
+
+	/**
+	 * Check if a script handle itself must remain synchronous (excluded handle, core wp- or wc- runtime, or has inline 'after' script).
+	 *
+	 * @since 3.0.0
+	 * @param string             $handle           Script handle.
+	 * @param array<int, string> $excluded_handles Excluded handles list.
+	 * @return bool
+	 */
+	private function is_handle_intrinsically_synchronous( $handle, $excluded_handles ) {
+		if ( in_array( $handle, $excluded_handles, true ) ) {
+			return true;
+		}
+
+		// Protect WordPress @wordpress/* packages (wp-*) and WooCommerce / Blocks runtime packages (wc-*, woocommerce*).
+		if (
+			0 === strpos( $handle, 'wp-' ) ||
+			0 === strpos( $handle, 'wc-' ) ||
+			0 === strpos( $handle, 'woocommerce' )
+		) {
+			return true;
+		}
+
 		$wp_scripts = wp_scripts();
 		if ( $wp_scripts instanceof WP_Scripts ) {
 			$after_data = $wp_scripts->get_data( $handle, 'after' );
 			if ( ! empty( $after_data ) ) {
-				return $tag;
+				return true;
 			}
 		}
 
-		if ( false !== stripos( $tag, ' defer' ) || false !== stripos( $tag, ' async' ) || false === stripos( $tag, ' src=' ) ) {
-			return $tag;
+		return false;
+	}
+
+	/**
+	 * Recursively check whether $child_handle depends on $target_dep in WP_Scripts.
+	 *
+	 * @since 3.0.0
+	 * @param string               $child_handle Child script handle.
+	 * @param string               $target_dep   Target dependency handle.
+	 * @param WP_Scripts           $wp_scripts   WP_Scripts instance.
+	 * @param array<string, true>  $visited      Visited handles guard against circular deps.
+	 * @return bool
+	 */
+	private function script_depends_on( $child_handle, $target_dep, $wp_scripts, $visited = array() ) {
+		if ( isset( $visited[ $child_handle ] ) || ! isset( $wp_scripts->registered[ $child_handle ] ) ) {
+			return false;
+		}
+		$visited[ $child_handle ] = true;
+
+		$deps = (array) $wp_scripts->registered[ $child_handle ]->deps;
+		if ( in_array( $target_dep, $deps, true ) ) {
+			return true;
 		}
 
-		return str_replace( ' src=', ' defer src=', $tag );
+		foreach ( $deps as $dep ) {
+			if ( $this->script_depends_on( $dep, $target_dep, $wp_scripts, $visited ) ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	/**
@@ -1306,11 +1402,21 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 	 * @return bool
 	 */
 	private function is_transactional_page() {
-		return (
+		if (
 			( function_exists( 'is_cart' ) && is_cart() ) ||
 			( function_exists( 'is_checkout' ) && is_checkout() ) ||
 			( function_exists( 'is_account_page' ) && is_account_page() )
-		);
+		) {
+			return true;
+		}
+
+		if ( function_exists( 'has_block' ) && is_singular() ) {
+			if ( has_block( 'woocommerce/cart' ) || has_block( 'woocommerce/checkout' ) ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	/**
