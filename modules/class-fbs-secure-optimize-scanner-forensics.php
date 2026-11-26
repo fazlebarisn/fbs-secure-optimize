@@ -88,7 +88,7 @@ class FBS_Secure_Optimize_Scanner_Forensics {
 			),
 			'Arbitrary File Write / Remote Code Fetch'   => array(
 				'severity' => 'HIGH',
-				'regex'    => '/\b(?:file_put_contents|move_uploaded_file)\s*\(|(?:wp_remote_get|curl_exec|file_get_contents)\s*\([^)]*https?:\/\/[^)]*\.(?:txt|php|bin|dat)/i',
+				'regex'    => '/\bmove_uploaded_file\s*\(|\bfile_put_contents\s*\([^;]{0,250}(?:\.php|\.phtml|\.phar|\.htaccess|\$_(?:GET|POST|REQUEST|COOKIE|FILES)|php:\/\/input|' . $b64_kw . ')|(?:wp_remote_get|curl_exec|file_get_contents)\s*\([^)]*https?:\/\/[^)]*\.(?:txt|php|bin|dat)/i',
 			),
 		);
 
