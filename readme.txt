@@ -4,7 +4,7 @@ Tags: performance, security, malware-scanner, security-headers, database-cleanup
 Requires at least: 5.8
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 3.0.0
+Stable tag: 3.0.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -151,6 +151,10 @@ Uninstalling the plugin through the **Plugins** screen cleanly removes its saved
 
 == Changelog ==
 
+= 3.0.1 =
+* Fix: Resolved a JavaScript dependency order inversion on WooCommerce Block Cart (`woocommerce/cart`), Block Checkout (`woocommerce/checkout`), and Mini-Cart pages when **Defer Non-Critical JavaScript** is enabled by adding recursive `WP_Scripts` dependency graph protection (`is_script_handle_safe_to_defer()`), protecting `@wordpress/*` (`wp-*`) and WooCommerce (`wc-*`) runtime packages, and enforcing automatic transactional page bypass.
+* Fix: Refined the `Arbitrary File Write / Remote Code Fetch` heuristic in the Deep Malware & Theme Template Scanner so legitimate custom child-theme CSS/JSON caching functions using `file_put_contents()` no longer trigger false positives while real `.php`/`.phtml`/`.phar`/`.htaccess` and superglobal file-dropper payloads remain 100% detected.
+
 = 3.0.0 =
 * Major Release: Deep Database Forensics, 1-Click Direct-DB Malware Remediation & Next-Gen Mobile Core Web Vitals Engine.
 * New: Deep Database Code & Snippet Injection Scanner — directly inspects `wp_snippets` & `ms_snippets` (*Code Snippets* plugin, bypassing self-hiding `admin_footer` CSS/JS rootkits), *Header Footer Code Manager* (`hfcm_scripts`), *XYZ PHP Code*, Elementor Custom Code (`elementor_snippet`), *WPCode*, *Woody Snippets*, injected `post`/`page` content, header/footer `wp_options`, and scheduled `WP-Cron` persistence hooks, plus displays a full **Active Database Code Snippets Inventory** for 100% visibility.
@@ -206,6 +210,9 @@ Uninstalling the plugin through the **Plugins** screen cleanly removes its saved
 * Initial release on WordPress.org.
 
 == Upgrade Notice ==
+
+= 3.0.1 =
+Fixes a JavaScript dependency inversion on WooCommerce Block Cart & Checkout pages when Defer Non-Critical JavaScript is enabled (adds recursive WP_Scripts dependency protection and wp-*/wc-* package guards) and refines child-theme CSS cache file-write scanner heuristics.
 
 = 3.0.0 =
 Major v3.0 release! Adds Deep DB Code Snippets/CPT/WP-Cron rootkit scanner, 6-Hook Reflection, App Passwords audit, Googlebot cloaking checks, Official WP.org checksums, Free 1-Click DB Remediation, and Next-Gen Mobile LCP & font-display:swap optimization.
