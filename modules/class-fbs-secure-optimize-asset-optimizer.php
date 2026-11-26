@@ -730,7 +730,7 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 	 * Preserves `font-display: block` on icon fonts (Font Awesome, eicons, Dashicons, etc.)
 	 * so icon glyphs never flash unstyled fallback characters.
 	 *
-	 * @since 2.3.1
+	 * @since 3.0.0
 	 * @param string $html Full HTML document.
 	 * @return string
 	 */
@@ -1952,7 +1952,7 @@ class FBS_Secure_Optimize_Asset_Optimizer {
 	/**
 	 * Scan a CSS string for the first above-the-fold hero background-image rule matching top_body.
 	 *
-	 * @since 2.3.1
+	 * @since 3.0.0
 	 * @param string $css_body         Raw CSS content.
 	 * @param string $style_attrs      Lowercased <style> tag attributes (empty for external files).
 	 * @param string $top_body         First 32 KB of <body>.

@@ -14,7 +14,7 @@ defined( 'ABSPATH' ) || exit;
  * front-end cloaked SEO spam detection, official WordPress.org plugin/theme
  * checksum verification, and safe 1-click direct-DB remediation handlers.
  *
- * @since 2.3.0
+ * @since 3.0.0
  */
 class FBS_Secure_Optimize_Scanner_Forensics {
 
@@ -50,7 +50,7 @@ class FBS_Secure_Optimize_Scanner_Forensics {
 	 * Return high-risk database/snippet/template signatures for rootkits, rogue-user creation,
 	 * UI concealment, hidden SEO spam, and backdoor execution.
 	 *
-	 * @since 2.3.0
+	 * @since 3.0.0
 	 * @return array<string, array{severity: string, regex: string}>
 	 */
 	public static function get_database_code_signatures() {
@@ -95,7 +95,7 @@ class FBS_Secure_Optimize_Scanner_Forensics {
 		/**
 		 * Filters database code & snippet malware signatures.
 		 *
-		 * @since 2.3.0
+		 * @since 3.0.0
 		 * @param array<string, array{severity: string, regex: string}> $rules Signature map.
 		 */
 		return apply_filters( 'fbsseop_db_code_signatures', $rules );
@@ -104,7 +104,7 @@ class FBS_Secure_Optimize_Scanner_Forensics {
 	/**
 	 * Match a code/HTML string against all database code signatures.
 	 *
-	 * @since 2.3.0
+	 * @since 3.0.0
 	 * @param string $code Raw snippet, option, or post content.
 	 * @return array{matched: array<int, string>, severity: string}
 	 */
@@ -140,7 +140,7 @@ class FBS_Secure_Optimize_Scanner_Forensics {
 	 * malicious event handlers, or off-screen hidden SEO spam links) after stripping educational
 	 * <pre>/<code> code blocks so developer/security blog posts do not trigger false positives.
 	 *
-	 * @since 2.3.0
+	 * @since 3.0.0
 	 * @param string $html Raw post_content HTML.
 	 * @return array{matched: array<int, string>, severity: string}
 	 */
@@ -212,7 +212,7 @@ class FBS_Secure_Optimize_Scanner_Forensics {
 	/**
 	 * Check whether a specific database table exists in MySQL.
 	 *
-	 * @since 2.3.0
+	 * @since 3.0.0
 	 * @param string $table_name Exact table name.
 	 * @return bool
 	 */
@@ -228,7 +228,7 @@ class FBS_Secure_Optimize_Scanner_Forensics {
 	 * Elementor/WPCode/Woody CPTs + postmeta, post/page spam injections, header/footer options,
 	 * and WP-Cron persistence hooks.
 	 *
-	 * @since 2.3.0
+	 * @since 3.0.0
 	 * @return array{threats: array<int, array<string, mixed>>, active_snippets: array<int, array<string, mixed>>}
 	 */
 	public static function scan_deep_database() {
@@ -620,7 +620,7 @@ class FBS_Secure_Optimize_Scanner_Forensics {
 	 * Does NOT flag normal unattached plugin hooks (many legitimate plugins like WP Rocket and Rank Math
 	 * only register cron listeners inside wp_doing_cron()).
 	 *
-	 * @since 2.3.0
+	 * @since 3.0.0
 	 * @return array<int, array<string, mixed>>
 	 */
 	public static function audit_wp_cron() {
@@ -781,7 +781,7 @@ class FBS_Secure_Optimize_Scanner_Forensics {
 	 * Audit all 6 user-concealment & tamper-blocking hooks via Reflection plus Administrator
 	 * Application Passwords in wp_usermeta.
 	 *
-	 * @since 2.3.0
+	 * @since 3.0.0
 	 * @return array{suspicious_hooks: array<int, array<string, mixed>>, app_passwords: array<int, array<string, mixed>>}
 	 */
 	public static function audit_user_hooks_and_app_passwords() {
@@ -931,7 +931,7 @@ class FBS_Secure_Optimize_Scanner_Forensics {
 	/**
 	 * Extract the PHP source lines of a reflected function, method, or closure on disk.
 	 *
-	 * @since 2.3.0
+	 * @since 3.0.0
 	 * @param mixed $callable Hooked PHP callable.
 	 * @return string
 	 */
@@ -974,7 +974,7 @@ class FBS_Secure_Optimize_Scanner_Forensics {
 	/**
 	 * Determine whether a non-WP.org callback's PHP body exhibits user-concealment or tamper-blocking behavior.
 	 *
-	 * @since 2.3.0
+	 * @since 3.0.0
 	 * @param string $hook_name WordPress hook name.
 	 * @param string $source    Extracted PHP source lines of the callback.
 	 * @return bool
@@ -1005,7 +1005,7 @@ class FBS_Secure_Optimize_Scanner_Forensics {
 	 * Perform dual HTTP loopback inspection on home_url('/') (Standard Visitor vs Googlebot + Google Referer)
 	 * to uncover front-end hidden/off-screen SEO spam links and conditional search-engine cloaking.
 	 *
-	 * @since 2.3.0
+	 * @since 3.0.0
 	 * @return array<int, array<string, mixed>>
 	 */
 	public static function scan_frontend_cloaking_and_spam() {
@@ -1135,7 +1135,7 @@ class FBS_Secure_Optimize_Scanner_Forensics {
 	/**
 	 * Extract unique external hostnames from <a href> and <script src> tags in an HTML document.
 	 *
-	 * @since 2.3.0
+	 * @since 3.0.0
 	 * @param string $html      Raw HTML string.
 	 * @param string $site_host Current site hostname.
 	 * @return array<int, string>
@@ -1160,7 +1160,7 @@ class FBS_Secure_Optimize_Scanner_Forensics {
 	 * Eliminates false positives on bundled vendor test files (e.g. Elementor's Twig IntegrationTestCase.php)
 	 * while still catching any modified/tampered plugin file.
 	 *
-	 * @since 2.3.0
+	 * @since 3.0.0
 	 * @param string $full_path Local absolute path to the flagged PHP file.
 	 * @return bool True if verified 100% identical to the official WordPress.org release.
 	 */
@@ -1224,7 +1224,7 @@ class FBS_Secure_Optimize_Scanner_Forensics {
 	/**
 	 * Look up the installed version of a plugin folder slug.
 	 *
-	 * @since 2.3.0
+	 * @since 3.0.0
 	 * @param string $slug Plugin folder name.
 	 * @return string Version string or empty string.
 	 */
@@ -1253,7 +1253,7 @@ class FBS_Secure_Optimize_Scanner_Forensics {
 	/**
 	 * Fetch and cache official WordPress.org plugin checksums JSON for a given slug and version.
 	 *
-	 * @since 2.3.0
+	 * @since 3.0.0
 	 * @param string $slug    Plugin directory slug.
 	 * @param string $version Plugin version.
 	 * @return array<string, mixed>|false
@@ -1302,7 +1302,7 @@ class FBS_Secure_Optimize_Scanner_Forensics {
 	 *   themes.svn.wordpress.org release files.
 	 * - If it is a child or custom theme, scan critical templates against our expanded database/rootkit/spam signatures.
 	 *
-	 * @since 2.3.0
+	 * @since 3.0.0
 	 * @return array<int, array<string, mixed>>
 	 */
 	public static function audit_active_and_parent_themes() {
@@ -1385,7 +1385,7 @@ class FBS_Secure_Optimize_Scanner_Forensics {
 	/**
 	 * Check whether a theme slug & version exists on official WordPress.org SVN.
 	 *
-	 * @since 2.3.0
+	 * @since 3.0.0
 	 * @param string $theme_slug Theme folder slug.
 	 * @param string $version    Theme version.
 	 * @return bool
@@ -1426,7 +1426,7 @@ class FBS_Secure_Optimize_Scanner_Forensics {
 	/**
 	 * Fetch and cache an official theme template file from themes.svn.wordpress.org.
 	 *
-	 * @since 2.3.0
+	 * @since 3.0.0
 	 * @param string $theme_slug Theme slug.
 	 * @param string $version    Theme version.
 	 * @param string $rel_file   Relative filename (e.g. 'functions.php').
@@ -1463,7 +1463,7 @@ class FBS_Secure_Optimize_Scanner_Forensics {
 	/**
 	 * AJAX handler: View Full Code for a database snippet, CPT injection, or wp_options row.
 	 *
-	 * @since 2.3.0
+	 * @since 3.0.0
 	 * @return void
 	 */
 	public static function ajax_view_db_code() {
@@ -1557,7 +1557,7 @@ class FBS_Secure_Optimize_Scanner_Forensics {
 	 *
 	 * Executes direct $wpdb queries so self-hiding rootkit hooks in snippet plugins cannot block removal.
 	 *
-	 * @since 2.3.0
+	 * @since 3.0.0
 	 * @return void
 	 */
 	public static function ajax_remediate_snippet() {
@@ -1681,7 +1681,7 @@ class FBS_Secure_Optimize_Scanner_Forensics {
 	 * Bypasses load-user-edit.php and delete_user hooks where rootkit snippets call wp_die('Invalid user ID.'),
 	 * reassigns any authored posts to the current administrator, destroys sessions, and flushes object cache.
 	 *
-	 * @since 2.3.0
+	 * @since 3.0.0
 	 * @return void
 	 */
 	public static function ajax_force_delete_user() {
@@ -1739,7 +1739,7 @@ class FBS_Secure_Optimize_Scanner_Forensics {
 	/**
 	 * AJAX handler: 1-Click Revoke an Application Password for a user.
 	 *
-	 * @since 2.3.0
+	 * @since 3.0.0
 	 * @return void
 	 */
 	public static function ajax_revoke_app_password() {
@@ -1793,7 +1793,7 @@ class FBS_Secure_Optimize_Scanner_Forensics {
 	/**
 	 * AJAX handler: Post-Cleanup 1-Click Clear All Caches & Invalidate All Other User Sessions.
 	 *
-	 * @since 2.3.0
+	 * @since 3.0.0
 	 * @return void
 	 */
 	public static function ajax_post_cleanup_purge() {

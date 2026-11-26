@@ -101,18 +101,21 @@ class FBS_Secure_Optimize_Controller {
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_scripts' ) );
 		add_filter( 'plugin_action_links_' . FBS_SECURE_OPTIMIZE_PLUGIN_BASENAME, array( $this, 'add_plugin_action_links' ) );
 
-		// Universal Top Admin Bar 1-Click Cache Purge & Auto-Invalidation Hooks.
+		// Universal Top Admin Bar 1-Click Cache Purge & Auto-Invalidation Hooks (only when Asset Optimizer is active).
 		add_action( 'admin_bar_menu', array( $this, 'register_admin_bar_menu' ), 99 );
 		add_action( 'admin_post_fbsseop_purge_cache', array( $this, 'handle_admin_bar_purge_cache' ) );
 		add_action( 'admin_notices', array( $this, 'maybe_render_purge_admin_notice' ) );
-		add_action( 'switch_theme', array( __CLASS__, 'purge_all_caches_without_opcache' ) );
-		add_action( 'customize_save_after', array( __CLASS__, 'purge_all_caches_without_opcache' ) );
-		add_action( 'upgrader_process_complete', array( __CLASS__, 'purge_all_caches_without_opcache' ) );
-		add_action( 'save_post', array( __CLASS__, 'maybe_purge_page_cache_on_post_change' ) );
-		add_action( 'deleted_post', array( __CLASS__, 'purge_disk_page_cache' ) );
-		add_action( 'wp_update_nav_menu', array( __CLASS__, 'purge_disk_page_cache' ) );
-		add_action( 'comment_post', array( __CLASS__, 'purge_disk_page_cache' ) );
-		add_action( 'wp_set_comment_status', array( __CLASS__, 'purge_disk_page_cache' ) );
+
+		if ( self::is_module_enabled( 'asset_optimizer' ) ) {
+			add_action( 'switch_theme', array( __CLASS__, 'purge_all_caches_without_opcache' ) );
+			add_action( 'customize_save_after', array( __CLASS__, 'purge_all_caches_without_opcache' ) );
+			add_action( 'upgrader_process_complete', array( __CLASS__, 'purge_all_caches_without_opcache' ) );
+			add_action( 'save_post', array( __CLASS__, 'maybe_purge_page_cache_on_post_change' ) );
+			add_action( 'deleted_post', array( __CLASS__, 'purge_disk_page_cache' ) );
+			add_action( 'wp_update_nav_menu', array( __CLASS__, 'purge_disk_page_cache' ) );
+			add_action( 'comment_post', array( __CLASS__, 'purge_disk_page_cache' ) );
+			add_action( 'wp_set_comment_status', array( __CLASS__, 'purge_disk_page_cache' ) );
+		}
 	}
 
 	/**
@@ -138,6 +141,11 @@ class FBS_Secure_Optimize_Controller {
 	 */
 	public function register_admin_bar_menu( $wp_admin_bar ) {
 		if ( ! is_admin_bar_showing() || ! current_user_can( 'manage_options' ) || ! ( $wp_admin_bar instanceof WP_Admin_Bar ) ) {
+			return;
+		}
+
+		// Only display the Top Admin Bar "Purge Cache" node when Asset & Core Web Vitals Optimizer is enabled.
+		if ( ! self::is_module_enabled( 'asset_optimizer' ) ) {
 			return;
 		}
 

@@ -514,7 +514,7 @@ class FBS_Secure_Optimize_Admin {
 						);
 						?>
 					</span>
-					<button type="button" id="fbsseop-purge-cache-btn" class="fbsseop-btn fbsseop-btn--glass">
+					<button type="button" id="fbsseop-purge-cache-btn" class="fbsseop-btn fbsseop-btn--glass"<?php echo empty( $settings['modules']['asset_optimizer'] ) ? ' style="display:none;"' : ''; ?>>
 						<span class="dashicons dashicons-update"></span>
 						<span><?php esc_html_e( 'Purge Cache', 'fbs-secure-optimize' ); ?></span>
 					</button>

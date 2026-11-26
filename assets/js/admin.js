@@ -26,6 +26,7 @@
 	}
 
 	function syncModuleVisibility(modulesMap) {
+		var showAssetOpt = !!modulesMap.asset_optimizer;
 		var showPerf = !!(modulesMap.asset_optimizer || modulesMap.database_cleanup);
 		var showSec = !!(modulesMap.security_headers || modulesMap.login_security || modulesMap.wp_hardening);
 		var showScan = !!modulesMap.malware_scanner;
@@ -33,19 +34,35 @@
 		var $perfTab = $('.fbsseop-tab[data-tab="performance"]');
 		var $secTab = $('.fbsseop-tab[data-tab="security"]');
 		var $scanTab = $('.fbsseop-tab[data-tab="scanner"]');
+		var $heroPurgeBtn = $('#fbsseop-purge-cache-btn');
+		var $adminBarPurge = $('#wp-admin-bar-fbsseop-toolbar');
+		var $wpSubmenuPerf = $('#toplevel_page_fbs-secure-optimize .wp-submenu a[href*="performance"]').closest('li');
+		var $wpSubmenuSec = $('#toplevel_page_fbs-secure-optimize .wp-submenu a[href*="security"]').closest('li');
 		var $heroScanBtn = $('#fbsseop-hero-scan-btn');
 		var $wpSubmenuScan = $('#toplevel_page_fbs-secure-optimize .wp-submenu a[href*="scanner"]').closest('li');
 
+		if (showAssetOpt) {
+			$heroPurgeBtn.fadeIn(150);
+			$adminBarPurge.show();
+		} else {
+			$heroPurgeBtn.fadeOut(150);
+			$adminBarPurge.hide();
+		}
+
 		if (showPerf) {
 			$perfTab.fadeIn(150);
+			$wpSubmenuPerf.show();
 		} else {
 			$perfTab.fadeOut(150);
+			$wpSubmenuPerf.hide();
 		}
 
 		if (showSec) {
 			$secTab.fadeIn(150);
+			$wpSubmenuSec.show();
 		} else {
 			$secTab.fadeOut(150);
+			$wpSubmenuSec.hide();
 		}
 
 		if (showScan) {

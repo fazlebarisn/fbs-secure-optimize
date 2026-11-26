@@ -4,7 +4,7 @@ Tags: performance, security, malware-scanner, security-headers, database-cleanup
 Requires at least: 5.8
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 2.3.0
+Stable tag: 3.0.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -27,12 +27,12 @@ Boost Lighthouse Performance, Largest Contentful Paint (LCP), Cumulative Layout 
 * **Zero-CLS Full-Width Builder Rows & Inline SVG Stabilizer:** Pre-calculates exact viewport geometry before First Paint to eliminate large layout shifts (`0.70+` CLS) caused by JS-stretched full-bleed rows (SiteOrigin Page Builder, WPBakery) and un-sized inline `<svg viewBox="...">` icons.
 * **Zero-CLS Missing Image `width` & `height` Injection (Full-Page):** Automatically detects local raster and `.svg` `<img>` tags across headers, content, widgets, and footers missing explicit dimensions and injects cached `width` and `height` attributes.
 * **Hoist & De-Block Chained CSS `@import` Google Fonts:** Extracts render-blocking `@import` Google Fonts hidden inside theme `style.css` files into parallel non-blocking `preconnect` + async swap links and serves a cached de-blocked stylesheet.
-* **Non-Blocking Google Fonts & Icon Stylesheets:** Converts render-blocking Google Fonts, Font Awesome, Elementor Icons, Ionicons, Line Awesome, and Magnific Popup stylesheets to asynchronous `media="print"` swap with `<noscript>` fallback.
-* **Auto-Inline Small Local CSS (`<= 8 KB`) & Strip `0`-Byte CSS:** Inlines tiny render-blocking CSS files into `<head>` while rewriting relative `url(...)` paths and removing empty `0`-byte plugin stylesheets.
+* **Non-Blocking Google Fonts, Custom `@font-face` Swap & Icon Stylesheets:** Converts render-blocking Google Fonts, Font Awesome, Elementor Icons, Ionicons, Line Awesome, and Magnific Popup stylesheets to asynchronous `media="print"` swap with `<noscript>` fallback, and automatically upgrades text `@font-face` rules and Google Fonts URLs from `font-display: auto`/`block` (FOIT) to `font-display: swap`.
+* **Auto-Inline Small Local CSS (`<= 16 KB`) & Strip `0`-Byte CSS:** Inlines small render-blocking CSS files into `<head>` while rewriting relative `url(...)` paths and removing empty `0`-byte plugin stylesheets.
 * **Smart Post-Render Unused Plugin CSS/JS & reCAPTCHA Unloader:** Inspects the complete rendered HTML document (including headers, popups, widgets, and footers) and safely strips unused Contact Form 7, orphaned Google reCAPTCHA v3, Smash Balloon Instagram Feed, Slick/Carousel, WPForms, TablePress, and unused block inline CSS on pages where those elements do not exist.
 * **Delay External & Inline Third-Party Trackers & reCAPTCHA v3 (TBT/INP):** Delays external and inline bootstrap trackers (GTM, GA4, Microsoft Clarity, Meta Pixel, Hotjar, LinkedIn, TikTok, and invisible reCAPTCHA v3) until first user interaction or post-load idle—automatically bypassed on WooCommerce cart, checkout, and account pages.
-* **Ultra-Light Guest HTML Disk Page Cache:** Optional 1-click static disk HTML page cache (`X-FBS-Cache: HIT`) for logged-out visitors with marketing UTM/GCLID cache-hit support, automatic post/comment/menu invalidation, and automatic bypass when LiteSpeed Cache or WP Rocket is active.
-* **Top Admin Bar & Dashboard 1-Click "Purge Cache":** Instantly clears FBS inlined/de-blocked CSS, CLS dimension caches, guest disk page cache, WordPress Object Cache (Redis/Memcached), PHP OPcache, and triggers compatible cache flushes across LiteSpeed Cache, WP Rocket, W3 Total Cache, WP Fastest Cache, WP Super Cache, Autoptimize, SiteGround, Breeze, and WP Engine.
+* **Ultra-Light Guest HTML Disk Page Cache:** Optional 1-click static disk HTML page cache (`X-FBS-Cache: HIT`) for logged-out visitors with marketing UTM/GCLID cache-hit support, automatic post/comment/menu invalidation, and automatic bypass when LiteSpeed Cache, WP Rocket, W3 Total Cache, SiteGround, WP Fastest Cache, or 20i StackCache is active.
+* **Top Admin Bar & Dashboard 1-Click "Purge Cache":** Instantly clears FBS inlined/de-blocked CSS, CLS dimension caches, guest disk page cache, WordPress Object Cache (Redis/Memcached), and triggers compatible cache flushes across LiteSpeed Cache, WP Rocket, W3 Total Cache, WP Fastest Cache, WP Super Cache, Autoptimize, SiteGround, Breeze, and WP Engine without triggering shared-host OPcache worker locks.
 * **Iframe & Video Lazy Loading:** Defers embedded maps and video players until visitors scroll near them.
 * **Safe Non-Critical JS Deferring:** Adds `defer` to frontend scripts while automatically protecting `jQuery`, WooCommerce checkout flows, and scripts with synchronous inline dependencies.
 * **Core Bloat Removal & Heartbeat Control:** Strip inline emoji scripts/styles, disable frontend Dashicons for guests, dequeue unused oEmbed scripts, clean `<head>` discovery tags, and throttle Heartbeat API to 60 seconds.
@@ -151,12 +151,14 @@ Uninstalling the plugin through the **Plugins** screen cleanly removes its saved
 
 == Changelog ==
 
-= 2.3.0 =
+= 3.0.0 =
+* Major Release: Deep Database Forensics, 1-Click Direct-DB Malware Remediation & Next-Gen Mobile Core Web Vitals Engine.
 * New: Deep Database Code & Snippet Injection Scanner — directly inspects `wp_snippets` & `ms_snippets` (*Code Snippets* plugin, bypassing self-hiding `admin_footer` CSS/JS rootkits), *Header Footer Code Manager* (`hfcm_scripts`), *XYZ PHP Code*, Elementor Custom Code (`elementor_snippet`), *WPCode*, *Woody Snippets*, injected `post`/`page` content, header/footer `wp_options`, and scheduled `WP-Cron` persistence hooks, plus displays a full **Active Database Code Snippets Inventory** for 100% visibility.
 * New: 6-Hook User-Concealment Reflection & Application Passwords Audit — reflects callbacks across `pre_user_query`, `views_users`, `users_list_table_query_args`, `load-user-edit.php`, `load-users.php`, and `delete_user` (flagging `eval()'d code` / database hooks as `CRITICAL`), detects rogue admins with empty/invalid emails or default backdoor usernames, and audits active REST API `_application_passwords` with 1-click revocation.
 * New: Front-End Live DOM & Googlebot Cloaked SEO Spam Scanner — performs dual HTTP loopback requests (Visitor vs. Googlebot User-Agent + Google Referer) to detect off-screen hidden spam links (`left: -9999px`, `font-size: 0`) and conditional search-engine cloaking.
 * New: Official WordPress.org Plugin & Theme Checksum Verification — verifies heuristic matches inside `wp-content/plugins/` against official `downloads.wordpress.org/plugin-checksums/` MD5/SHA-256 hashes (eliminating vendor false positives such as Elementor's Twig `IntegrationTestCase.php`) and audits active/parent theme critical templates (`functions.php`, `header.php`, `footer.php`).
 * New: Safe 1-Click Direct-DB Remediation in Free Edition — view full database code payloads, deactivate or delete malicious snippets directly via `$wpdb`, force-delete tamper-protected rogue admin users directly in MySQL (reassigning authored posts and destroying sessions), revoke Application Passwords, and purge all caches while invalidating all other user sessions in 1 click.
+* Improved: Mobile Core Web Vitals & LCP Optimizer — added external page-builder/theme stylesheet (`post-*.css`) hero `background-image` auto-preloading with `:not(...)` pseudo-class selector resolution and transient caching, upgraded inline custom `@font-face` rules and `display=auto`/`block` Google Fonts URLs to `font-display: swap` to prevent Slow-4G FOIT text LCP delays, unlocked smart `jQuery` deferring when WordPress Core outputs `jQuery.uiBackCompat`, raised the small-CSS auto-inline threshold to `16 KB`, added 20i `StackCache` auto-bypass, and removed `opcache_reset()` from cache purges to prevent `429 Too Many Requests` worker locks on 20i/StackCP and shared hosts.
 
 = 2.2.1 =
 * Fix: Prevented a one-time blank screen on `wp-admin/admin-post.php` when saving settings immediately after a plugin update on LiteSpeed LSAPI / PHP-FPM servers by skipping unnecessary `opcache_reset()` calls during settings saves and deferring manual-purge OPcache resets until after HTTP response/redirect completion (`register_shutdown_function`).
@@ -205,8 +207,8 @@ Uninstalling the plugin through the **Plugins** screen cleanly removes its saved
 
 == Upgrade Notice ==
 
-= 2.3.0 =
-Major Malware Scanner upgrade! Adds Deep DB Code Snippets/CPT/WP-Cron rootkit detection, 6-Hook Reflection, App Passwords audit, Googlebot cloaked spam checks, Official WP.org checksum verification, and Free 1-Click DB Cleanup.
+= 3.0.0 =
+Major v3.0 release! Adds Deep DB Code Snippets/CPT/WP-Cron rootkit scanner, 6-Hook Reflection, App Passwords audit, Googlebot cloaking checks, Official WP.org checksums, Free 1-Click DB Remediation, and Next-Gen Mobile LCP & font-display:swap optimization.
 
 = 2.2.1 =
 Fixes a one-time blank screen on admin-post.php when saving settings right after updating on LiteSpeed / PHP-FPM servers by deferring OPcache resets to post-response shutdown.
